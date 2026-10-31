@@ -13,15 +13,20 @@
       <h1>AI Team</h1>
     </div>
     <div class="header-tools">
-      <div class="model-chip"><span class="status-dot"></span><span id="model-name">Connecting to Ollama…</span></div>
+      <div class="model-chip"><span class="status-dot" id="model-dot"></span><span id="model-name">Connecting to Ollama…</span></div>
       <div class="cpu-meter" title="Overall CPU utilization across the VM, not just Ollama">
         <span class="cpu-label">VM CPU</span>
         <div class="cpu-track" role="progressbar" aria-label="VM CPU utilization" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="cpu-bar"></span></div>
         <strong id="cpu-value">—</strong>
         <span id="llm-state" class="llm-state">Idle</span>
       </div>
+      <button class="secondary header-statistics-button" id="open-projects" type="button">Projects &amp; modules</button>
+      <button class="secondary header-statistics-button" id="open-settings" type="button">Connections &amp; routing</button>
       <button class="secondary header-statistics-button" id="open-statistics" type="button">Statistics</button>
-      <section class="notifications header-notifications" id="notifications" aria-live="polite"><div class="progress-heading"><strong>Notifications</strong><span id="notification-count">Checking…</span></div><div id="notification-list"></div></section>
+      <button type="button" class="header-notifications-trigger" id="open-notifications" aria-label="Open issues modal">
+        <span class="notification-counter" id="notification-count">0 issues</span>
+        <span class="notification-latest-title" id="notification-latest-title">Checking…</span>
+      </button>
     </div>
   </header>
 
@@ -29,7 +34,12 @@
     <section class="tasks-panel panel">
       <div class="section-heading">
         <div><p class="eyebrow">PROJECT BOARD</p><h2>Tasks</h2></div>
-        <div class="board-actions"><label class="active-project-label">Project<select id="active-project"></select></label><button class="secondary" id="open-documentation" type="button">Documentation</button><button class="secondary" id="open-files" type="button">Files</button><button class="secondary" id="open-projects" type="button">Projects & modules</button><button class="secondary" id="open-settings" type="button">Connections & routing</button><button class="primary" id="new-task">＋ New task</button></div>
+        <div class="board-actions">
+          <label class="active-project-label">Project<select id="active-project"></select></label>
+          <button class="secondary" id="open-documentation" type="button">Documentation</button>
+          <button class="secondary" id="open-files" type="button">Files</button>
+          <button class="primary" id="new-task" type="button">＋ New task</button>
+        </div>
       </div>
       <div class="summary" id="task-summary"></div>
       <div class="project-progress" id="project-progress" hidden><div class="progress-heading"><strong>Planned work</strong><span id="progress-label"></span></div><progress id="progress-bar" max="100" value="0" aria-label="Planned task completion"></progress><div class="progress-note">Counts PM-planned work tasks marked Done; it does not yet measure code integration.</div></div>
@@ -41,7 +51,7 @@
         <div class="empty-icon">☷</div>
         <h3>No tasks yet</h3>
         <p>Create a task to start keeping the project plan in one place.</p>
-        <button class="secondary" id="empty-new-task">Create the first task</button>
+        <button class="secondary" id="empty-new-task" type="button">Create the first task</button>
       </div>
     </section>
 
@@ -69,6 +79,22 @@
     </div>
   </dialog>
 
+  <dialog id="notifications-dialog" class="notifications-dialog">
+    <div class="notifications-modal-content">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">WORKSPACE ALERTS</p>
+          <h2>Issues &amp; notifications <span class="muted" id="notification-modal-count">(0 issues)</span></h2>
+        </div>
+        <button class="icon-button" type="button" id="close-notifications" aria-label="Close">×</button>
+      </div>
+      <div class="notifications-modal-list" id="notification-list" aria-live="polite"></div>
+      <div class="dialog-actions">
+        <button class="secondary" type="button" id="close-notifications-footer">Close</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="task-dialog">
     <form id="task-form" class="task-form">
       <div class="dialog-heading"><div><p class="eyebrow">ADD TO THE BOARD</p><h2 id="task-dialog-title">New task</h2></div><button class="icon-button" type="button" id="close-dialog" aria-label="Close">×</button></div>
@@ -83,61 +109,145 @@
       <label class="deliverable-choice"><input type="checkbox" name="produces_deliverable"> This task produces a deliverable that must pass validation</label>
       <div class="draft-note">New tasks start as <strong>Draft</strong>. A deliverable task needs at least one acceptance check before it can be marked Ready.</div>
       <div class="form-error" id="form-error" role="alert"></div>
-      <div class="dialog-actions"><button class="secondary" type="button" id="cancel-task">Cancel</button><button class="primary" type="submit">Save draft</button></div>
+      <div class="dialog-actions"><button class="secondary" type="button" id="cancel-task">Cancel</button><button class="primary" type="submit" id="save-task-submit">Save draft</button></div>
     </form>
   </dialog>
+
   <dialog id="prompt-dialog">
     <form id="prompt-form" class="task-form">
       <div class="dialog-heading"><div><p class="eyebrow">SAVED ON YOUR VM</p><h2>Agent prompts</h2></div><button class="icon-button" type="button" id="close-prompts" aria-label="Close">×</button></div>
-      <label>Prompt<select name="prompt_id"></select></label>
+      <label>
+        <span class="progress-heading">
+          <span>Prompt</span>
+          <span id="prompt-status-badge" class="state state-done">Default prompt active</span>
+        </span>
+        <select name="prompt_id"></select>
+      </label>
       <label>Instructions<textarea name="content" rows="18" maxlength="20000" required></textarea></label>
-      <p class="draft-note">Only the shared rules and the selected role prompt are included with each agent request. Changes are saved locally and kept through app updates.</p>
+      <p class="draft-note">Only the shared rules and the selected role prompt are included with each agent request. Saved custom prompts are used automatically and kept through app updates; clicking Reset to default restores the built-in prompt for the selected agent.</p>
+      <div class="prompt-feedback" id="prompt-feedback" hidden role="status"></div>
       <div class="form-error" id="prompt-error" role="alert"></div>
-      <div class="dialog-actions"><button class="secondary" type="button" id="cancel-prompts">Close</button><button class="primary" type="submit">Save prompt</button></div>
+      <div class="dialog-actions">
+        <button class="secondary prompt-reset-button" type="button" id="reset-prompt">Reset to default</button>
+        <button class="secondary" type="button" id="cancel-prompts">Close</button>
+        <button class="primary" type="submit">Save prompt</button>
+      </div>
     </form>
   </dialog>
+
   <dialog id="context-dialog">
     <form id="context-form" class="task-form">
       <div class="dialog-heading"><div><p class="eyebrow">SAVED ON YOUR VM</p><h2>Project context</h2></div><button class="icon-button" type="button" id="close-context" aria-label="Close">×</button></div>
       <label>Document<select name="document_id"></select></label>
       <label>Project information<textarea name="content" rows="18" maxlength="20000" required></textarea></label>
-      <div class="history-controls"><label>Previous version<select id="context-history"><option value="">No saved versions</option></select></label><button class="secondary" id="restore-context" type="button" disabled>Restore selected version</button><button class="history-delete" id="delete-context-version" type="button" disabled>Delete version</button></div>
+      <div class="history-controls">
+        <label>Previous version<select id="context-version"><option value="">No saved versions</option></select></label>
+        <button class="secondary" type="button" id="restore-context-version" disabled>Restore selected version</button>
+        <button class="history-delete" type="button" id="delete-context-version" disabled>Delete version</button>
+      </div>
       <p class="draft-note">These notes give agents durable project knowledge. Current task status comes from the board. Record confirmed facts here; keep agent behavior instructions in Agent prompts.</p>
       <div class="form-error" id="context-error" role="alert"></div>
       <div class="dialog-actions"><button class="secondary" type="button" id="cancel-context">Close</button><button class="primary" type="submit">Save document</button></div>
     </form>
   </dialog>
-  <dialog id="task-detail-dialog"><div class="detail-dialog" id="task-detail"></div></dialog>
+
+  <dialog id="task-detail-dialog">
+    <div class="detail-dialog">
+      <div class="dialog-heading">
+        <div><p class="eyebrow" id="detail-eyebrow"></p><h2 id="detail-title"></h2></div>
+        <button class="icon-button" type="button" id="close-detail" aria-label="Close">×</button>
+      </div>
+      <div class="detail-status"><span id="detail-status" class="state"></span><span id="detail-deliverable" class="deliverable-tag" hidden>Deliverable · validation required</span></div>
+      <p class="queue-note" id="detail-waiting-note" hidden></p>
+      <div class="detail-provider-row" id="detail-provider-row" hidden>
+        <label for="detail-provider-select">AI provider</label>
+        <select id="detail-provider-select">
+          <option value="Automatic">Automatic</option>
+          <option value="Gemini">Gemini</option>
+          <option value="Antigravity">Antigravity</option>
+          <option value="GroqCloud">GroqCloud</option>
+          <option value="OpenRouter">OpenRouter</option>
+        </select>
+        <span id="detail-provider-feedback" class="detail-provider-feedback"></span>
+      </div>
+      <h3>Request</h3>
+      <p class="detail-copy" id="detail-request"></p>
+      <div id="detail-pm-section" hidden>
+        <h3>PM/PO summary</h3>
+        <p class="detail-copy" id="detail-pm-summary"></p>
+      </div>
+      <div id="detail-question-section" hidden>
+        <h3>Why PM/PO is asking</h3>
+        <p class="question-why" id="detail-question-why"></p>
+        <h3>Your answer</h3>
+        <div id="detail-question-body"></div>
+      </div>
+      <div id="detail-overview-section" hidden>
+        <h3>Proposed Project context</h3>
+        <p class="draft-note">Edit any document before approval. Approval replaces these three context documents; confirmed outcomes are kept. Previous versions are saved for rollback.</p>
+        <div id="detail-overview-fields"></div>
+      </div>
+      <h3>Acceptance checks</h3>
+      <div id="detail-checks"></div>
+      <h3>Validation</h3>
+      <div id="detail-validation"></div>
+      <div id="detail-pr-section" hidden>
+        <h3>GitHub pull request</h3>
+        <p class="detail-copy" id="detail-pr-copy"></p>
+      </div>
+      <p class="queue-note blocked-note" id="detail-github-error" hidden></p>
+      <h3>Agent replies</h3>
+      <div class="agent-replies" id="detail-replies"></div>
+      <h3>Activity</h3>
+      <div class="activity-list" id="detail-activity"></div>
+      <div class="detail-actions" id="detail-actions"></div>
+    </div>
+  </dialog>
+
   <dialog id="repository-view-dialog" class="repository-view-dialog">
     <section class="repository-view">
-      <div class="dialog-heading"><div><p class="eyebrow" id="repository-view-eyebrow">GITHUB DEFAULT BRANCH</p><h2 id="repository-view-title">Project files</h2></div><button class="icon-button" type="button" id="close-repository-view" aria-label="Close">×</button></div>
-      <div class="repository-view-meta" id="repository-view-meta"></div>
-      <div class="repository-view-body"><nav id="repository-file-list" aria-label="Repository files"></nav><pre id="repository-file-content"><span class="muted">Choose a file to view it.</span></pre></div>
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow" id="repository-view-eyebrow">GITHUB DEFAULT BRANCH</p>
+          <h2 id="repository-view-title">Project files</h2>
+        </div>
+        <button class="icon-button" type="button" id="close-repository-view" aria-label="Close">×</button>
+      </div>
+      <p class="repository-view-meta" id="repository-view-meta"></p>
+      <div class="repository-view-body">
+        <nav id="repository-file-list" aria-label="Repository files"></nav>
+        <pre id="repository-file-content"><span class="muted">Choose a file to view it.</span></pre>
+      </div>
       <div class="form-error" id="repository-view-error" role="alert"></div>
     </section>
   </dialog>
+
   <dialog id="settings-dialog">
     <form id="settings-form" class="task-form">
-      <div class="dialog-heading"><div><p class="eyebrow">SAVED ON YOUR VM</p><h2>Connections & routing</h2></div><button class="icon-button" type="button" id="close-settings" aria-label="Close">×</button></div>
-      <p class="draft-note">Keys are encrypted on the VM. Saved values are never sent back to this page. Use fine-grained GitHub tokens, not your GitHub password.</p>
-      <div id="connection-fields"></div>
-      <div class="dialog-actions"><button class="secondary" type="button" id="test-github">Test GitHub connection</button><button class="secondary" type="button" id="remove-github">Remove GitHub token</button></div>
-      <label>Default provider order for each role <span class="muted">Move provider names in each row; unavailable connections are skipped.</span></label>
-      <div id="routing-fields"></div>
+      <div class="dialog-heading"><div><p class="eyebrow">ENCRYPTED ON YOUR VM</p><h2>Connections &amp; routing</h2></div><button class="icon-button" type="button" id="close-settings" aria-label="Close">×</button></div>
+      <p class="draft-note" id="settings-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. Configure default provider rank order per role below; unavailable connections are skipped automatically.</p>
+      <div id="connection-list"></div>
+      <div class="dialog-actions"><button class="secondary" type="button" id="test-github">Test GitHub connection</button></div>
+      <label>Default provider order for each role <span class="muted">Select provider rank order in each row; swapping ranks keeps every provider listed once.</span></label>
+      <div id="routing-roles"></div>
+      <div class="prompt-feedback" id="settings-success" hidden role="status"></div>
       <div class="form-error" id="settings-error" role="alert"></div>
-      <div class="dialog-actions"><button class="secondary" type="button" id="cancel-settings">Close</button><button class="primary" type="submit">Save connections and routing</button></div>
+      <div class="dialog-actions"><button class="secondary" type="button" id="cancel-settings">Close</button><button class="primary" type="submit">Save routing</button></div>
     </form>
   </dialog>
+
   <dialog id="projects-dialog">
     <form id="projects-form" class="task-form">
-      <div class="dialog-heading"><div><p class="eyebrow">PROJECTS ON YOUR VM</p><h2>Projects & sub-projects</h2></div><button class="icon-button" type="button" id="close-projects" aria-label="Close">×</button></div>
+      <div class="dialog-heading"><div><p class="eyebrow">PROJECTS ON YOUR VM</p><h2>Projects &amp; sub-projects</h2></div><button class="icon-button" type="button" id="close-projects" aria-label="Close">×</button></div>
       <p class="draft-note">Each project points to one GitHub repository. Add sub-projects to scope tasks to a repository folder and store focused background notes. GitHub credentials are shared.</p>
-      <div id="projects-fields"></div>
+      <div id="project-editors"></div>
+      <datalist id="github-repo-options"></datalist>
       <button class="secondary" type="button" id="add-project">＋ Add project</button>
       <div class="form-error" id="projects-error" role="alert"></div>
       <div class="dialog-actions"><button class="secondary" type="button" id="cancel-projects">Close</button><button class="primary" type="submit">Save projects</button></div>
     </form>
   </dialog>
+
   <script src="/app.js" defer></script>
 </body>
 </html>
