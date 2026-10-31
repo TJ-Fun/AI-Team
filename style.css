@@ -53,7 +53,8 @@
 @media(max-width:720px){.header-notifications{width:min(100%,420px);max-height:120px}}
 .board-actions>button,#open-documentation,#open-files,#new-task{height:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center}
 .active-project-label{align-items:center}
-.active-project-label select{height:36px;box-sizing:border-box}
+.active-project-label[hidden]{display:none!important}
+.active-project-label select{height:36px;max-width:145px;box-sizing:border-box}
 .task-card-actions .card-ready,.task-card-actions .card-delete{height:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
 @media(max-width:720px){.provider-quality{overflow-x:auto}#provider-quality-rows{min-width:560px}.statistics-content .quality-head,.statistics-content .quality-row{grid-template-columns:minmax(105px,1.25fr) .8fr .9fr .6fr .75fr;gap:6px;font-size:10px}}
 .repository-view-dialog{width:min(1100px,calc(100vw - 32px));max-width:1100px}
