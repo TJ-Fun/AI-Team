@@ -1,845 +1,2083 @@
-const $ = (selector) => document.querySelector(selector);
-const taskList = $("#task-list");
-const emptyState = $("#empty-state");
-const messages = $("#messages");
-let tasksById = new Map();
-let taskSignature = "";
-let selectedTaskId = null;
-let taskPollInFlight = false;
-let projectCache = [];
-let githubRepoOptions = [];
+(() => {
+  const $ = (selector) => document.querySelector(selector);
+  const escapeHtml = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (ch) => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[ch]));
-}
-
-function formatTime(value) {
-  try { return new Date(value).toLocaleString([], {dateStyle:"medium", timeStyle:"short"}); }
-  catch { return value || ""; }
-}
-
-function elapsedSeconds(attempt) {
-  if (!attempt?.started_at || !attempt?.finished_at) return null;
-  const elapsed = (Date.parse(attempt.finished_at) - Date.parse(attempt.started_at)) / 1000;
-  return Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null;
-}
-
-function formatDuration(seconds) {
-  if (seconds == null) return "—";
-  if (seconds < 60) return `${Math.round(seconds)} sec`;
-  const minutes = Math.floor(seconds / 60);
-  const remainder = Math.round(seconds % 60);
-  return remainder ? `${minutes} min ${remainder} sec` : `${minutes} min`;
-}
-
-function periodBucket(period, date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return period === "today" ? `${year}-${month}-${day}` : period === "month" ? `${year}-${month}` : period === "year" ? String(year) : "all";
-}
-
-function matchesPeriod(value, period, current = new Date()) {
-  if (period === "all") return true;
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return false;
-  if (period === "today") return date.toDateString() === current.toDateString();
-  if (period === "month") return date.getFullYear() === current.getFullYear() && date.getMonth() === current.getMonth();
-  return date.getFullYear() === current.getFullYear();
-}
-
-function providerMetrics(tasks, localCalls, localModel, resets, period) {
-  const records = [];
-  for (const task of tasks) {
-    for (const attempt of task.attempts || []) {
-      if (attempt.provider) records.push({...attempt, requested_at:attempt.started_at || attempt.finished_at});
-    }
-  }
-  for (const call of localCalls || []) records.push({...call, provider:"Ollama", requested_at:call.started_at});
-  const bucket = periodBucket(period);
-  const applicableResets = (resets || []).filter(reset => reset.period === period && reset.bucket === bucket);
-  const cutoff = new Map(applicableResets.map(reset => [`${reset.provider}\u0000${reset.model}`, reset.reset_at]));
-  const metrics = new Map();
-  const keyFor = (provider, model) => `${provider}\u0000${model}`;
-  const ensureMetric = (provider, model) => {
-    const key = keyFor(provider, model);
-    if (!metrics.has(key)) metrics.set(key, {provider, model, requests:0, replies:0, seconds:0, timedReplies:0});
-    return metrics.get(key);
+  const state = {
+    tasks: [],
+    projects: [{ id: "default", name: "Main project", repository: "", context: "", modules: [] }],
+    activeProjectId: localStorage.getItem("ai_team_active_project") || "default",
+    localModel: "orchestrator",
+    localCalls: [],
+    statResets: [],
+    qualityRows: [],
+    notifications: [],
+    editingTaskId: null,
+    detailTaskId: null,
+    prompts: [],
+    contextDocs: [],
+    connections: [],
+    encryptionAvailable: true,
+    routing: {},
+    routingRoles: [],
+    routingProviders: ["Gemini", "Antigravity", "GroqCloud", "OpenRouter"],
+    repoMode: "files",
+    repoCurrentPath: "",
+    pollBusy: false,
+    llmBusy: false,
   };
-  for (const record of records) if (record.provider) ensureMetric(record.provider, record.model || "Model not recorded");
-  for (const reset of applicableResets) ensureMetric(reset.provider, reset.model);
-  ensureMetric("Ollama", localModel || "orchestrator");
-  for (const record of records) {
-    if (!record.provider || !matchesPeriod(record.requested_at, period)) continue;
-    const model = record.model || "Model not recorded";
-    const resetAt = cutoff.get(keyFor(record.provider, model));
-    if (resetAt && Date.parse(record.requested_at) <= Date.parse(resetAt)) continue;
-    const metric = ensureMetric(record.provider, model);
-    metric.requests++;
-    if (record.state === "succeeded") {
-      metric.replies++;
-      const duration = typeof record.duration_seconds === "number" ? record.duration_seconds : elapsedSeconds(record);
-      if (duration != null) { metric.seconds += duration; metric.timedReplies++; }
+
+  async function api(url, options = {}) {
+    const response = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || `Request failed (${response.status})`);
+    }
+    return data;
+  }
+
+  function formatTime(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (!Number.isFinite(d.getTime())) return String(value);
+    return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function elapsedSeconds(attempt) {
+    if (!attempt?.started_at || !attempt?.finished_at) return null;
+    const sec = (Date.parse(attempt.finished_at) - Date.parse(attempt.started_at)) / 1000;
+    return Number.isFinite(sec) && sec >= 0 ? sec : null;
+  }
+
+  function formatDuration(seconds) {
+    if (seconds == null || !Number.isFinite(seconds)) return "—";
+    if (seconds < 60) return `${Math.round(seconds)} sec`;
+    const mins = Math.floor(seconds / 60);
+    const rem = Math.round(seconds % 60);
+    return rem ? `${mins} min ${rem} sec` : `${mins} min`;
+  }
+
+  function slugify(value) {
+    return (
+      String(value || "")
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 40) || `project-${Date.now()}`
+    );
+  }
+
+  function statusClass(status) {
+    return `state state-${String(status || "draft").toLowerCase().replace(/\s+/g, "-")}`;
+  }
+
+  function periodBucket(period, date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    if (period === "today") return `${y}-${m}-${d}`;
+    if (period === "month") return `${y}-${m}`;
+    if (period === "year") return String(y);
+    return "all";
+  }
+
+  function matchesPeriod(value, period, current = new Date()) {
+    if (period === "all") return true;
+    if (!value) return false;
+    const d = new Date(value);
+    if (!Number.isFinite(d.getTime())) return false;
+    if (period === "today") return d.toDateString() === current.toDateString();
+    if (period === "month") return d.getFullYear() === current.getFullYear() && d.getMonth() === current.getMonth();
+    return d.getFullYear() === current.getFullYear();
+  }
+
+  // --- Header & Status ---
+  async function loadConfig() {
+    const dot = $("#model-dot") || $(".model-chip .status-dot");
+    const nameEl = $("#model-name");
+    try {
+      const cfg = await api("/api/config");
+      if (!cfg.available) {
+        nameEl.textContent = "Ollama unavailable";
+        dot?.classList.add("offline");
+      } else if (!cfg.model_found) {
+        nameEl.textContent = `Model missing · ${cfg.model}`;
+        dot?.classList.add("offline");
+      } else {
+        nameEl.textContent = `Ollama · ${cfg.model}`;
+        dot?.classList.remove("offline");
+      }
+    } catch {
+      nameEl.textContent = "Ollama unavailable";
+      dot?.classList.add("offline");
     }
   }
-  const rows = [...metrics.values()].sort((a,b) => a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model));
-  const total = rows.reduce((sum, item) => ({requests:sum.requests+item.requests, replies:sum.replies+item.replies, seconds:sum.seconds+item.seconds, timedReplies:sum.timedReplies+item.timedReplies}), {requests:0,replies:0,seconds:0,timedReplies:0});
-  return {rows, total};
-}
 
-async function api(url, options = {}) {
-  const response = await fetch(url, {headers:{"Content-Type":"application/json"}, ...options});
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
-  return data;
-}
+  async function refreshStatus() {
+    try {
+      const data = await api("/api/status");
+      const cpu = data.cpu_percent;
+      $("#cpu-value").textContent = cpu == null ? "—" : `${cpu}%`;
+      const bar = $("#cpu-bar");
+      if (bar) bar.style.width = cpu == null ? "0%" : `${Math.max(0, Math.min(100, cpu))}%`;
+      const track = $(".cpu-track");
+      if (track) track.setAttribute("aria-valuenow", String(cpu ?? 0));
 
-async function loadTasks() {
-  if (taskPollInFlight) return;
-  taskPollInFlight = true;
-  try {
-    const [{tasks}, usage, notices, projectData, qualityData] = await Promise.all([api("/api/tasks"), api("/api/llm-usage"), api("/api/notifications"), api("/api/projects"), api("/api/provider-quality")]);
-    projectCache = projectData.projects || [];
-    const activeProject = $("#active-project").value;
-    $("#active-project").innerHTML = projectCache.map(project => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.name)}</option>`).join("");
-    $("#active-project").value = projectCache.some(project => project.id === activeProject) ? activeProject : projectCache[0]?.id || "default";
-    renderNotifications(notices.notifications || []);
-    $("#provider-quality-rows").innerHTML = qualityData.quality.length ? `<div class="quality-head"><span>Role / provider</span><span>Requests / replies</span><span>QA pass</span><span>Errors</span><span>Avg time</span></div>` + qualityData.quality.map(row => `<div class="quality-row"><strong>${escapeHtml(row.role)}<small>${escapeHtml(row.provider)}</small></strong><span>${row.requests} / ${row.replies}</span><span>${row.qa_pass_rate == null ? `— (${row.measured} scored)` : `${row.qa_pass_rate}% (${row.measured})`}</span><span>${row.quota_or_service_errors}</span><span>${row.average_seconds == null ? "—" : formatDuration(row.average_seconds)}</span></div>`).join("") : `<p class="notification-empty">No task outcomes recorded yet. Deliverable QA results will appear here.</p>`;
-    tasksById = new Map(tasks.map(task => [task.id, task]));
-    $("#task-summary").textContent = `${tasks.length} ${tasks.length === 1 ? "task" : "tasks"}`;
-    const overviewExists = tasks.some(task => task.task_type === "project_overview");
-    const plannedWork = tasks.filter(task => task.task_type === "work" && task.status !== "Canceled");
-    const completedWork = plannedWork.filter(task => task.status === "Done").length;
-    const progress = plannedWork.length ? Math.round(completedWork * 100 / plannedWork.length) : 0;
-    $("#project-progress").hidden = !overviewExists;
-    $("#progress-label").textContent = `${completedWork} of ${plannedWork.length} tasks · ${progress}%`;
-    $("#progress-bar").value = progress;
-    $("#progress-bar").setAttribute("aria-valuenow", String(progress));
-    const period = $("#stat-period").value;
-    const stats = providerMetrics(tasks, usage.local_calls, usage.local_model, usage.resets, period);
-    const statLine = metric => `<span>${metric.requests} ${metric.requests === 1 ? "request" : "requests"}</span><span>${metric.replies} ${metric.replies === 1 ? "reply" : "replies"}</span><span>avg ${formatDuration(metric.timedReplies ? metric.seconds / metric.timedReplies : null)}</span>`;
-    $("#provider-statistics").hidden = false;
-    $("#provider-stat-rows").innerHTML = `<div class="provider-stat-row provider-stat-total"><strong>Total</strong>${statLine(stats.total)}<span></span></div>` + stats.rows.map(metric => `
-      <div class="provider-stat-row"><div class="provider-stat-model"><strong>${escapeHtml(metric.provider)}</strong><small>${escapeHtml(metric.model)}</small></div>${statLine(metric)}<button type="button" class="stat-reset" data-stat-reset data-provider="${escapeHtml(metric.provider)}" data-model="${escapeHtml(metric.model)}">Reset</button></div>`).join("");
-    $("#board-updated").textContent = `Updated ${new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"})} · refreshes every 5 seconds`;
-    const signature = JSON.stringify(tasks.map(task => [task.id, task.updated_at, task.status, task.latest_reply_file, task.project_id, task.module_id, task.pull_request?.url, task.github_error]));
-    if (signature === taskSignature) return;
-    taskSignature = signature;
-    emptyState.hidden = tasks.length !== 0;
-    taskList.innerHTML = tasks.map(task => `
-      <article class="task-card">
-        <div class="task-topline"><span class="state state-${task.status.toLowerCase().replaceAll(" ", "-")}">${escapeHtml(task.status)}</span><span class="task-id">${escapeHtml(task.id)}</span><time>${escapeHtml(formatTime(task.created_at))}</time></div>
-        <h3>${escapeHtml(task.title)}</h3>
-        ${(() => {const project = projectCache.find(item => item.id === (task.project_id || "default")); const module = project?.modules?.find(item => item.id === task.module_id); return project ? `<div class="task-scope">${escapeHtml(project.name)}${module ? ` / ${escapeHtml(module.name)}` : ""}</div>` : "";})()}
-        <p class="task-request">${escapeHtml(task.request)}</p>
-        ${(() => { const attempts = task.attempts || []; const successful = [...attempts].reverse().find(item => item.state === "succeeded"); const duration = successful ? elapsedSeconds(successful) : null; const asked = task.provider || (task.assigned_role === "OpenRouter free agent" ? "OpenRouter" : task.assigned_role === "Gemini" ? "Gemini" : "Automatic"); const sentTo = [...new Set(attempts.map(item => item.provider).filter(Boolean))]; const route = sentTo.length ? `${asked}${asked === "Automatic" ? ` (sent to ${sentTo.join(", ")})` : ""}` : asked; return `<div class="task-ai-info"><span>Requested: ${escapeHtml(route)}</span><span>${successful ? `Answered by: ${escapeHtml(successful.provider)} · ${formatDuration(duration)}` : attempts.length ? "No answer yet" : "Not sent yet"}</span>${task.pull_request?.url && task.pull_request.url.startsWith("https://github.com/") ? `<span><a href="${escapeHtml(task.pull_request.url)}" target="_blank" rel="noopener noreferrer">PR #${escapeHtml(task.pull_request.number)} · ${escapeHtml(task.pull_request.state)}</a></span>` : ""}</div>`; })()}
-        ${task.status === "Ready" && task.dispatch_note ? `<p class="queue-note">${escapeHtml(task.dispatch_note)}</p>` : ""}
-        ${task.status === "Waiting for capacity" ? `<p class="queue-note">${escapeHtml(task.waiting_reason || "Waiting for the provider retry time.")}${task.retry_after ? ` · retry after ${escapeHtml(formatTime(task.retry_after))}` : ""}</p>` : ""}
-        ${task.status === "Blocked" && task.block_reason ? `<p class="queue-note blocked-note">${escapeHtml(task.block_reason)}</p>` : ""}
-        <div class="task-footer"><span class="role-icon">${escapeHtml(task.assigned_role)} · ${escapeHtml(task.provider || (task.assigned_role === "OpenRouter free agent" ? "OpenRouter" : task.assigned_role === "Gemini" ? "Gemini" : "Automatic"))}</span><span>${(task.acceptance_checks || []).length} acceptance ${(task.acceptance_checks || []).length === 1 ? "check" : "checks"}</span><div class="task-card-actions">${task.status === "Draft" ? `<button class="primary card-ready" type="button" data-card-ready="${escapeHtml(task.id)}">Mark ready</button>` : ""}<button class="danger card-delete" type="button" data-card-delete="${escapeHtml(task.id)}">Delete</button></div><button class="text-button" data-open-task="${escapeHtml(task.id)}">Details</button></div>
-      </article>`).join("");
-    if (selectedTaskId && $("#task-detail-dialog").open && tasksById.has(selectedTaskId)) {
-      renderTaskDetails(tasksById.get(selectedTaskId));
-    }
-  } catch (error) {
-    taskList.innerHTML = `<div class="inline-error">Could not load tasks: ${escapeHtml(error.message)}</div>`;
-    $("#board-updated").textContent = "Board refresh failed; retrying…";
-  } finally { taskPollInFlight = false; }
-}
+      const working = Boolean(data.llm_working || data.gemini_working || data.openrouter_working);
+      state.llmBusy = Boolean(data.llm_working);
+      const llmState = $("#llm-state");
+      llmState.textContent = data.openrouter_working
+        ? "Hosted AI working"
+        : data.gemini_working
+          ? "Gemini working"
+          : data.llm_working
+            ? "Ollama working"
+            : "Idle";
+      llmState.classList.toggle("working", working);
+      $("#clear-chat").disabled = state.llmBusy;
 
-function renderNotifications(items) {
-  const box = $("#notification-list");
-  $("#notification-count").textContent = items.length ? `${items.length} need attention` : "All clear";
-  box.innerHTML = items.length ? items.map(item => `<div class="notification notification-${escapeHtml(item.severity)}"><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.message)}</p></div><button type="button" class="notification-dismiss" aria-label="Dismiss" data-dismiss-notification="${escapeHtml(item.id)}">×</button></div>`).join("") : `<p class="notification-empty">No current issues or provider suggestions.</p>`;
-}
+      $("#agent-status").textContent =
+        `Gemini / Antigravity ${data.gemini_configured ? "connected" : "not connected"} · ` +
+        `GroqCloud ${data.groq_configured ? "connected" : "not connected"} · ` +
+        `OpenRouter ${data.openrouter_configured ? "connected" : "not connected"} · ` +
+        `GitHub ${data.github_configured ? "connected" : "not connected"}`;
 
-$("#notification-list").addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-dismiss-notification]");
-  if (!button) return;
-  try { await api(`/api/notifications/${encodeURIComponent(button.dataset.dismissNotification)}`, {method:"DELETE"}); await loadTasks(); }
-  catch (error) { alert(error.message); }
-});
-
-$("#stat-period").addEventListener("change", loadTasks);
-const statisticsDialog = $("#statistics-dialog");
-$("#open-statistics").addEventListener("click", () => statisticsDialog.showModal());
-$("#close-statistics").addEventListener("click", () => statisticsDialog.close());
-$("#provider-stat-rows").addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-stat-reset]");
-  if (!button) return;
-  const period = $("#stat-period").value;
-  const periodLabel = $("#stat-period").selectedOptions[0].textContent;
-  const provider = button.dataset.provider;
-  const model = button.dataset.model;
-  if (!confirm(`Reset the displayed ${periodLabel} statistic for ${provider} · ${model}? Past usage history will be kept.`)) return;
-  button.disabled = true;
-  try {
-    await api("/api/llm-usage/reset", {method:"POST", body:JSON.stringify({provider, model, period, bucket:periodBucket(period)})});
-    await loadTasks();
-  } catch (error) { alert(error.message); button.disabled = false; }
-});
-
-function renderTaskDetails(task) {
-  const detail = $("#task-detail");
-  const sameTask = selectedTaskId === task.id;
-  const priorChoice = detail.querySelector("#question-option")?.value || "";
-  const priorAnswerText = detail.querySelector("#question-free-text")?.value || "";
-  const priorOverviewValues = sameTask ? Object.fromEntries([...detail.querySelectorAll("[data-overview-doc]")].map(field => [field.dataset.overviewDoc, field.value])) : {};
-  const checks = (task.acceptance_checks || []).length
-    ? `<ul>${task.acceptance_checks.map(check => `<li>${escapeHtml(check)}</li>`).join("")}</ul>`
-    : `<p class="muted">No acceptance checks added.</p>`;
-  const history = (task.activity || []).slice().reverse().map(item => `
-    <div class="activity-item"><span class="activity-dot"></span><div><div class="activity-title">${escapeHtml(item.message || item.type)}</div><time>${escapeHtml(formatTime(item.at))}</time></div></div>`).join("");
-  const validation = task.validation
-    ? `<div class="validation-result"><strong>${escapeHtml(task.validation.status.replaceAll("_", " "))}</strong>${(task.validation.checks || []).map(item => `<div class="validation-check">${item.passed === true ? "✓" : item.passed === false ? "✕" : "·"} ${escapeHtml(item.check)} — ${escapeHtml(item.message)}</div>`).join("")}</div>`
-    : `<p class="muted">No validation recorded yet.</p>`;
-  const questionData = task.question_data || {};
-  const questionPanel = task.task_type === "clarification_question"
-    ? `<h3>Why PM/PO is asking</h3><p class="question-why">${escapeHtml(questionData.why || "This information helps PM/PO plan the work.")}</p>${task.status === "Needs answer"
-      ? `<h3>Your answer</h3><div class="question-options"><label>Choose an option<select id="question-option"><option value="">Select an option</option>${(questionData.options || []).map(option => `<option value="${escapeHtml(option.label)}">${escapeHtml(option.label)}${option.description ? ` — ${escapeHtml(option.description)}` : ""}</option>`).join("")}</select></label>${questionData.allow_free_text !== false ? `<label>Or add your own answer<textarea id="question-free-text" rows="3" maxlength="5000" placeholder="Optional extra detail, or your own answer"></textarea></label>` : ""}<button class="primary" type="button" data-answer-question="${escapeHtml(task.id)}">Submit answer</button></div>`
-      : `<h3>Your answer</h3><p class="detail-copy">${escapeHtml(task.answer || "")}</p>`}`
-    : "";
-  const overviewDocuments = task.overview_documents || {};
-  const overviewFields = [
-    ["project_brief", "Project brief"],
-    ["technical_overview", "Technical overview"],
-    ["decisions", "Decision log"],
-  ];
-  const overviewPanel = task.task_type === "project_overview"
-    ? `<h3>Proposed Project context</h3><p class="draft-note">Edit any document before approval. Approval replaces these three context documents; confirmed outcomes are kept. Previous versions are saved for rollback.</p>${overviewFields.map(([key,label]) => `<label class="overview-field">${label}<textarea data-overview-doc="${key}" rows="7" maxlength="20000" ${task.status === "Needs approval" ? "" : "readonly"}>${escapeHtml(overviewDocuments[key] || "")}</textarea></label>`).join("")}`
-    : "";
-  const overviewActions = task.task_type === "project_overview" && task.status === "Needs approval"
-    ? `<button class="secondary" type="button" data-save-overview="${escapeHtml(task.id)}">Save edits</button><button class="primary" type="button" data-approve-overview="${escapeHtml(task.id)}">Approve and update Project context</button>`
-    : "";
-  const actions = [];
-  if (["Draft", "Blocked", "Rework needed"].includes(task.status)) actions.push(["edit", "Edit task", "secondary"]);
-  if (task.status === "Draft") actions.push(["Ready", "Mark Ready", "primary"]);
-  if (["Draft", "Ready"].includes(task.status)) actions.push(["Blocked", "Block", "secondary"]);
-  if (["Draft", "Ready", "Blocked"].includes(task.status)) actions.push(["Canceled", "Cancel task", "secondary"]);
-  if (task.status === "Blocked") actions.unshift(["Draft", "Return to Draft", "secondary"]);
-  if (task.status === "Blocked") actions.splice(1, 0, ["Ready", "Mark Ready", "primary"]);
-  if (task.status === "Rework needed") actions.unshift(["Ready", "Return to agent queue", "primary"]);
-  detail.innerHTML = `
-    <div class="dialog-heading"><div><p class="eyebrow">${escapeHtml(task.id)} · ${escapeHtml(task.assigned_role)} · ${escapeHtml(task.provider || (task.assigned_role === "OpenRouter free agent" ? "OpenRouter" : task.assigned_role === "Gemini" ? "Gemini" : "Automatic"))}</p><h2>${escapeHtml(task.title)}</h2></div><button class="icon-button" data-close-detail aria-label="Close">×</button></div>
-    <div class="detail-status"><span class="state state-${task.status.toLowerCase().replaceAll(" ", "-")}">${escapeHtml(task.status)}</span>${task.produces_deliverable ? `<span class="deliverable-tag">Deliverable · validation required</span>` : ""}</div>
-    <h3>Request</h3><p class="detail-copy">${escapeHtml(task.request)}</p>
-    ${task.planning_summary ? `<h3>PM/PO summary</h3><p class="detail-copy">${escapeHtml(task.planning_summary)}</p>` : ""}
-    ${questionPanel}
-    ${overviewPanel}
-    <h3>Acceptance checks</h3>${checks}
-    <h3>Validation</h3>${validation}
-    ${task.pull_request?.url && task.pull_request.url.startsWith("https://github.com/") ? `<h3>GitHub pull request</h3><p class="detail-copy"><a href="${escapeHtml(task.pull_request.url)}" target="_blank" rel="noopener noreferrer">Open pull request #${escapeHtml(task.pull_request.number)} (${escapeHtml(task.pull_request.state)})</a></p>` : ""}
-    ${task.github_error ? `<p class="queue-note blocked-note">GitHub: ${escapeHtml(task.github_error)}</p>` : ""}
-    <h3>Agent replies</h3><div class="agent-replies" id="agent-replies">Loading saved replies…</div>
-    <h3>Activity</h3><div class="activity-list">${history || `<p class="muted">No activity yet.</p>`}</div>
-    <div class="detail-actions">${actions.map(([status,label,kind]) => `<button class="${kind}" data-task-action="${status}" data-task-id="${escapeHtml(task.id)}">${label}</button>`).join("")}${overviewActions}<button class="secondary" type="button" data-close-detail>Close</button><button class="danger" data-delete-task="${escapeHtml(task.id)}">Delete task</button></div>`;
-  if (task.task_type === "clarification_question" && task.status === "Needs answer") {
-    detail.querySelector("#question-option").value = priorChoice;
-    const freeText = detail.querySelector("#question-free-text");
-    if (freeText) freeText.value = priorAnswerText;
-  }
-  if (task.task_type === "project_overview" && task.status === "Needs approval" && sameTask) {
-    for (const field of detail.querySelectorAll("[data-overview-doc]")) {
-      if (Object.hasOwn(priorOverviewValues, field.dataset.overviewDoc)) field.value = priorOverviewValues[field.dataset.overviewDoc];
+      const wd = data.watchdog || {};
+      $("#watchdog-info").textContent = wd.error
+        ? "Watchdog check had an error"
+        : wd.last_run
+          ? `Board checked ${formatTime(wd.last_run)} · every 2 hours`
+          : "Watchdog starting…";
+    } catch {
+      // ignore transient status poll error
     }
   }
-  if (task.status === "Needs validation" && task.produces_deliverable) {
-    detail.querySelector(".detail-actions").insertAdjacentHTML("afterbegin", `<button class="secondary" data-validation-action="rework" data-task-id="${escapeHtml(task.id)}">Request rework</button><button class="primary" data-validation-action="pass" data-task-id="${escapeHtml(task.id)}">Approve deliverable</button>`);
-  }
-  selectedTaskId = task.id;
-  if (!$("#task-detail-dialog").open) $("#task-detail-dialog").showModal();
-  loadTaskReplies(task.id);
-}
 
-async function loadTaskReplies(taskId) {
-  const container = $("#agent-replies");
-  try {
-    const {replies} = await api(`/api/tasks/${encodeURIComponent(taskId)}/replies`);
-    container.replaceChildren();
-    if (!replies.length) { container.textContent = "No agent replies yet."; container.classList.add("muted"); return; }
-    for (const reply of replies) {
-      const card = document.createElement("article");
-      card.className = "reply-card";
-      const heading = document.createElement("div");
-      heading.className = "reply-heading";
-      heading.textContent = `${reply.provider} · attempt ${reply.attempt} · ${reply.state} · ${formatTime(reply.at)}`;
-      const text = document.createElement("pre");
-      text.className = "reply-text";
-      text.textContent = reply.text || reply.error || "No response text was saved.";
-      card.append(heading, text);
-      container.append(card);
+  // --- Notifications ---
+  const notificationsDialog = $("#notifications-dialog");
+
+  function renderNotifications() {
+    const countEl = $("#notification-count");
+    const latestEl = $("#notification-latest-title");
+    const modalCountEl = $("#notification-modal-count");
+    const triggerEl = $("#open-notifications");
+    const listEl = $("#notification-list");
+    const items = state.notifications || [];
+    const countLabel = `${items.length} ${items.length === 1 ? "issue" : "issues"}`;
+    const latestTitle = items[0]?.title || "All clear";
+
+    if (countEl) countEl.textContent = countLabel;
+    if (latestEl) latestEl.textContent = latestTitle;
+    if (modalCountEl) modalCountEl.textContent = `(${countLabel})`;
+    if (triggerEl) {
+      triggerEl.classList.toggle("has-issues", items.length > 0);
+      triggerEl.title = items.length > 0 ? `${latestTitle} — click to view all issues` : "No active issues";
     }
-  } catch (error) { container.textContent = `Could not load replies: ${error.message}`; }
-}
 
-taskList.addEventListener("click", async (event) => {
-  const deleteButton = event.target.closest("[data-card-delete]");
-  if (deleteButton) {
-    if (!confirm("Permanently delete this task, its agent replies, and its task activity log entries? The overall chat conversation will remain. This cannot be undone.")) return;
-    deleteButton.disabled = true;
-    try {
-      await api(`/api/tasks/${encodeURIComponent(deleteButton.dataset.cardDelete)}`, {method:"DELETE"});
-      await loadTasks();
-    } catch (error) { alert(error.message); deleteButton.disabled = false; }
-    return;
+    if (!listEl) return;
+    if (!items.length) {
+      listEl.innerHTML = `<p class="notification-empty">No current issues or provider suggestions.</p>`;
+      return;
+    }
+    listEl.innerHTML = items
+      .map(
+        (item) => `
+        <div class="notification notification-${escapeHtml(item.severity || "low")}">
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <p>${escapeHtml(item.message)}</p>
+          </div>
+          <button type="button" class="notification-dismiss" data-dismiss-notification="${escapeHtml(item.id)}" aria-label="Dismiss">×</button>
+        </div>`
+      )
+      .join("");
   }
-  const readyButton = event.target.closest("[data-card-ready]");
-  if (readyButton) {
-    readyButton.disabled = true;
-    try {
-      await api(`/api/tasks/${encodeURIComponent(readyButton.dataset.cardReady)}/status`, {method:"POST", body:JSON.stringify({status:"Ready"})});
-      await loadTasks();
-    } catch (error) { alert(error.message); readyButton.disabled = false; }
-    return;
-  }
-  const button = event.target.closest("[data-open-task]");
-  if (button && tasksById.has(button.dataset.openTask)) renderTaskDetails(tasksById.get(button.dataset.openTask));
-});
 
-$("#task-detail").addEventListener("click", async (event) => {
-  if (event.target.closest("[data-close-detail]")) return $("#task-detail-dialog").close();
-  const saveOverviewButton = event.target.closest("[data-save-overview]");
-  const approveOverviewButton = event.target.closest("[data-approve-overview]");
-  const overviewButton = saveOverviewButton || approveOverviewButton;
-  if (overviewButton) {
-    if (approveOverviewButton && !confirm("Approve this overview and replace Project brief, Technical overview, and Decision log? Current versions will be saved in history; Confirmed outcomes are preserved.")) return;
-    const documents = Object.fromEntries([...$("#task-detail").querySelectorAll("[data-overview-doc]")].map(field => [field.dataset.overviewDoc, field.value]));
-    overviewButton.disabled = true;
+  $("#open-notifications")?.addEventListener("click", () => {
+    renderNotifications();
+    if (notificationsDialog && !notificationsDialog.open) {
+      notificationsDialog.showModal();
+    }
+  });
+  $("#close-notifications")?.addEventListener("click", () => notificationsDialog?.close());
+  $("#close-notifications-footer")?.addEventListener("click", () => notificationsDialog?.close());
+
+  $("#notification-list")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-dismiss-notification]");
+    if (!btn) return;
+    const id = btn.getAttribute("data-dismiss-notification");
     try {
-      const taskId = overviewButton.dataset.saveOverview || overviewButton.dataset.approveOverview;
-      const url = approveOverviewButton ? `/api/tasks/${encodeURIComponent(taskId)}/approve-overview` : `/api/tasks/${encodeURIComponent(taskId)}/overview`;
-      await api(url, {method:approveOverviewButton ? "POST" : "PUT", body:JSON.stringify({documents})});
-      await loadTasks();
-    } catch (error) { alert(error.message); overviewButton.disabled = false; }
-    return;
+      await api(`/api/notifications/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await refreshBoard();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // --- Projects & Active Project Selector ---
+  function renderActiveProjectSelect() {
+    const select = $("#active-project");
+    if (!select) return;
+    if (!state.projects.some((p) => p.id === state.activeProjectId)) {
+      state.activeProjectId = state.projects[0]?.id || "default";
+      localStorage.setItem("ai_team_active_project", state.activeProjectId);
+    }
+    select.innerHTML = state.projects
+      .map(
+        (p) =>
+          `<option value="${escapeHtml(p.id)}"${p.id === state.activeProjectId ? " selected" : ""}>${escapeHtml(p.name)}</option>`
+      )
+      .join("");
   }
-  const answerButton = event.target.closest("[data-answer-question]");
-  if (answerButton) {
-    answerButton.disabled = true;
+
+  $("#active-project")?.addEventListener("change", (e) => {
+    state.activeProjectId = e.target.value;
+    localStorage.setItem("ai_team_active_project", state.activeProjectId);
+    renderTasks();
+    if ($("#repository-view-dialog")?.open) {
+      void openRepositoryView(state.repoMode);
+    }
+  });
+
+  // --- Task Board ---
+  function getAskedProvider(task) {
+    if (task.provider) return task.provider;
+    if (task.assigned_role === "OpenRouter free agent") return "OpenRouter";
+    if (task.assigned_role === "Gemini") return "Gemini";
+    return "Automatic";
+  }
+
+  function renderTasks() {
+    const allTasks = state.tasks || [];
+    const overviewExists = allTasks.some((t) => t.task_type === "project_overview");
+    const plannedWork = allTasks.filter((t) => t.task_type === "work" && t.status !== "Canceled");
+    const completedWork = plannedWork.filter((t) => t.status === "Done").length;
+    const pct = plannedWork.length ? Math.round((completedWork * 100) / plannedWork.length) : 0;
+
+    const progWrap = $("#project-progress");
+    if (progWrap) {
+      progWrap.hidden = !overviewExists;
+      if (overviewExists) {
+        $("#progress-label").textContent = `${completedWork} of ${plannedWork.length} tasks · ${pct}%`;
+        $("#progress-bar").value = pct;
+      }
+    }
+
+    $("#task-summary").textContent = `${allTasks.length} ${allTasks.length === 1 ? "task" : "tasks"}`;
+    const listEl = $("#task-list");
+    const emptyEl = $("#empty-state");
+
+    if (!allTasks.length) {
+      listEl.innerHTML = "";
+      emptyEl.hidden = false;
+      return;
+    }
+    emptyEl.hidden = true;
+
+    listEl.innerHTML = allTasks
+      .map((task) => {
+        const proj = state.projects.find((p) => p.id === (task.project_id || "default"));
+        const mod = proj?.modules?.find((m) => m.id === task.module_id);
+        const attempts = task.attempts || [];
+        const successful = [...attempts].reverse().find((a) => a.state === "succeeded");
+        const dur = successful ? elapsedSeconds(successful) : null;
+        const asked = getAskedProvider(task);
+        const sentTo = [...new Set(attempts.map((a) => a.provider).filter(Boolean))];
+        const route = sentTo.length
+          ? `${asked}${asked === "Automatic" ? ` (sent to ${sentTo.join(", ")})` : ""}`
+          : asked;
+        const checksCount = (task.acceptance_checks || []).length;
+        const pr = task.pull_request;
+
+        return `
+        <article class="task-card" data-task-id="${escapeHtml(task.id)}">
+          <div class="task-topline">
+            <span class="${escapeHtml(statusClass(task.status))}">${escapeHtml(task.status)}</span>
+            <span class="task-id">${escapeHtml(task.id)}</span>
+            <time>${escapeHtml(formatTime(task.created_at))}</time>
+          </div>
+          <h3>${escapeHtml(task.title)}</h3>
+          ${
+            proj
+              ? `<div class="task-scope">${escapeHtml(proj.name)}${mod ? ` / ${escapeHtml(mod.name)}` : ""}</div>`
+              : ""
+          }
+          <p class="task-request">${escapeHtml(task.request)}</p>
+          <div class="task-ai-info">
+            <span>Requested: ${escapeHtml(route)}</span>
+            <span>${
+              successful
+                ? `Answered by: ${escapeHtml(successful.provider)} · ${escapeHtml(formatDuration(dur))}`
+                : attempts.length
+                  ? "No answer yet"
+                  : "Not sent yet"
+            }</span>
+            ${
+              pr?.url && String(pr.url).startsWith("https://github.com/")
+                ? `<span><a href="${escapeHtml(pr.url)}" target="_blank" rel="noopener noreferrer">PR #${escapeHtml(pr.number)} · ${escapeHtml(pr.state)}</a></span>`
+                : ""
+            }
+          </div>
+          ${
+            task.status === "Ready" && task.dispatch_note
+              ? `<p class="queue-note">${escapeHtml(task.dispatch_note)}</p>`
+              : ""
+          }
+          ${
+            task.status === "Waiting for capacity"
+              ? `<p class="queue-note">${escapeHtml(task.waiting_reason || "Waiting for the provider retry time.")}${
+                  task.retry_after ? ` · retry after ${escapeHtml(formatTime(task.retry_after))}` : ""
+                }</p>`
+              : ""
+          }
+          ${
+            task.status === "Blocked" && task.block_reason
+              ? `<p class="queue-note blocked-note">${escapeHtml(task.block_reason)}</p>`
+              : ""
+          }
+          <div class="task-footer">
+            <span class="role-icon">${escapeHtml(task.assigned_role)} · ${escapeHtml(asked)}</span>
+            <span>${checksCount} acceptance ${checksCount === 1 ? "check" : "checks"}</span>
+            <div class="task-card-actions">
+              ${
+                task.status === "Draft"
+                  ? `<button class="primary card-ready" type="button" data-mark-ready="${escapeHtml(task.id)}">Mark ready</button>`
+                  : ""
+              }
+              ${
+                task.status === "Waiting for capacity"
+                  ? `<button class="primary card-ready" type="button" data-retry-task="${escapeHtml(task.id)}">Retry</button>`
+                  : ""
+              }
+              <button class="danger card-delete" type="button" data-delete-task="${escapeHtml(task.id)}">Delete</button>
+            </div>
+            <button class="text-button" type="button" data-open-detail="${escapeHtml(task.id)}">Details</button>
+          </div>
+        </article>`;
+      })
+      .join("");
+  }
+
+  $("#task-list")?.addEventListener("click", async (e) => {
+    const readyBtn = e.target.closest("[data-mark-ready], [data-retry-task]");
+    if (readyBtn) {
+      const id = readyBtn.getAttribute("data-mark-ready") || readyBtn.getAttribute("data-retry-task");
+      readyBtn.disabled = true;
+      try {
+        await api(`/api/tasks/${encodeURIComponent(id)}/status`, {
+          method: "POST",
+          body: JSON.stringify({ status: "Ready" }),
+        });
+        await refreshBoard();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        readyBtn.disabled = false;
+      }
+      return;
+    }
+
+    const delBtn = e.target.closest("[data-delete-task]");
+    if (delBtn) {
+      const id = delBtn.getAttribute("data-delete-task");
+      if (
+        !confirm(
+          "Permanently delete this task, its agent replies, and its task activity log entries? The overall chat conversation will remain. This cannot be undone."
+        )
+      ) {
+        return;
+      }
+      delBtn.disabled = true;
+      try {
+        await api(`/api/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
+        await refreshBoard();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        delBtn.disabled = false;
+      }
+      return;
+    }
+
+    const detailBtn = e.target.closest("[data-open-detail]");
+    if (detailBtn) {
+      const id = detailBtn.getAttribute("data-open-detail");
+      void openTaskDetail(id);
+    }
+  });
+
+  async function refreshBoard() {
+    if (state.pollBusy) return;
+    state.pollBusy = true;
     try {
-      const {followup_task} = await api(`/api/tasks/${encodeURIComponent(answerButton.dataset.answerQuestion)}/answer`, {
-        method:"POST", body:JSON.stringify({selected_option:$("#question-option").value, free_text:$("#question-free-text")?.value || ""})
+      const [tasksRes, usageRes, noticesRes, projectsRes, qualityRes] = await Promise.all([
+        api("/api/tasks"),
+        api("/api/llm-usage"),
+        api("/api/notifications"),
+        api("/api/projects"),
+        api("/api/provider-quality"),
+      ]);
+      state.projects = projectsRes.projects || [];
+      state.tasks = tasksRes.tasks || [];
+      state.localModel = usageRes.local_model || "orchestrator";
+      state.localCalls = usageRes.local_calls || [];
+      state.statResets = usageRes.resets || [];
+      state.notifications = noticesRes.notifications || [];
+      state.qualityRows = qualityRes.quality || [];
+
+      renderActiveProjectSelect();
+      renderNotifications();
+      renderTasks();
+      if ($("#statistics-dialog")?.open) {
+        renderStatistics();
+      }
+      if (state.detailTaskId && $("#task-detail-dialog")?.open) {
+        const updated = state.tasks.find((t) => t.id === state.detailTaskId);
+        if (updated) void renderTaskDetailContent(updated, false);
+      }
+      const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      $("#board-updated").textContent = `Updated ${stamp} · refreshes every 5 seconds`;
+    } catch (err) {
+      $("#board-updated").textContent = `Board refresh failed (${err.message}); retrying…`;
+    } finally {
+      state.pollBusy = false;
+    }
+  }
+
+  // --- New / Edit Task Dialog ---
+  const taskDialog = $("#task-dialog");
+  const taskForm = $("#task-form");
+
+  function populateTaskProjectOptions(selectedProjectId, selectedModuleId = "") {
+    const projSelect = taskForm.elements.project_id;
+    projSelect.innerHTML = state.projects
+      .map(
+        (p) =>
+          `<option value="${escapeHtml(p.id)}"${p.id === selectedProjectId ? " selected" : ""}>${escapeHtml(p.name)}</option>`
+      )
+      .join("");
+    populateTaskModuleOptions(selectedProjectId, selectedModuleId);
+  }
+
+  function populateTaskModuleOptions(projectId, selectedModuleId = "") {
+    const modSelect = taskForm.elements.module_id;
+    const proj = state.projects.find((p) => p.id === projectId);
+    const modules = proj?.modules || [];
+    modSelect.innerHTML =
+      `<option value="">Whole project</option>` +
+      modules
+        .map(
+          (m) =>
+            `<option value="${escapeHtml(m.id)}"${m.id === selectedModuleId ? " selected" : ""}>${escapeHtml(m.name)}${
+              m.path ? ` · ${escapeHtml(m.path)}` : ""
+            }</option>`
+        )
+        .join("");
+  }
+
+  taskForm?.elements.project_id?.addEventListener("change", (e) => {
+    populateTaskModuleOptions(e.target.value, "");
+  });
+
+  function openTaskDialog(task = null) {
+    state.editingTaskId = task ? task.id : null;
+    $("#task-dialog-title").textContent = task ? "Edit task" : "New task";
+    $("#save-task-submit").textContent = task ? "Save changes" : "Save draft";
+    $("#form-error").textContent = "";
+
+    const projId = task?.project_id || state.activeProjectId || state.projects[0]?.id || "default";
+    populateTaskProjectOptions(projId, task?.module_id || "");
+
+    taskForm.elements.title.value = task?.title || "";
+    taskForm.elements.request.value = task?.request || "";
+    taskForm.elements.role.value = task?.assigned_role || "PM/PO";
+    taskForm.elements.provider.value = task ? getAskedProvider(task) : "Automatic";
+    taskForm.elements.checks.value = (task?.acceptance_checks || []).join("\n");
+    taskForm.elements.produces_deliverable.checked = Boolean(task?.produces_deliverable);
+
+    if (!taskDialog.open) taskDialog.showModal();
+  }
+
+  $("#new-task")?.addEventListener("click", () => openTaskDialog(null));
+  $("#empty-new-task")?.addEventListener("click", () => openTaskDialog(null));
+  $("#close-dialog")?.addEventListener("click", () => taskDialog.close());
+  $("#cancel-task")?.addEventListener("click", () => taskDialog.close());
+
+  taskForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("#form-error").textContent = "";
+    const submitBtn = $("#save-task-submit");
+    submitBtn.disabled = true;
+    try {
+      const payload = {
+        title: taskForm.elements.title.value,
+        request: taskForm.elements.request.value,
+        role: taskForm.elements.role.value,
+        provider: taskForm.elements.provider.value,
+        project_id: taskForm.elements.project_id.value,
+        module_id: taskForm.elements.module_id.value,
+        acceptance_checks: taskForm.elements.checks.value.split("\n"),
+        produces_deliverable: taskForm.elements.produces_deliverable.checked,
+      };
+      if (state.editingTaskId) {
+        await api(`/api/tasks/${encodeURIComponent(state.editingTaskId)}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await api("/api/tasks", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+      taskDialog.close();
+      await refreshBoard();
+    } catch (err) {
+      $("#form-error").textContent = err.message;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  // --- Task Detail Dialog ---
+  const detailDialog = $("#task-detail-dialog");
+  $("#close-detail")?.addEventListener("click", () => {
+    state.detailTaskId = null;
+    detailDialog.close();
+  });
+
+  async function openTaskDetail(taskId) {
+    const task = state.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    state.detailTaskId = taskId;
+    await renderTaskDetailContent(task, true);
+    if (!detailDialog.open) detailDialog.showModal();
+  }
+
+  async function renderTaskDetailContent(task, resetInputs = false) {
+    const asked = getAskedProvider(task);
+    $("#detail-eyebrow").textContent = `${task.id} · ${task.assigned_role} · ${asked}`;
+    $("#detail-title").textContent = task.title;
+    const statusEl = $("#detail-status");
+    statusEl.className = statusClass(task.status);
+    statusEl.textContent = task.status;
+    $("#detail-deliverable").hidden = !task.produces_deliverable;
+
+    const waitingNoteEl = $("#detail-waiting-note");
+    if (waitingNoteEl) {
+      if (task.status === "Waiting for capacity") {
+        waitingNoteEl.hidden = false;
+        waitingNoteEl.textContent =
+          (task.waiting_reason || "Waiting for the provider retry time.") +
+          (task.retry_after ? ` · scheduled retry after ${formatTime(task.retry_after)}` : "");
+      } else {
+        waitingNoteEl.hidden = true;
+        waitingNoteEl.textContent = "";
+      }
+    }
+
+    const providerRow = $("#detail-provider-row");
+    const providerSelect = $("#detail-provider-select");
+    const providerFeedback = $("#detail-provider-feedback");
+    if (providerRow && providerSelect) {
+      const showProviderRow =
+        task.task_type !== "clarification_question" && task.task_type !== "project_overview";
+      providerRow.hidden = !showProviderRow;
+      if (showProviderRow) {
+        const canChange = !["In progress", "Done", "Canceled"].includes(task.status);
+        providerSelect.value = asked;
+        providerSelect.disabled = !canChange;
+        if (resetInputs && providerFeedback) {
+          providerFeedback.textContent = canChange ? "" : `Locked while ${String(task.status).toLowerCase()}`;
+        } else if (!canChange && providerFeedback) {
+          providerFeedback.textContent = `Locked while ${String(task.status).toLowerCase()}`;
+        }
+      }
+    }
+
+    $("#detail-request").textContent = task.request || "";
+
+    const pmSec = $("#detail-pm-section");
+    if (task.planning_summary) {
+      pmSec.hidden = false;
+      $("#detail-pm-summary").textContent = task.planning_summary;
+    } else {
+      pmSec.hidden = true;
+    }
+
+    // Clarification question section
+    const qSec = $("#detail-question-section");
+    if (task.task_type === "clarification_question") {
+      qSec.hidden = false;
+      const qData = task.question_data || {};
+      $("#detail-question-why").textContent = qData.why || "This information helps PM/PO plan the work.";
+      const qBody = $("#detail-question-body");
+      if (task.status === "Needs answer") {
+        if (resetInputs || !qBody.querySelector("#question-option-select")) {
+          const opts = (qData.options || [])
+            .map(
+              (o) =>
+                `<option value="${escapeHtml(o.label)}">${escapeHtml(o.label)}${
+                  o.description ? ` — ${escapeHtml(o.description)}` : ""
+                }</option>`
+            )
+            .join("");
+          qBody.innerHTML = `
+            <div class="question-options">
+              <label>Choose an option
+                <select id="question-option-select">
+                  <option value="">Select an option</option>
+                  ${opts}
+                </select>
+              </label>
+              ${
+                qData.allow_free_text !== false
+                  ? `<label>Or add your own answer<textarea id="question-free-text" rows="3" maxlength="5000" placeholder="Optional extra detail, or your own answer"></textarea></label>`
+                  : ""
+              }
+              <button class="primary" type="button" id="submit-question-answer">Submit answer</button>
+            </div>`;
+          qBody.querySelector("#submit-question-answer")?.addEventListener("click", async (ev) => {
+            ev.target.disabled = true;
+            try {
+              const selected_option = qBody.querySelector("#question-option-select")?.value || "";
+              const free_text = qBody.querySelector("#question-free-text")?.value || "";
+              const res = await api(`/api/tasks/${encodeURIComponent(task.id)}/answer`, {
+                method: "POST",
+                body: JSON.stringify({ selected_option, free_text }),
+              });
+              await refreshBoard();
+              if (res.followup_task) await loadChat();
+            } catch (err) {
+              alert(err.message);
+            } finally {
+              ev.target.disabled = false;
+            }
+          });
+        }
+      } else {
+        qBody.innerHTML = `<p class="detail-copy">${escapeHtml(task.answer || "")}</p>`;
+      }
+    } else {
+      qSec.hidden = true;
+    }
+
+    // Project overview section
+    const ovSec = $("#detail-overview-section");
+    if (task.task_type === "project_overview") {
+      ovSec.hidden = false;
+      const fieldsWrap = $("#detail-overview-fields");
+      if (resetInputs || !fieldsWrap.querySelector("textarea")) {
+        const docs = task.overview_documents || {};
+        const editable = task.status === "Needs approval";
+        const pairs = [
+          ["project_brief", "Project brief"],
+          ["technical_overview", "Technical overview"],
+          ["decisions", "Decision log"],
+        ];
+        fieldsWrap.innerHTML = pairs
+          .map(
+            ([key, label]) => `
+            <label class="overview-field">${escapeHtml(label)}
+              <textarea data-overview-doc="${escapeHtml(key)}" rows="7" maxlength="20000" ${
+                editable ? "" : "readonly"
+              }>${escapeHtml(docs[key] || "")}</textarea>
+            </label>`
+          )
+          .join("");
+      }
+    } else {
+      ovSec.hidden = true;
+    }
+
+    // Acceptance checks
+    const checks = task.acceptance_checks || [];
+    $("#detail-checks").innerHTML = checks.length
+      ? `<ul>${checks.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`
+      : `<p class="muted">No acceptance checks added.</p>`;
+
+    // Validation
+    if (task.validation) {
+      const vChecks = (task.validation.checks || [])
+        .map(
+          (item) =>
+            `<div class="validation-check">${item.passed === true ? "✓" : item.passed === false ? "✕" : "·"} ${escapeHtml(
+              item.check
+            )} — ${escapeHtml(item.message)}</div>`
+        )
+        .join("");
+      $("#detail-validation").innerHTML = `<div class="validation-result"><strong>${escapeHtml(
+        String(task.validation.status || "").replace(/_/g, " ")
+      )}</strong>${vChecks}</div>`;
+    } else {
+      $("#detail-validation").innerHTML = `<p class="muted">No validation recorded yet.</p>`;
+    }
+
+    // PR & GitHub error
+    const prSec = $("#detail-pr-section");
+    if (task.pull_request?.url && String(task.pull_request.url).startsWith("https://github.com/")) {
+      prSec.hidden = false;
+      $("#detail-pr-copy").innerHTML = `<a href="${escapeHtml(
+        task.pull_request.url
+      )}" target="_blank" rel="noopener noreferrer">Open pull request #${escapeHtml(
+        task.pull_request.number
+      )} (${escapeHtml(task.pull_request.state)})</a>`;
+    } else {
+      prSec.hidden = true;
+    }
+
+    const ghErr = $("#detail-github-error");
+    if (task.github_error) {
+      ghErr.hidden = false;
+      ghErr.textContent = `GitHub: ${task.github_error}`;
+    } else {
+      ghErr.hidden = true;
+    }
+
+    // Replies
+    const repliesEl = $("#detail-replies");
+    if (resetInputs) {
+      repliesEl.textContent = "Loading saved replies…";
+    }
+    try {
+      const res = await api(`/api/tasks/${encodeURIComponent(task.id)}/replies`);
+      const replies = res.replies || [];
+      repliesEl.innerHTML = replies.length
+        ? replies
+            .map(
+              (r) => `
+            <article class="reply-card">
+              <div class="reply-heading">${escapeHtml(r.provider)} · attempt ${escapeHtml(r.attempt)} · ${escapeHtml(
+                r.state
+              )} · ${escapeHtml(formatTime(r.at))}</div>
+              <pre class="reply-text">${escapeHtml(r.text || r.error || "No response text was saved.")}</pre>
+            </article>`
+            )
+            .join("")
+        : `<span class="muted">No agent replies yet.</span>`;
+    } catch (err) {
+      repliesEl.textContent = `Could not load replies: ${err.message}`;
+    }
+
+    // Activity
+    const activity = [...(task.activity || [])].reverse();
+    $("#detail-activity").innerHTML = activity.length
+      ? activity
+          .map(
+            (a) => `
+          <div class="activity-item">
+            <span class="activity-dot"></span>
+            <div>
+              <div class="activity-title">${escapeHtml(a.message || a.type)}</div>
+              <time>${escapeHtml(formatTime(a.at))}</time>
+            </div>
+          </div>`
+          )
+          .join("")
+      : `<p class="muted">No activity yet.</p>`;
+
+    // Actions
+    const actions = [];
+    if (["Draft", "Blocked", "Rework needed", "Waiting for capacity"].includes(task.status)) {
+      actions.push(["edit", "Edit task", "secondary"]);
+    }
+    if (task.status === "Draft") actions.push(["Ready", "Mark Ready", "primary"]);
+    if (["Draft", "Ready", "Waiting for capacity"].includes(task.status)) {
+      actions.push(["Blocked", "Block", "secondary"]);
+    }
+    if (["Draft", "Ready", "Blocked", "Waiting for capacity"].includes(task.status)) {
+      actions.push(["Canceled", "Cancel task", "secondary"]);
+    }
+    if (task.status === "Blocked") {
+      actions.unshift(["Draft", "Return to Draft", "secondary"]);
+      actions.splice(1, 0, ["Ready", "Mark Ready", "primary"]);
+    }
+    if (task.status === "Rework needed") {
+      actions.unshift(["Ready", "Return to agent queue", "primary"]);
+    }
+    if (task.status === "Waiting for capacity") {
+      actions.unshift(["Ready", "Retry", "primary"]);
+    }
+
+    let actionHtml = "";
+    if (task.status === "Needs validation" && task.produces_deliverable) {
+      actionHtml += `
+        <button class="secondary" type="button" data-validation-decision="rework">Request rework</button>
+        <button class="primary" type="button" data-validation-decision="pass">Approve deliverable</button>`;
+    }
+    actionHtml += actions
+      .map(
+        ([key, label, cls]) =>
+          `<button class="${cls}" type="button" data-detail-status-action="${escapeHtml(key)}">${escapeHtml(label)}</button>`
+      )
+      .join("");
+    if (task.task_type === "project_overview" && task.status === "Needs approval") {
+      actionHtml += `
+        <button class="secondary" type="button" data-overview-action="save">Save edits</button>
+        <button class="primary" type="button" data-overview-action="approve">Approve and update Project context</button>`;
+    }
+    actionHtml += `
+      <button class="secondary" type="button" data-detail-close="1">Close</button>
+      <button class="danger" type="button" data-detail-delete="1">Delete task</button>`;
+    $("#detail-actions").innerHTML = actionHtml;
+  }
+
+  $("#detail-provider-select")?.addEventListener("change", async (e) => {
+    const task = state.tasks.find((t) => t.id === state.detailTaskId);
+    if (!task) return;
+    const select = e.target;
+    const nextProvider = select.value;
+    const feedback = $("#detail-provider-feedback");
+    select.disabled = true;
+    if (feedback) feedback.textContent = "Saving…";
+    try {
+      await api(`/api/tasks/${encodeURIComponent(task.id)}/provider`, {
+        method: "POST",
+        body: JSON.stringify({ provider: nextProvider }),
       });
-      await loadTasks();
-      if (followup_task) await loadChat();
-    } catch (error) { alert(error.message); answerButton.disabled = false; }
-    return;
-  }
-  const deleteButton = event.target.closest("[data-delete-task]");
-  if (deleteButton) {
-    const confirmed = confirm("Permanently delete this task, its agent replies, and its task activity log entries? The overall chat conversation will remain. This cannot be undone.");
-    if (!confirmed) return;
-    deleteButton.disabled = true;
-    try {
-      await api(`/api/tasks/${encodeURIComponent(deleteButton.dataset.deleteTask)}`, {method:"DELETE"});
-      $("#task-detail-dialog").close();
-      await loadTasks();
-    } catch (error) { alert(error.message); deleteButton.disabled = false; }
-    return;
-  }
-  const validationButton = event.target.closest("[data-validation-action]");
-  if (validationButton) {
-    const decision = validationButton.dataset.validationAction;
-    let notes = "";
-    if (decision === "pass" && !confirm("Approve this deliverable and mark the task Done?")) return;
-    if (decision === "rework") {
-      const entered = prompt("What should the agent fix before you review it again?");
-      if (entered === null) return;
-      notes = entered.trim();
-      if (!notes) return alert("Please describe what needs to change.");
+      await refreshBoard();
+      if (feedback) feedback.textContent = `Updated to ${nextProvider}`;
+    } catch (err) {
+      if (feedback) feedback.textContent = "";
+      select.value = getAskedProvider(task);
+      alert(err.message);
+    } finally {
+      const latest = state.tasks.find((t) => t.id === task.id) || task;
+      select.disabled = ["In progress", "Done", "Canceled"].includes(latest.status);
     }
-    validationButton.disabled = true;
-    try {
-      await api(`/api/tasks/${encodeURIComponent(validationButton.dataset.taskId)}/validation`, {method:"POST", body:JSON.stringify({decision, notes})});
-      await loadTasks();
-    } catch (error) { alert(error.message); validationButton.disabled = false; }
-    return;
-  }
-  const button = event.target.closest("[data-task-action]");
-  if (!button) return;
-  const target = button.dataset.taskAction;
-  if (target === "edit") {
-    const task = tasksById.get(button.dataset.taskId);
-    if (task) {
-      $("#task-detail-dialog").close();
-      openTaskDialog(task);
+  });
+
+  $("#detail-actions")?.addEventListener("click", async (e) => {
+    const task = state.tasks.find((t) => t.id === state.detailTaskId);
+    if (!task) return;
+
+    if (e.target.closest("[data-detail-close]")) {
+      state.detailTaskId = null;
+      detailDialog.close();
+      return;
     }
-    return;
+
+    if (e.target.closest("[data-detail-delete]")) {
+      if (
+        !confirm(
+          "Permanently delete this task, its agent replies, and its task activity log entries? The overall chat conversation will remain. This cannot be undone."
+        )
+      ) {
+        return;
+      }
+      try {
+        await api(`/api/tasks/${encodeURIComponent(task.id)}`, { method: "DELETE" });
+        state.detailTaskId = null;
+        detailDialog.close();
+        await refreshBoard();
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+
+    const statusBtn = e.target.closest("[data-detail-status-action]");
+    if (statusBtn) {
+      const target = statusBtn.getAttribute("data-detail-status-action");
+      if (target === "edit") {
+        detailDialog.close();
+        openTaskDialog(task);
+        return;
+      }
+      let note = "";
+      if (target === "Canceled") {
+        if (!confirm("Cancel this task? This cannot be undone.")) return;
+      } else if (target === "Blocked") {
+        const reason = prompt("Why is this task blocked? (Optional)", "");
+        if (reason === null) return;
+        note = reason;
+      }
+      try {
+        await api(`/api/tasks/${encodeURIComponent(task.id)}/status`, {
+          method: "POST",
+          body: JSON.stringify({ status: target, note }),
+        });
+        detailDialog.close();
+        await refreshBoard();
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+
+    const valBtn = e.target.closest("[data-validation-decision]");
+    if (valBtn) {
+      const decision = valBtn.getAttribute("data-validation-decision");
+      let notes = "";
+      if (decision === "pass") {
+        if (!confirm("Approve this deliverable and mark the task Done?")) return;
+      } else {
+        const input = prompt("What should the agent fix before you review it again?", "");
+        if (input === null) return;
+        notes = input.trim();
+        if (!notes) {
+          alert("Please describe what needs to change.");
+          return;
+        }
+      }
+      try {
+        await api(`/api/tasks/${encodeURIComponent(task.id)}/validation`, {
+          method: "POST",
+          body: JSON.stringify({ decision, notes }),
+        });
+        await refreshBoard();
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+
+    const ovBtn = e.target.closest("[data-overview-action]");
+    if (ovBtn) {
+      const approve = ovBtn.getAttribute("data-overview-action") === "approve";
+      if (
+        approve &&
+        !confirm(
+          "Approve this overview and replace Project brief, Technical overview, and Decision log? Current versions will be saved in history; Confirmed outcomes are preserved."
+        )
+      ) {
+        return;
+      }
+      const documents = {};
+      document.querySelectorAll("[data-overview-doc]").forEach((el) => {
+        documents[el.getAttribute("data-overview-doc")] = el.value;
+      });
+      try {
+        await api(
+          approve
+            ? `/api/tasks/${encodeURIComponent(task.id)}/approve-overview`
+            : `/api/tasks/${encodeURIComponent(task.id)}/overview`,
+          {
+            method: approve ? "POST" : "PUT",
+            body: JSON.stringify({ documents }),
+          }
+        );
+        await refreshBoard();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  // --- Agent Prompts Dialog (Custom Prompt + Reset to Default) ---
+  const promptDialog = $("#prompt-dialog");
+  const promptForm = $("#prompt-form");
+  const promptSelect = promptForm?.elements.prompt_id;
+  const promptTextarea = promptForm?.elements.content;
+  const promptStatusBadge = $("#prompt-status-badge");
+  const promptFeedback = $("#prompt-feedback");
+  const resetPromptBtn = $("#reset-prompt");
+
+  function setPromptFeedback(message = "") {
+    if (!promptFeedback) return;
+    if (message) {
+      promptFeedback.textContent = message;
+      promptFeedback.hidden = false;
+    } else {
+      promptFeedback.textContent = "";
+      promptFeedback.hidden = true;
+    }
   }
-  let note = "";
-  if (target === "Canceled" && !confirm("Cancel this task? This cannot be undone.")) return;
-  if (target === "Blocked") {
-    const entered = prompt("Why is this task blocked? (Optional)");
-    if (entered === null) return;
-    note = entered;
+
+  function renderPromptOptions(selectedId) {
+    if (!promptSelect) return;
+    promptSelect.innerHTML = state.prompts
+      .map(
+        (p) =>
+          `<option value="${escapeHtml(p.id)}"${p.id === selectedId ? " selected" : ""}>${escapeHtml(p.title)}${
+            p.is_custom ? " (custom)" : ""
+          }</option>`
+      )
+      .join("");
   }
-  button.disabled = true;
-  try {
-    await api(`/api/tasks/${encodeURIComponent(button.dataset.taskId)}/status`, {method:"POST", body:JSON.stringify({status:target, note})});
-    $("#task-detail-dialog").close();
-    await loadTasks();
-  } catch (error) {
-    alert(error.message);
-    button.disabled = false;
+
+  function updatePromptStatusUI() {
+    const selected = state.prompts.find((p) => p.id === promptSelect?.value);
+    if (!selected) return;
+    const currentText = (promptTextarea?.value || "").trim();
+    const savedText = (selected.content || "").trim();
+    const defaultText = (selected.default_content || "").trim();
+    const hasUnsaved = currentText !== savedText;
+    const differsFromDefault = Boolean(defaultText && currentText !== defaultText);
+    const isCustom = Boolean(selected.is_custom);
+
+    if (promptStatusBadge) {
+      promptStatusBadge.className = `state ${isCustom ? "state-ready" : "state-done"}`;
+      promptStatusBadge.textContent =
+        (isCustom ? "Custom prompt active" : "Default prompt active") + (hasUnsaved ? " · unsaved edits" : "");
+    }
+    if (resetPromptBtn) {
+      resetPromptBtn.disabled = !isCustom && !differsFromDefault;
+    }
   }
-});
 
-function addMessage(message) {
-  const bubble = document.createElement("div");
-  bubble.className = `message ${message.role === "user" ? "user-message" : "assistant-message"}`;
-  const who = document.createElement("div");
-  who.className = "message-role";
-  who.textContent = message.role === "user" ? "You" : "Orchestrator";
-  const content = document.createElement("div");
-  content.className = "message-content";
-  content.textContent = message.content;
-  bubble.append(who, content);
-  messages.append(bubble);
-}
+  $("#open-prompts")?.addEventListener("click", async () => {
+    $("#prompt-error").textContent = "";
+    setPromptFeedback("");
+    try {
+      const res = await api("/api/prompts");
+      state.prompts = res.prompts || [];
+      const initial = state.prompts.find((p) => p.id === "orchestrator") || state.prompts[0];
+      if (initial) {
+        renderPromptOptions(initial.id);
+        promptTextarea.value = initial.content || "";
+        updatePromptStatusUI();
+      }
+      if (!promptDialog.open) promptDialog.showModal();
+    } catch (err) {
+      alert(`Could not load agent prompts: ${err.message}`);
+    }
+  });
 
-$("#task-detail-dialog").addEventListener("close", () => { selectedTaskId = null; });
+  promptSelect?.addEventListener("change", () => {
+    $("#prompt-error").textContent = "";
+    setPromptFeedback("");
+    const found = state.prompts.find((p) => p.id === promptSelect.value);
+    promptTextarea.value = found?.content || "";
+    updatePromptStatusUI();
+  });
 
-async function updateStatusMeter() {
-  try {
-    const data = await api("/api/status");
-    const {cpu_percent, llm_working, gemini_working, gemini_configured, openrouter_working, openrouter_configured, watchdog} = data;
-    const value = $("#cpu-value");
-    const track = $(".cpu-track");
-    const bar = $("#cpu-bar");
-    value.textContent = cpu_percent === null ? "…" : `${cpu_percent}%`;
-    bar.style.width = `${cpu_percent === null ? 0 : cpu_percent}%`;
-    track.setAttribute("aria-valuenow", cpu_percent === null ? "0" : String(cpu_percent));
-    $("#llm-state").textContent = openrouter_working ? "Hosted AI working" : gemini_working ? "Gemini working" : llm_working ? "Orchestrator working" : "Idle";
-    $("#llm-state").classList.toggle("working", llm_working || gemini_working || openrouter_working);
-    $("#clear-chat").disabled = llm_working;
-    $("#agent-status").textContent = `Gemini / Antigravity ${gemini_configured ? "connected" : "not connected"} · GroqCloud ${data.groq_configured ? "connected" : "not connected"} · OpenRouter ${openrouter_configured ? "connected" : "not connected"} · GitHub ${data.github_configured ? "connected" : "not connected"}`;
-    if (watchdog?.error) $("#watchdog-info").textContent = "Watchdog check had an error";
-    else if (watchdog?.last_run) $("#watchdog-info").textContent = `Board checked ${formatTime(watchdog.last_run)} · every 2 hours`;
-  } catch { $("#cpu-value").textContent = "—"; }
-}
+  promptTextarea?.addEventListener("input", () => {
+    setPromptFeedback("");
+    updatePromptStatusUI();
+  });
 
-async function loadChat() {
-  try {
-    const {messages: history} = await api("/api/chat");
-    messages.replaceChildren();
-    if (history.length === 0) {
-      const welcome = document.createElement("div");
-      welcome.className = "welcome-message";
-      welcome.innerHTML = `<div class="welcome-icon">✳</div><h3>Talk through the work</h3><p>Ask for help clarifying a request, planning acceptance checks, or understanding the board.</p>`;
-      messages.append(welcome);
-    } else history.forEach(addMessage);
-    messages.scrollTop = messages.scrollHeight;
-  } catch (error) {
-    messages.innerHTML = `<div class="inline-error">Could not load chat history: ${escapeHtml(error.message)}</div>`;
+  $("#close-prompts")?.addEventListener("click", () => promptDialog.close());
+  $("#cancel-prompts")?.addEventListener("click", () => promptDialog.close());
+
+  promptForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("#prompt-error").textContent = "";
+    setPromptFeedback("");
+    const id = promptSelect.value;
+    try {
+      const updated = await api(`/api/prompts/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify({ content: promptTextarea.value }),
+      });
+      state.prompts = state.prompts.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              content: updated.content,
+              default_content: updated.default_content ?? p.default_content,
+              is_custom: Boolean(updated.is_custom),
+            }
+          : p
+      );
+      promptTextarea.value = updated.content;
+      renderPromptOptions(id);
+      updatePromptStatusUI();
+      setPromptFeedback(
+        updated.is_custom
+          ? `Saved custom prompt for ${updated.title || id}. Future agent runs will use this prompt.`
+          : `Saved prompt for ${updated.title || id} (matches built-in default).`
+      );
+    } catch (err) {
+      $("#prompt-error").textContent = err.message;
+    }
+  });
+
+  resetPromptBtn?.addEventListener("click", async () => {
+    const id = promptSelect?.value;
+    const selected = state.prompts.find((p) => p.id === id);
+    if (!selected) return;
+    if (
+      !confirm(
+        `Reset "${selected.title}" back to its built-in default prompt? Your saved custom prompt for this role will be replaced with the default template.`
+      )
+    ) {
+      return;
+    }
+    $("#prompt-error").textContent = "";
+    setPromptFeedback("");
+    resetPromptBtn.disabled = true;
+    try {
+      const reset = await api(`/api/prompts/${encodeURIComponent(id)}/reset`, {
+        method: "POST",
+        body: "{}",
+      });
+      state.prompts = state.prompts.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              content: reset.content,
+              default_content: reset.default_content ?? p.default_content,
+              is_custom: false,
+            }
+          : p
+      );
+      promptTextarea.value = reset.content;
+      renderPromptOptions(id);
+      updatePromptStatusUI();
+      setPromptFeedback(`Restored default prompt for ${selected.title}.`);
+    } catch (err) {
+      $("#prompt-error").textContent = err.message;
+      updatePromptStatusUI();
+    }
+  });
+
+  // --- Project Context Dialog ---
+  const contextDialog = $("#context-dialog");
+  const contextForm = $("#context-form");
+  const contextSelect = contextForm?.elements.document_id;
+  const contextTextarea = contextForm?.elements.content;
+  const contextVersionSelect = $("#context-version");
+
+  async function loadContextHistory(docId) {
+    try {
+      const res = await api(`/api/project-context/${encodeURIComponent(docId)}/history`);
+      const history = res.history || [];
+      if (!history.length) {
+        contextVersionSelect.innerHTML = `<option value="">No saved versions</option>`;
+        $("#restore-context-version").disabled = true;
+        $("#delete-context-version").disabled = true;
+        return;
+      }
+      contextVersionSelect.innerHTML = history
+        .map(
+          (h) =>
+            `<option value="${escapeHtml(h.id)}">${escapeHtml(formatTime(h.created_at))} · ${escapeHtml(
+              h.preview || "Saved version"
+            )}</option>`
+        )
+        .join("");
+      $("#restore-context-version").disabled = false;
+      $("#delete-context-version").disabled = false;
+    } catch {
+      contextVersionSelect.innerHTML = `<option value="">No saved versions</option>`;
+      $("#restore-context-version").disabled = true;
+      $("#delete-context-version").disabled = true;
+    }
   }
-}
 
-function openTaskDialog(task = null) {
-  const form = $("#task-form");
-  form.reset();
-  form.dataset.editId = task?.id || "";
-  $("#form-error").textContent = "";
-  $("#task-dialog-title").textContent = task ? "Edit task" : "New task";
-  form.querySelector('[type="submit"]').textContent = task ? "Save changes" : "Save draft";
-  form.elements.project_id.innerHTML = projectCache.map(project => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.name)}</option>`).join("");
-  const defaultProjectId = task?.project_id || $("#active-project").value;
-  form.elements.project_id.value = projectCache.some(project => project.id === defaultProjectId) ? defaultProjectId : projectCache[0]?.id || "default";
-  updateModuleOptions(form.elements.project_id.value, task?.module_id || "");
-  if (task) {
-    form.elements.title.value = task.title;
-    form.elements.request.value = task.request;
-    form.elements.role.value = ["PM/PO", "Frontend developer", "Backend developer", "QA", "UI designer", "Documentation"].includes(task.assigned_role) ? task.assigned_role : "PM/PO";
-    form.elements.provider.value = task.provider || (task.assigned_role === "Gemini" ? "Gemini" : task.assigned_role === "OpenRouter free agent" ? "OpenRouter" : "Automatic");
-    form.elements.checks.value = (task.acceptance_checks || []).join("\n");
-    form.elements.produces_deliverable.checked = Boolean(task.produces_deliverable);
+  $("#open-context")?.addEventListener("click", async () => {
+    $("#context-error").textContent = "";
+    try {
+      const res = await api("/api/project-context");
+      state.contextDocs = res.documents || [];
+      const first = state.contextDocs.find((d) => d.id === "project_brief") || state.contextDocs[0];
+      contextSelect.innerHTML = state.contextDocs
+        .map((d) => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.title)}</option>`)
+        .join("");
+      if (first) {
+        contextSelect.value = first.id;
+        contextTextarea.value = first.content || "";
+        await loadContextHistory(first.id);
+      }
+      if (!contextDialog.open) contextDialog.showModal();
+    } catch (err) {
+      alert(`Could not load project context: ${err.message}`);
+    }
+  });
+
+  contextSelect?.addEventListener("change", async () => {
+    const doc = state.contextDocs.find((d) => d.id === contextSelect.value);
+    contextTextarea.value = doc?.content || "";
+    await loadContextHistory(contextSelect.value);
+  });
+
+  $("#close-context")?.addEventListener("click", () => contextDialog.close());
+  $("#cancel-context")?.addEventListener("click", () => contextDialog.close());
+
+  contextForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("#context-error").textContent = "";
+    const docId = contextSelect.value;
+    try {
+      const res = await api(`/api/project-context/${encodeURIComponent(docId)}`, {
+        method: "PUT",
+        body: JSON.stringify({ content: contextTextarea.value }),
+      });
+      state.contextDocs = state.contextDocs.map((d) => (d.id === docId ? { ...d, content: res.content } : d));
+      await loadContextHistory(docId);
+    } catch (err) {
+      $("#context-error").textContent = err.message;
+    }
+  });
+
+  $("#restore-context-version")?.addEventListener("click", async () => {
+    const versionId = contextVersionSelect.value;
+    const docId = contextSelect.value;
+    if (!versionId) return;
+    if (!confirm("Restore this saved version? The current document will first be saved as a new history version.")) {
+      return;
+    }
+    try {
+      const res = await api(`/api/project-context/${encodeURIComponent(docId)}/restore`, {
+        method: "POST",
+        body: JSON.stringify({ snapshot_id: versionId }),
+      });
+      contextTextarea.value = res.content;
+      state.contextDocs = state.contextDocs.map((d) => (d.id === docId ? { ...d, content: res.content } : d));
+      await loadContextHistory(docId);
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  $("#delete-context-version")?.addEventListener("click", async () => {
+    const versionId = contextVersionSelect.value;
+    const docId = contextSelect.value;
+    if (!versionId) return;
+    if (!confirm("Permanently delete this saved version? The current Project context will not change.")) {
+      return;
+    }
+    try {
+      await api(
+        `/api/project-context/${encodeURIComponent(docId)}/history/${encodeURIComponent(versionId)}`,
+        { method: "DELETE" }
+      );
+      await loadContextHistory(docId);
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // --- Repository View Dialog (Documentation & Files Buttons) ---
+  const repoDialog = $("#repository-view-dialog");
+
+  async function loadRepositoryFolder(folderPath, allowDocsFallback = false) {
+    $("#repository-view-error").textContent = "";
+    $("#repository-file-content").innerHTML = `<span class="muted">Choose a file to view it.</span>`;
+    const activeProj = state.projects.find((p) => p.id === state.activeProjectId);
+    if (!activeProj || !activeProj.repository) {
+      $("#repository-view-meta").textContent = activeProj ? `${activeProj.name} · No repository linked` : "";
+      $("#repository-file-list").innerHTML = `<p class="muted">No GitHub repository linked.</p>`;
+      $("#repository-view-error").textContent =
+        "This project does not have a GitHub repository URL configured yet. Open 'Projects & modules' to add a GitHub repository URL.";
+      return;
+    }
+
+    try {
+      const res = await api(
+        `/api/projects/${encodeURIComponent(state.activeProjectId)}/github-files?path=${encodeURIComponent(folderPath)}`
+      );
+      state.repoCurrentPath = res.path || "";
+      $("#repository-view-meta").textContent = `${activeProj.repository} · ${res.branch} · ${res.path || "/"}`;
+
+      const entries = res.entries || [];
+      const folders = entries.filter((item) => item.type === "dir");
+      let files = entries.filter((item) => item.type === "file");
+      if (state.repoMode === "documentation") {
+        files = files.filter((f) => /\.(md|txt)$/i.test(f.name));
+      }
+
+      const parentPath = state.repoCurrentPath.includes("/")
+        ? state.repoCurrentPath.split("/").slice(0, -1).join("/")
+        : "";
+
+      let html = `<button type="button" class="repository-entry repository-parent" data-repository-path="${escapeHtml(
+        parentPath
+      )}">↑ ${state.repoCurrentPath ? "Parent folder" : "Repository root"}</button>`;
+
+      html += folders
+        .map(
+          (dir) =>
+            `<button type="button" class="repository-entry" data-repository-path="${escapeHtml(
+              dir.path
+            )}">📁 ${escapeHtml(dir.name)}/</button>`
+        )
+        .join("");
+
+      html += files
+        .map(
+          (file) =>
+            `<button type="button" class="repository-entry" data-repository-file="${escapeHtml(
+              file.path
+            )}">${escapeHtml(file.name)} <span>${Number(file.size || 0).toLocaleString()} B</span></button>`
+        )
+        .join("");
+
+      if (!folders.length && !files.length) {
+        html += `<p class="muted">No matching files in this folder.</p>`;
+      }
+      $("#repository-file-list").innerHTML = html;
+    } catch (err) {
+      if (allowDocsFallback && folderPath === "docs") {
+        await loadRepositoryFolder("", false);
+        return;
+      }
+      $("#repository-file-list").innerHTML = "";
+      $("#repository-view-error").textContent = err.message;
+    }
   }
-  $("#task-dialog").showModal();
-}
-function updateModuleOptions(projectId, selected = "") {
-  const select = $("#task-form").elements.module_id;
-  const project = projectCache.find(item => item.id === projectId);
-  select.innerHTML = `<option value="">Whole project</option>` + (project?.modules || []).map(module => `<option value="${escapeHtml(module.id)}">${escapeHtml(module.name)}${module.path ? ` · ${escapeHtml(module.path)}` : ""}</option>`).join("");
-  select.value = selected;
-}
-$("#task-form").elements.project_id.addEventListener("change", event => updateModuleOptions(event.target.value));
-$("#new-task").addEventListener("click", openTaskDialog);
-$("#empty-new-task").addEventListener("click", openTaskDialog);
-$("#close-dialog").addEventListener("click", () => $("#task-dialog").close());
-$("#cancel-task").addEventListener("click", () => $("#task-dialog").close());
 
-$("#task-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const taskForm = event.currentTarget;
-  const form = new FormData(taskForm);
-  const button = taskForm.querySelector('[type="submit"]');
-  button.disabled = true;
-  $("#form-error").textContent = "";
-  try {
-    const editId = taskForm.dataset.editId;
-    const payload = {
-      title:form.get("title"), request:form.get("request"), role:form.get("role"), provider:form.get("provider"),
-      acceptance_checks:String(form.get("checks") || "").split("\n"),
-      project_id:form.get("project_id"), module_id:form.get("module_id"),
-      produces_deliverable:form.get("produces_deliverable") === "on"
+  async function openRepositoryView(mode) {
+    state.repoMode = mode;
+    $("#repository-view-eyebrow").textContent =
+      mode === "documentation" ? "VERSIONED PROJECT DOCUMENTS" : "GITHUB DEFAULT BRANCH";
+    $("#repository-view-title").textContent =
+      mode === "documentation" ? "Project documentation" : "Project files";
+    if (!repoDialog.open) repoDialog.showModal();
+    if (mode === "documentation") {
+      await loadRepositoryFolder("docs", true);
+    } else {
+      await loadRepositoryFolder("", false);
+    }
+  }
+
+  $("#open-documentation")?.addEventListener("click", () => void openRepositoryView("documentation"));
+  $("#open-files")?.addEventListener("click", () => void openRepositoryView("files"));
+  $("#close-repository-view")?.addEventListener("click", () => repoDialog.close());
+
+  $("#repository-file-list")?.addEventListener("click", async (e) => {
+    const folderBtn = e.target.closest("[data-repository-path]");
+    if (folderBtn) {
+      const nextPath = folderBtn.getAttribute("data-repository-path") || "";
+      await loadRepositoryFolder(nextPath, false);
+      return;
+    }
+    const fileBtn = e.target.closest("[data-repository-file]");
+    if (fileBtn) {
+      const filePath = fileBtn.getAttribute("data-repository-file");
+      $("#repository-view-error").textContent = "";
+      try {
+        const res = await api(
+          `/api/projects/${encodeURIComponent(state.activeProjectId)}/github-files?file=${encodeURIComponent(filePath)}`
+        );
+        const activeProj = state.projects.find((p) => p.id === state.activeProjectId);
+        $("#repository-view-meta").textContent = `${activeProj?.repository || "Repository"} · ${res.branch} · ${res.path}`;
+        $("#repository-file-content").textContent = res.content;
+      } catch (err) {
+        $("#repository-view-error").textContent = err.message;
+      }
+    }
+  });
+
+  // --- Connections & Routing Dialog ---
+  const settingsDialog = $("#settings-dialog");
+  const settingsForm = $("#settings-form");
+
+  function isProviderConnected(providerName) {
+    return state.connections.some((c) => {
+      if (!c.configured) return false;
+      if ((providerName === "Gemini" || providerName === "Antigravity") && c.id === "gemini") return true;
+      if (providerName === "GroqCloud" && c.id === "groq") return true;
+      if (providerName === "OpenRouter" && c.id === "openrouter") return true;
+      return false;
+    });
+  }
+
+  function setSettingsSuccess(message = "") {
+    const el = $("#settings-success");
+    if (!el) return;
+    if (message) {
+      el.textContent = message;
+      el.hidden = false;
+    } else {
+      el.textContent = "";
+      el.hidden = true;
+    }
+  }
+
+  function renderConnectionsAndRouting() {
+    $("#connection-list").innerHTML = state.connections
+      .map(
+        (c) => `
+        <div class="route-role">
+          <div class="progress-heading">
+            <strong>${escapeHtml(c.name)}</strong>
+            <span class="state ${c.configured ? "state-done" : "state-draft"}">${
+              c.configured ? `Connected · ${escapeHtml(c.source || "Saved")}` : "Not connected"
+            }</span>
+          </div>
+          <div class="connection-controls">
+            ${
+              state.encryptionAvailable
+                ? `<input type="password" class="connection-key" data-conn-input="${escapeHtml(
+                    c.id
+                  )}" placeholder="Paste new API key / token to replace" autocomplete="off">
+                  <button type="button" class="secondary" data-save-conn="${escapeHtml(c.id)}">Save</button>`
+                : ""
+            }
+            ${
+              c.id === "gemini"
+                ? `<button type="button" class="secondary" data-test-conn="gemini" ${
+                    c.configured ? "" : "disabled"
+                  }>Test Gemini</button>
+                  <button type="button" class="secondary" data-test-conn="antigravity" ${
+                    c.configured ? "" : "disabled"
+                  }>Test Antigravity</button>`
+                : `<button type="button" class="secondary" data-test-conn="${escapeHtml(c.id)}" ${
+                    c.configured ? "" : "disabled"
+                  }>Test</button>`
+            }
+            ${
+              state.encryptionAvailable
+                ? `<button type="button" class="danger" data-clear-conn="${escapeHtml(c.id)}" ${
+                    c.configured ? "" : "disabled"
+                  }>Clear</button>`
+                : ""
+            }
+          </div>
+        </div>`
+      )
+      .join("");
+
+    $("#routing-roles").innerHTML = state.routingRoles
+      .map((role) => {
+        const order = state.routing[role] || state.routingProviders;
+        const selects = order
+          .map(
+            (prov, idx) => `
+            <label>${idx + 1}
+              <select data-route-role="${escapeHtml(role)}" data-route-idx="${idx}">
+                ${state.routingProviders
+                  .map(
+                    (opt) =>
+                      `<option value="${escapeHtml(opt)}"${opt === prov ? " selected" : ""}>${escapeHtml(opt)}${
+                        !isProviderConnected(opt) ? " · not connected" : ""
+                      }</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>`
+          )
+          .join("");
+        return `<section class="route-role"><strong>${escapeHtml(role)}</strong><div class="route-order">${selects}</div></section>`;
+      })
+      .join("");
+  }
+
+  async function reloadSettingsData() {
+    const [connRes, routeRes] = await Promise.all([api("/api/connections"), api("/api/routing")]);
+    state.connections = connRes.connections || [];
+    state.encryptionAvailable = connRes.encryption_available !== false;
+    state.routingRoles = routeRes.roles || [];
+    state.routingProviders = routeRes.providers || ["Gemini", "Antigravity", "GroqCloud", "OpenRouter"];
+    state.routing = routeRes.routing || {};
+    renderConnectionsAndRouting();
+  }
+
+  $("#open-settings")?.addEventListener("click", async () => {
+    $("#settings-error").textContent = "";
+    setSettingsSuccess("");
+    try {
+      await reloadSettingsData();
+      if (!settingsDialog.open) settingsDialog.showModal();
+    } catch (err) {
+      alert(`Could not load settings: ${err.message}`);
+    }
+  });
+
+  $("#connection-list")?.addEventListener("click", async (e) => {
+    const saveBtn = e.target.closest("[data-save-conn]");
+    if (saveBtn) {
+      const id = saveBtn.getAttribute("data-save-conn");
+      const input = document.querySelector(`[data-conn-input="${id}"]`);
+      const secret = input?.value?.trim() || "";
+      if (!secret) {
+        setSettingsSuccess("");
+        $("#settings-error").textContent = "Paste a key or token before clicking Save.";
+        return;
+      }
+      $("#settings-error").textContent = "";
+      setSettingsSuccess("");
+      try {
+        await api(`/api/connections/${encodeURIComponent(id)}`, {
+          method: "PUT",
+          body: JSON.stringify({ secret }),
+        });
+        if (input) input.value = "";
+        await reloadSettingsData();
+        await refreshStatus();
+        setSettingsSuccess("Saved encrypted credential.");
+      } catch (err) {
+        $("#settings-error").textContent = err.message;
+      }
+      return;
+    }
+
+    const testBtn = e.target.closest("[data-test-conn]");
+    if (testBtn) {
+      const id = testBtn.getAttribute("data-test-conn");
+      const origLabel = testBtn.textContent;
+      testBtn.disabled = true;
+      testBtn.textContent = "Testing…";
+      $("#settings-error").textContent = "";
+      setSettingsSuccess("");
+      try {
+        const res = await api(`/api/connections/${encodeURIComponent(id)}/test`, {
+          method: "POST",
+          body: "{}",
+        });
+        const msg = res.message || (res.login ? `GitHub connected as ${res.login}.` : "Connection verified.");
+        setSettingsSuccess(msg);
+        alert(msg);
+      } catch (err) {
+        $("#settings-error").textContent = err.message;
+      } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = origLabel || "Test";
+      }
+      return;
+    }
+
+    const clearBtn = e.target.closest("[data-clear-conn]");
+    if (clearBtn) {
+      const id = clearBtn.getAttribute("data-clear-conn");
+      if (!confirm("Remove the saved credential from this VM?")) return;
+      $("#settings-error").textContent = "";
+      setSettingsSuccess("");
+      try {
+        await api(`/api/connections/${encodeURIComponent(id)}`, { method: "DELETE" });
+        await reloadSettingsData();
+        await refreshStatus();
+        setSettingsSuccess("Removed saved credential.");
+      } catch (err) {
+        $("#settings-error").textContent = err.message;
+      }
+    }
+  });
+
+  $("#routing-roles")?.addEventListener("change", (e) => {
+    const sel = e.target.closest("[data-route-role]");
+    if (!sel) return;
+    const role = sel.getAttribute("data-route-role");
+    const idx = Number(sel.getAttribute("data-route-idx"));
+    const nextProv = sel.value;
+    const current = [...(state.routing[role] || state.routingProviders)];
+    const existingIdx = current.indexOf(nextProv);
+    if (existingIdx >= 0 && existingIdx !== idx) {
+      const tmp = current[idx];
+      current[idx] = nextProv;
+      current[existingIdx] = tmp;
+    } else {
+      current[idx] = nextProv;
+    }
+    state.routing[role] = current;
+    renderConnectionsAndRouting();
+  });
+
+  $("#test-github")?.addEventListener("click", async () => {
+    $("#settings-error").textContent = "";
+    setSettingsSuccess("");
+    try {
+      const res = await api("/api/connections/github/test", { method: "POST", body: "{}" });
+      const msg = res.message || `GitHub connected as ${res.login}.`;
+      setSettingsSuccess(msg);
+      alert(msg);
+    } catch (err) {
+      $("#settings-error").textContent = err.message;
+    }
+  });
+
+  $("#close-settings")?.addEventListener("click", () => settingsDialog.close());
+  $("#cancel-settings")?.addEventListener("click", () => settingsDialog.close());
+
+  settingsForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("#settings-error").textContent = "";
+    try {
+      await api("/api/routing", {
+        method: "POST",
+        body: JSON.stringify({ routing: state.routing }),
+      });
+      settingsDialog.close();
+      await refreshBoard();
+    } catch (err) {
+      $("#settings-error").textContent = err.message;
+    }
+  });
+
+  // --- Projects & Sub-projects Dialog ---
+  const projectsDialog = $("#projects-dialog");
+  const projectsForm = $("#projects-form");
+  let projectDrafts = [];
+
+  async function fetchProjectHistory(projectId) {
+    if (!projectId) return [];
+    try {
+      const res = await api(`/api/projects/${encodeURIComponent(projectId)}/context-history`);
+      return res.history || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function renderProjectEditors() {
+    $("#project-editors").innerHTML = projectDrafts
+      .map(
+        (d, idx) => `
+        <section class="project-editor" data-proj-idx="${idx}">
+          <div class="two-columns">
+            <label>Project name
+              <input data-proj-field="name" value="${escapeHtml(d.name)}" required maxlength="100">
+            </label>
+            <label>GitHub repository URL
+              <input list="github-repo-options" data-proj-field="repository" value="${escapeHtml(
+                d.repository
+              )}" placeholder="https://github.com/owner/repository">
+            </label>
+          </div>
+          <label>Project background notes
+            <textarea rows="4" maxlength="20000" data-proj-field="context" placeholder="Goals, product shape, stack, shared conventions">${escapeHtml(
+              d.context
+            )}</textarea>
+          </label>
+          <div class="project-history-controls">
+            <select data-proj-field="selectedVersion" ${d.history.length ? "" : "disabled"}>
+              ${
+                d.history.length
+                  ? d.history
+                      .map(
+                        (h) =>
+                          `<option value="${escapeHtml(h.id)}"${
+                            h.id === d.selectedVersion ? " selected" : ""
+                          }>${escapeHtml(formatTime(h.created_at))} · ${escapeHtml(h.preview)}</option>`
+                      )
+                      .join("")
+                  : `<option value="">No saved versions</option>`
+              }
+            </select>
+            <button type="button" class="secondary" data-proj-restore="${idx}" ${
+              d.history.length ? "" : "disabled"
+            }>Restore</button>
+            <button type="button" class="danger" data-proj-del-ver="${idx}" ${
+              d.history.length ? "" : "disabled"
+            }>Delete version</button>
+          </div>
+          <label>Sub-projects <span class="muted">One per line: name | repository folder | focused background notes</span>
+            <textarea rows="4" data-proj-field="modulesText" placeholder="Payments | backend/payments | Owns billing and subscription logic">${escapeHtml(
+              d.modulesText
+            )}</textarea>
+          </label>
+          <button type="button" class="danger" data-proj-remove="${idx}">Remove project</button>
+        </section>`
+      )
+      .join("");
+  }
+
+  $("#project-editors")?.addEventListener("input", (e) => {
+    const sec = e.target.closest("[data-proj-idx]");
+    const field = e.target.getAttribute("data-proj-field");
+    if (!sec || !field) return;
+    const idx = Number(sec.getAttribute("data-proj-idx"));
+    if (projectDrafts[idx]) projectDrafts[idx][field] = e.target.value;
+  });
+
+  $("#project-editors")?.addEventListener("change", (e) => {
+    const sec = e.target.closest("[data-proj-idx]");
+    const field = e.target.getAttribute("data-proj-field");
+    if (!sec || !field) return;
+    const idx = Number(sec.getAttribute("data-proj-idx"));
+    if (projectDrafts[idx]) projectDrafts[idx][field] = e.target.value;
+  });
+
+  $("#project-editors")?.addEventListener("click", async (e) => {
+    const rmBtn = e.target.closest("[data-proj-remove]");
+    if (rmBtn) {
+      if (projectDrafts.length < 2) {
+        alert("Keep at least one project.");
+        return;
+      }
+      projectDrafts.splice(Number(rmBtn.getAttribute("data-proj-remove")), 1);
+      renderProjectEditors();
+      return;
+    }
+
+    const resBtn = e.target.closest("[data-proj-restore]");
+    if (resBtn) {
+      const d = projectDrafts[Number(resBtn.getAttribute("data-proj-restore"))];
+      if (!d?.id || !d.selectedVersion) return;
+      if (!confirm("Restore this saved background? The current notes will be saved as another version.")) return;
+      try {
+        const res = await api(`/api/projects/${encodeURIComponent(d.id)}/restore-context`, {
+          method: "POST",
+          body: JSON.stringify({ version_id: d.selectedVersion }),
+        });
+        d.context = res.context;
+        d.history = await fetchProjectHistory(d.id);
+        d.selectedVersion = d.history[0]?.id || "";
+        renderProjectEditors();
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+
+    const delVerBtn = e.target.closest("[data-proj-del-ver]");
+    if (delVerBtn) {
+      const d = projectDrafts[Number(delVerBtn.getAttribute("data-proj-del-ver"))];
+      if (!d?.id || !d.selectedVersion) return;
+      if (!confirm("Permanently delete this saved project background version?")) return;
+      try {
+        await api(
+          `/api/projects/${encodeURIComponent(d.id)}/context-history/${encodeURIComponent(d.selectedVersion)}`,
+          { method: "DELETE" }
+        );
+        d.history = await fetchProjectHistory(d.id);
+        d.selectedVersion = d.history[0]?.id || "";
+        renderProjectEditors();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  $("#open-projects")?.addEventListener("click", async () => {
+    $("#projects-error").textContent = "";
+    try {
+      const res = await api("/api/projects");
+      const list = res.projects || [];
+      api("/api/connections/github/repositories", { method: "POST", body: "{}" })
+        .then((r) => {
+          $("#github-repo-options").innerHTML = (r.repositories || [])
+            .map(
+              (repo) =>
+                `<option value="${escapeHtml(repo.clone_url)}">${escapeHtml(repo.full_name)}${
+                  repo.private ? " · private" : ""
+                }</option>`
+            )
+            .join("");
+        })
+        .catch(() => {});
+
+      projectDrafts = await Promise.all(
+        list.map(async (p) => {
+          const hist = await fetchProjectHistory(p.id);
+          return {
+            id: p.id || "",
+            name: p.name || "",
+            repository: p.repository || "",
+            context: p.context || "",
+            modulesText: (p.modules || [])
+              .map((m) => `${m.name} | ${m.path || ""} | ${m.context || ""}`)
+              .join("\n"),
+            history: hist,
+            selectedVersion: hist[0]?.id || "",
+          };
+        })
+      );
+      renderProjectEditors();
+      if (!projectsDialog.open) projectsDialog.showModal();
+    } catch (err) {
+      alert(`Could not load projects: ${err.message}`);
+    }
+  });
+
+  $("#add-project")?.addEventListener("click", () => {
+    projectDrafts.push({
+      id: "",
+      name: "",
+      repository: "",
+      context: "",
+      modulesText: "",
+      history: [],
+      selectedVersion: "",
+    });
+    renderProjectEditors();
+  });
+
+  $("#close-projects")?.addEventListener("click", () => projectsDialog.close());
+  $("#cancel-projects")?.addEventListener("click", () => projectsDialog.close());
+
+  projectsForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("#projects-error").textContent = "";
+    try {
+      const payload = projectDrafts.map((d) => {
+        const name = d.name.trim();
+        const modules = d.modulesText
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .map((line) => {
+            const parts = line.split("|").map((p) => p.trim());
+            return {
+              id: slugify(parts[0]),
+              name: parts[0],
+              path: parts[1] || "",
+              context: parts.slice(2).join(" | "),
+            };
+          });
+        return {
+          id: d.id || slugify(name),
+          name,
+          repository: d.repository.trim(),
+          context: d.context.trim(),
+          modules,
+        };
+      });
+      await api("/api/projects", {
+        method: "PUT",
+        body: JSON.stringify({ projects: payload }),
+      });
+      projectsDialog.close();
+      await refreshBoard();
+    } catch (err) {
+      $("#projects-error").textContent = err.message;
+    }
+  });
+
+  // --- Statistics Dialog ---
+  const statsDialog = $("#statistics-dialog");
+  const statPeriodSelect = $("#stat-period");
+
+  function renderStatistics() {
+    const period = statPeriodSelect?.value || "today";
+    const records = [];
+    for (const task of state.tasks) {
+      for (const att of task.attempts || []) {
+        if (att.provider) {
+          records.push({ ...att, requested_at: att.started_at || att.finished_at });
+        }
+      }
+    }
+    for (const call of state.localCalls || []) {
+      records.push({ ...call, provider: "Ollama", requested_at: call.started_at });
+    }
+
+    const bucket = periodBucket(period);
+    const applicableResets = (state.statResets || []).filter((r) => r.period === period && r.bucket === bucket);
+    const cutoff = new Map(applicableResets.map((r) => [`${r.provider}\0${r.model}`, r.reset_at]));
+    const metrics = new Map();
+    const ensure = (provider, model) => {
+      const k = `${provider}\0${model}`;
+      if (!metrics.has(k)) {
+        metrics.set(k, { provider, model, requests: 0, replies: 0, seconds: 0, timedReplies: 0 });
+      }
+      return metrics.get(k);
     };
-    await api(editId ? `/api/tasks/${encodeURIComponent(editId)}` : "/api/tasks", {
-      method:editId ? "PUT" : "POST", body:JSON.stringify(payload)
-    });
-    taskForm.reset();
-    taskForm.dataset.editId = "";
-    $("#task-dialog").close();
-    await loadTasks();
-  } catch (error) { $("#form-error").textContent = error.message; }
-  finally { button.disabled = false; }
-});
 
-$("#chat-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const input = $("#chat-input");
-  const button = $("#send-button");
-  const text = input.value.trim();
-  if (!text) return;
-  addMessage({role:"user", content:text});
-  input.value = "";
-  button.disabled = true;
-  const pending = document.createElement("div");
-  pending.className = "message assistant-message pending-message";
-  pending.textContent = "Orchestrator is thinking…";
-  messages.append(pending);
-  messages.scrollTop = messages.scrollHeight;
-  try {
-    const {reply} = await api("/api/chat", {method:"POST", body:JSON.stringify({message:text})});
-    pending.remove();
-    addMessage(reply);
-  } catch (error) {
-    pending.remove();
-    addMessage({role:"assistant", content:`I couldn’t reach Ollama: ${error.message}`});
-  } finally {
-    button.disabled = false;
-    input.focus();
-    messages.scrollTop = messages.scrollHeight;
-  }
-});
+    for (const r of records) if (r.provider) ensure(r.provider, r.model || "Model not recorded");
+    for (const r of applicableResets) ensure(r.provider, r.model);
+    ensure("Ollama", state.localModel || "orchestrator");
 
-$("#pm-button").addEventListener("click", async () => {
-  const input = $("#chat-input");
-  const button = $("#pm-button");
-  const request = input.value.trim();
-  if (!request) return alert("Describe the project request first.");
-  button.disabled = true;
-  const pending = document.createElement("div");
-  pending.className = "message assistant-message pending-message";
-  pending.textContent = "Sending the project request to PM/PO…";
-  messages.append(pending);
-  messages.scrollTop = messages.scrollHeight;
-  try {
-    await api("/api/pm-requests", {method:"POST", body:JSON.stringify({request, project_id:$("#active-project").value})});
-    input.value = "";
-    pending.remove();
-    await Promise.all([loadChat(), loadTasks()]);
-  } catch (error) {
-    pending.remove();
-    alert(`Could not send the request to PM/PO: ${error.message}`);
-  } finally { button.disabled = false; input.focus(); }
-});
-
-$("#clear-chat").addEventListener("click", async () => {
-  if (!confirm("Clear the saved Orchestrator conversation? This keeps all tasks and agent reply files.")) return;
-  const button = $("#clear-chat");
-  button.disabled = true;
-  try {
-    await api("/api/chat", {method:"DELETE"});
-    await loadChat();
-  } catch (error) {
-    alert(error.message);
-  } finally { button.disabled = false; }
-});
-
-const promptDialog = $("#prompt-dialog");
-const promptForm = $("#prompt-form");
-let promptCache = new Map();
-$("#open-prompts").addEventListener("click", async () => {
-  $("#prompt-error").textContent = "";
-  try {
-    const {prompts} = await api("/api/prompts");
-    promptCache = new Map(prompts.map(prompt => [prompt.id, prompt]));
-    promptForm.elements.prompt_id.innerHTML = prompts.map(prompt => `<option value="${escapeHtml(prompt.id)}">${escapeHtml(prompt.title)}</option>`).join("");
-    promptForm.elements.prompt_id.value = "orchestrator";
-    promptForm.elements.content.value = promptCache.get("orchestrator")?.content || "";
-    promptDialog.showModal();
-  } catch (error) { alert(`Could not load prompts: ${error.message}`); }
-});
-promptForm.elements.prompt_id.addEventListener("change", () => {
-  promptForm.elements.content.value = promptCache.get(promptForm.elements.prompt_id.value)?.content || "";
-});
-$("#close-prompts").addEventListener("click", () => promptDialog.close());
-$("#cancel-prompts").addEventListener("click", () => promptDialog.close());
-promptForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const id = promptForm.elements.prompt_id.value;
-  const button = promptForm.querySelector('[type="submit"]');
-  button.disabled = true;
-  $("#prompt-error").textContent = "";
-  try {
-    const {content, title} = await api(`/api/prompts/${encodeURIComponent(id)}`, {
-      method:"PUT", body:JSON.stringify({content:promptForm.elements.content.value})
-    });
-    promptCache.set(id, {id, title, content});
-    promptDialog.close();
-  } catch (error) { $("#prompt-error").textContent = error.message; }
-  finally { button.disabled = false; }
-});
-
-const contextDialog = $("#context-dialog");
-const contextForm = $("#context-form");
-let contextCache = new Map();
-$("#open-context").addEventListener("click", async () => {
-  $("#context-error").textContent = "";
-  try {
-    const {documents} = await api("/api/project-context");
-    contextCache = new Map(documents.map(document => [document.id, document]));
-    contextForm.elements.document_id.innerHTML = documents.map(document => `<option value="${escapeHtml(document.id)}">${escapeHtml(document.title)}</option>`).join("");
-    contextForm.elements.document_id.value = "project_brief";
-    contextForm.elements.content.value = contextCache.get("project_brief")?.content || "";
-    await loadContextHistory("project_brief");
-    contextDialog.showModal();
-  } catch (error) { alert(`Could not load project context: ${error.message}`); }
-});
-contextForm.elements.document_id.addEventListener("change", async () => {
-  const id = contextForm.elements.document_id.value;
-  contextForm.elements.content.value = contextCache.get(id)?.content || "";
-  await loadContextHistory(id);
-});
-$("#close-context").addEventListener("click", () => contextDialog.close());
-$("#cancel-context").addEventListener("click", () => contextDialog.close());
-contextForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const id = contextForm.elements.document_id.value;
-  const button = contextForm.querySelector('[type="submit"]');
-  button.disabled = true;
-  $("#context-error").textContent = "";
-  try {
-    const {content, title} = await api(`/api/project-context/${encodeURIComponent(id)}`, {
-      method:"PUT", body:JSON.stringify({content:contextForm.elements.content.value})
-    });
-    contextCache.set(id, {id, title, content});
-    await loadContextHistory(id);
-  } catch (error) { $("#context-error").textContent = error.message; }
-  finally { button.disabled = false; }
-});
-
-async function loadContextHistory(id) {
-  const select = $("#context-history");
-  const restoreButton = $("#restore-context");
-  const deleteButton = $("#delete-context-version");
-  const previousSelection = select.value;
-  const {history} = await api(`/api/project-context/${encodeURIComponent(id)}/history`);
-  select.innerHTML = history.length
-    ? history.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(formatTime(item.created_at))} · ${escapeHtml(item.preview || "Saved version")}</option>`).join("")
-    : `<option value="">No saved versions</option>`;
-  if (history.some(item => item.id === previousSelection)) select.value = previousSelection;
-  restoreButton.disabled = history.length === 0;
-  deleteButton.disabled = history.length === 0;
-}
-
-$("#context-history").addEventListener("change", () => {
-  const hasSelection = Boolean($("#context-history").value);
-  $("#restore-context").disabled = !hasSelection;
-  $("#delete-context-version").disabled = !hasSelection;
-});
-
-$("#restore-context").addEventListener("click", async () => {
-  const id = contextForm.elements.document_id.value;
-  const snapshotId = $("#context-history").value;
-  if (!snapshotId) return;
-  if (!confirm("Restore this saved version? The current document will first be saved as a new history version.")) return;
-  const button = $("#restore-context");
-  button.disabled = true;
-  try {
-    const restored = await api(`/api/project-context/${encodeURIComponent(id)}/restore`, {method:"POST", body:JSON.stringify({snapshot_id:snapshotId})});
-    contextForm.elements.content.value = restored.content;
-    contextCache.set(id, {id, title:restored.title, content:restored.content});
-    await loadContextHistory(id);
-  } catch (error) { alert(error.message); }
-  finally { button.disabled = false; }
-});
-
-$("#delete-context-version").addEventListener("click", async () => {
-  const id = contextForm.elements.document_id.value;
-  const snapshotId = $("#context-history").value;
-  if (!snapshotId) return;
-  const selectedLabel = $("#context-history").selectedOptions[0]?.textContent || snapshotId;
-  if (!confirm(`Permanently delete this saved version?\n\n${selectedLabel}\n\nThe current Project context will not change. This saved version cannot be restored after deletion.`)) return;
-  const button = $("#delete-context-version");
-  button.disabled = true;
-  try {
-    await api(`/api/project-context/${encodeURIComponent(id)}/history/${encodeURIComponent(snapshotId)}`, {method:"DELETE"});
-    await loadContextHistory(id);
-  } catch (error) { alert(error.message); }
-  finally { button.disabled = !$("#context-history").value; }
-});
-
-$("#chat-input").addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); $("#chat-form").requestSubmit(); }
-});
-
-api("/api/config").then(({model, available, model_found}) => {
-  if (!available) { $("#model-name").textContent = "Ollama unavailable"; $(".status-dot").classList.add("offline"); }
-  else if (!model_found) { $("#model-name").textContent = `Model not found · ${model}`; $(".status-dot").classList.add("offline"); }
-  else { $("#model-name").textContent = `Ollama · ${model}`; }
-}).catch(() => { $("#model-name").textContent = "Ollama unavailable"; $(".status-dot").classList.add("offline"); });
-loadTasks();
-loadChat();
-updateStatusMeter();
-setInterval(loadTasks, 5000);
-setInterval(updateStatusMeter, 2000);
-
-const settingsDialog = $("#settings-dialog");
-const connectionLabels = {gemini:"Gemini API key", openrouter:"OpenRouter free API key", groq:"GroqCloud API key", github:"GitHub fine-grained token"};
-$("#open-settings").addEventListener("click", async () => {
-  $("#settings-error").textContent = "";
-  try {
-    const [{connections, encryption_available}, {roles, providers, routing}] = await Promise.all([api("/api/connections"), api("/api/routing")]);
-    if (!encryption_available) throw new Error("Install python3-cryptography on the VM before adding saved credentials.");
-    $("#connection-fields").innerHTML = connections.map(item => `<label>${escapeHtml(item.name)}<input type="password" class="connection-key" data-connection="${escapeHtml(item.id)}" autocomplete="new-password" placeholder="${item.configured ? `Connected · ${escapeHtml(item.source)} · paste to replace` : "Not connected · paste key"}"><small class="muted">${item.configured ? "Saved value is hidden." : "Stored encrypted on the VM."}</small></label>`).join("");
-    $("#routing-fields").innerHTML = roles.map(role => `<section class="route-role"><strong>${escapeHtml(role)}</strong><div class="route-order">${routing[role].map((provider, index) => `<label>${index+1}<select data-route-role="${escapeHtml(role)}" data-route-rank="${index}">${providers.map(option => `<option value="${escapeHtml(option)}" ${option===provider?"selected":""}>${escapeHtml(option)}${!connections.some(c => c.configured && ((option==="Gemini"||option==="Antigravity")&&c.id==="gemini"||option==="OpenRouter"&&c.id==="openrouter"||option==="GroqCloud"&&c.id==="groq"))?" · not connected":""}</option>`).join("")}</select></label>`).join("")}</div></section>`).join("");
-    settingsDialog.showModal();
-  } catch (error) { $("#settings-error").textContent = error.message; settingsDialog.showModal(); }
-});
-$("#close-settings").addEventListener("click", () => settingsDialog.close());
-$("#cancel-settings").addEventListener("click", () => settingsDialog.close());
-$("#remove-github").addEventListener("click", async () => {
-  if (!confirm("Remove the saved GitHub token from the VM? Projects and task records will remain.")) return;
-  try { await api("/api/connections/github", {method:"DELETE"}); alert("Saved GitHub token removed."); settingsDialog.close(); }
-  catch (error) { $("#settings-error").textContent = error.message; }
-});
-$("#test-github").addEventListener("click", async () => {
-  try { const result = await api("/api/connections/github/test", {method:"POST", body:"{}"}); alert(`GitHub connected as ${result.login}.`); }
-  catch (error) { $("#settings-error").textContent = error.message; }
-});
-$("#settings-form").addEventListener("submit", async event => {
-  event.preventDefault();
-  const button = event.currentTarget.querySelector('[type="submit"]'); button.disabled = true; $("#settings-error").textContent = "";
-  try {
-    for (const input of $("#connection-fields").querySelectorAll(".connection-key")) if (input.value.trim()) await api(`/api/connections/${encodeURIComponent(input.dataset.connection)}`, {method:"PUT", body:JSON.stringify({secret:input.value.trim()})});
-    const routeMap = {};
-    for (const role of $("#routing-fields").querySelectorAll(".route-role")) {
-      const selects = [...role.querySelectorAll("select")].sort((a,b) => Number(a.dataset.routeRank)-Number(b.dataset.routeRank));
-      routeMap[selects[0]?.dataset.routeRole] = selects.map(select => select.value);
+    for (const r of records) {
+      if (!r.provider || !matchesPeriod(r.requested_at, period)) continue;
+      const model = r.model || "Model not recorded";
+      const resetAt = cutoff.get(`${r.provider}\0${model}`);
+      if (resetAt && r.requested_at && Date.parse(r.requested_at) <= Date.parse(resetAt)) continue;
+      const m = ensure(r.provider, model);
+      m.requests += 1;
+      if (r.state === "succeeded") {
+        m.replies += 1;
+        const dur = typeof r.duration_seconds === "number" ? r.duration_seconds : elapsedSeconds(r);
+        if (dur != null) {
+          m.seconds += dur;
+          m.timedReplies += 1;
+        }
+      }
     }
-    await api("/api/routing", {method:"POST", body:JSON.stringify({routing:routeMap})});
-    await loadTasks(); settingsDialog.close();
-  } catch (error) { $("#settings-error").textContent = error.message; }
-  finally { button.disabled = false; }
-});
 
-const projectsDialog = $("#projects-dialog");
-function slugify(value) { return String(value).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40) || `project-${Date.now()}`; }
-function renderProjectEditor(projects) {
-  $("#projects-fields").innerHTML = projects.map(project => `<section class="project-editor" data-project-card><div class="two-columns"><label>Project name<input data-project-name value="${escapeHtml(project.name||"")}" required maxlength="100"></label><label>GitHub repository URL<input data-project-repository list="github-repo-options" value="${escapeHtml(project.repository||"")}" placeholder="https://github.com/owner/repository"></label></div><label>Project background notes<textarea data-project-context rows="4" maxlength="20000" placeholder="Goals, product shape, stack, shared conventions">${escapeHtml(project.context||"")}</textarea></label><div class="project-history-controls"><select data-project-history disabled><option value="">No saved versions</option></select><button type="button" class="secondary" data-project-restore disabled>Restore</button><button type="button" class="danger" data-project-delete-version disabled>Delete version</button></div><label>Sub-projects <span class="muted">One per line: name | repository folder | focused background notes</span><textarea data-project-modules rows="4" placeholder="Payments | backend/payments | Owns billing and subscription logic">${escapeHtml((project.modules||[]).map(module=>`${module.name} | ${module.path} | ${module.context||""}`).join("\n"))}</textarea><input type="hidden" data-project-id value="${escapeHtml(project.id||"")}"></label><button type="button" class="danger" data-remove-project>Remove project</button></section>`).join("") + `<datalist id="github-repo-options">${githubRepoOptions.map(repo=>`<option value="${escapeHtml(repo.clone_url)}">${escapeHtml(repo.full_name)}${repo.private?" · private":""}</option>`).join("")}</datalist>`;
-}
-$("#open-projects").addEventListener("click", async () => {
-  $("#projects-error").textContent = "";
-  try { const result = await api("/api/projects"); projectCache = result.projects; githubRepoOptions = []; try { githubRepoOptions = (await api("/api/connections/github/repositories")).repositories || []; } catch {} renderProjectEditor(projectCache); for (const card of $("#projects-fields").querySelectorAll("[data-project-card]")) await loadProjectBackgroundHistory(card); projectsDialog.showModal(); }
-  catch (error) { $("#projects-error").textContent = error.message; projectsDialog.showModal(); }
-});
-$("#close-projects").addEventListener("click", () => projectsDialog.close());
-$("#cancel-projects").addEventListener("click", () => projectsDialog.close());
-$("#add-project").addEventListener("click", () => { const items = [...$("#projects-fields").querySelectorAll("[data-project-card]")].map(readProjectCard); items.push({id:"",name:"",repository:"",modules:[]}); renderProjectEditor(items); });
-$("#projects-fields").addEventListener("click", event => {
-  const restoreButton = event.target.closest("[data-project-restore]");
-  if (restoreButton) {
-    const card = restoreButton.closest("[data-project-card]");
-    const versionId = card.querySelector("[data-project-history]").value;
-    if (!versionId || !confirm("Restore this saved background? The current notes will be saved as another version.")) return;
-    api(`/api/projects/${encodeURIComponent(card.querySelector("[data-project-id]").value)}/restore-context`, {method:"POST", body:JSON.stringify({version_id:versionId})})
-      .then(result => {card.querySelector("[data-project-context]").value=result.context;return loadProjectBackgroundHistory(card);})
-      .catch(error => alert(error.message));
-    return;
-  }
-  const deleteVersionButton = event.target.closest("[data-project-delete-version]");
-  if (deleteVersionButton) {
-    const card=deleteVersionButton.closest("[data-project-card]");const versionId=card.querySelector("[data-project-history]").value;
-    if (!versionId || !confirm("Permanently delete this saved project background version?")) return;
-    api(`/api/projects/${encodeURIComponent(card.querySelector("[data-project-id]").value)}/context-history/${encodeURIComponent(versionId)}`, {method:"DELETE"})
-      .then(()=>loadProjectBackgroundHistory(card)).catch(error=>alert(error.message));
-    return;
-  }
-  if (!event.target.closest("[data-remove-project]")) return;
-  const cards = [...$("#projects-fields").querySelectorAll("[data-project-card]")];
-  if (cards.length < 2) return alert("Keep at least one project.");
-  event.target.closest("[data-project-card]").remove();
-});
-function readProjectCard(card) {
-  const name = card.querySelector("[data-project-name]").value.trim();
-  const lines = card.querySelector("[data-project-modules]").value.split("\n").map(line=>line.trim()).filter(Boolean);
-  const modules = lines.map(line=>{const parts=line.split("|").map(part=>part.trim());return {id:slugify(parts[0]),name:parts[0],path:parts[1]||"",context:parts.slice(2).join(" | ")};});
-  return {id:card.querySelector("[data-project-id]").value||slugify(name),name,repository:card.querySelector("[data-project-repository]").value.trim(),context:card.querySelector("[data-project-context]").value.trim(),modules};
-}
+    const rows = [...metrics.values()].sort(
+      (a, b) => a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model)
+    );
+    const total = rows.reduce(
+      (acc, item) => ({
+        requests: acc.requests + item.requests,
+        replies: acc.replies + item.replies,
+        seconds: acc.seconds + item.seconds,
+        timedReplies: acc.timedReplies + item.timedReplies,
+      }),
+      { requests: 0, replies: 0, seconds: 0, timedReplies: 0 }
+    );
 
-const repositoryViewDialog = $("#repository-view-dialog");
-let repositoryViewMode = "files";
-let repositoryViewPath = "";
-async function showRepositoryFolder(path = "") {
-  const projectId = $("#active-project").value;
-  const error = $("#repository-view-error");
-  error.textContent = "";
-  try {
-    const result = await api(`/api/projects/${encodeURIComponent(projectId)}/github-files?path=${encodeURIComponent(path)}`);
-    repositoryViewPath = result.path;
-    $("#repository-view-meta").textContent = `${projectCache.find(item => item.id === projectId)?.repository || "GitHub repository"} · ${result.branch} · ${result.path || "/"}`;
-    const folders = result.entries.filter(item => item.type === "dir");
-    let files = result.entries.filter(item => item.type === "file");
-    if (repositoryViewMode === "documentation") files = files.filter(item => /\.(md|txt)$/i.test(item.name));
-    $("#repository-file-list").innerHTML = `<button class="repository-entry repository-parent" data-repository-path="${escapeHtml(result.path.includes("/") ? result.path.split("/").slice(0,-1).join("/") : "")}">↑ ${result.path ? "Parent folder" : "Repository root"}</button>` + folders.map(item => `<button class="repository-entry" data-repository-path="${escapeHtml(item.path)}">📁 ${escapeHtml(item.name)}/</button>`).join("") + files.map(item => `<button class="repository-entry" data-repository-file="${escapeHtml(item.path)}">${escapeHtml(item.name)} <span>${Number(item.size||0).toLocaleString()} B</span></button>`).join("") || `<p class="muted">No matching files in this folder.</p>`;
-    $("#repository-file-content").textContent = "Choose a file to view it.";
-  } catch (cause) {
-    if (repositoryViewMode === "documentation" && path === "docs") return showRepositoryFolder("");
-    error.textContent = cause.message; $("#repository-file-list").replaceChildren();
+    const cells = (m) => `
+      <span>${m.requests} ${m.requests === 1 ? "request" : "requests"}</span>
+      <span>${m.replies} ${m.replies === 1 ? "reply" : "replies"}</span>
+      <span>avg ${escapeHtml(formatDuration(m.timedReplies ? m.seconds / m.timedReplies : null))}</span>`;
+
+    $("#provider-statistics").hidden = false;
+    $("#provider-stat-rows").innerHTML =
+      `<div class="provider-stat-row provider-stat-total"><strong>Total</strong>${cells(total)}<span></span></div>` +
+      rows
+        .map(
+          (m) => `
+          <div class="provider-stat-row">
+            <div class="provider-stat-model"><strong>${escapeHtml(m.provider)}</strong><small>${escapeHtml(
+              m.model
+            )}</small></div>
+            ${cells(m)}
+            <button type="button" class="stat-reset" data-reset-provider="${escapeHtml(
+              m.provider
+            )}" data-reset-model="${escapeHtml(m.model)}">Reset</button>
+          </div>`
+        )
+        .join("");
+
+    const qRows = state.qualityRows || [];
+    $("#provider-quality-rows").innerHTML = qRows.length
+      ? `<div class="quality-head"><span>Role / provider</span><span>Requests / replies</span><span>QA pass</span><span>Errors</span><span>Avg time</span></div>` +
+        qRows
+          .map(
+            (r) => `
+          <div class="quality-row">
+            <strong>${escapeHtml(r.role)}<small>${escapeHtml(r.provider)}</small></strong>
+            <span>${r.requests} / ${r.replies}</span>
+            <span>${r.qa_pass_rate == null ? `— (${r.measured} scored)` : `${r.qa_pass_rate}% (${r.measured})`}</span>
+            <span>${r.quota_or_service_errors}</span>
+            <span>${r.average_seconds == null ? "—" : escapeHtml(formatDuration(r.average_seconds))}</span>
+          </div>`
+          )
+          .join("")
+      : `<p class="notification-empty">No task outcomes recorded yet. Deliverable QA results will appear here.</p>`;
   }
-}
-async function openRepositoryView(mode) {
-  repositoryViewMode = mode;
-  $("#repository-view-title").textContent = mode === "documentation" ? "Project documentation" : "Project files";
-  $("#repository-view-eyebrow").textContent = mode === "documentation" ? "VERSIONED PROJECT DOCUMENTS" : "GITHUB DEFAULT BRANCH";
-  repositoryViewDialog.showModal();
-  if (mode === "documentation") {
-    try { await showRepositoryFolder("docs"); }
-    catch { await showRepositoryFolder(""); }
-  } else await showRepositoryFolder("");
-}
-$("#open-files").addEventListener("click", () => openRepositoryView("files"));
-$("#open-documentation").addEventListener("click", () => openRepositoryView("documentation"));
-$("#close-repository-view").addEventListener("click", () => repositoryViewDialog.close());
-$("#repository-file-list").addEventListener("click", async event => {
-  const folder = event.target.closest("[data-repository-path]");
-  if (folder) return showRepositoryFolder(folder.dataset.repositoryPath);
-  const file = event.target.closest("[data-repository-file]");
-  if (!file) return;
-  const projectId = $("#active-project").value;
-  const error = $("#repository-view-error"); error.textContent = "";
-  try {
-    const result = await api(`/api/projects/${encodeURIComponent(projectId)}/github-files?file=${encodeURIComponent(file.dataset.repositoryFile)}`);
-    $("#repository-view-meta").textContent = `${projectCache.find(item => item.id === projectId)?.repository || "GitHub repository"} · ${result.branch} · ${result.path}`;
-    $("#repository-file-content").textContent = result.content;
-  } catch (cause) { error.textContent = cause.message; }
-});
-$("#active-project").addEventListener("change", () => {
-  if (repositoryViewDialog.open) showRepositoryFolder(repositoryViewMode === "documentation" ? "docs" : "");
-});
-async function loadProjectBackgroundHistory(card) {
-  const projectId = card.querySelector("[data-project-id]").value;
-  const select = card.querySelector("[data-project-history]");
-  if (!projectId) return;
-  try {
-    const {history} = await api(`/api/projects/${encodeURIComponent(projectId)}/context-history`);
-    select.innerHTML = history.length ? history.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(formatTime(item.created_at))} · ${escapeHtml(item.preview)}</option>`).join("") : `<option value="">No saved versions</option>`;
-    card.querySelector("[data-project-restore]").disabled = history.length === 0;
-    card.querySelector("[data-project-delete-version]").disabled = history.length === 0;
-  } catch {}
-}
-$("#projects-form").addEventListener("submit", async event => {
-  event.preventDefault(); const button=event.currentTarget.querySelector('[type="submit"]');button.disabled=true;$("#projects-error").textContent="";
-  try { const projects=[...$("#projects-fields").querySelectorAll("[data-project-card]")].map(readProjectCard);await api("/api/projects",{method:"PUT",body:JSON.stringify({projects})});projectCache=projects;projectsDialog.close();await loadTasks(); }
-  catch(error){$("#projects-error").textContent=error.message;} finally{button.disabled=false;}
-});
+
+  $("#open-statistics")?.addEventListener("click", () => {
+    renderStatistics();
+    if (!statsDialog.open) statsDialog.showModal();
+  });
+  $("#close-statistics")?.addEventListener("click", () => statsDialog.close());
+  statPeriodSelect?.addEventListener("change", () => renderStatistics());
+
+  $("#provider-stat-rows")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-reset-provider]");
+    if (!btn) return;
+    const provider = btn.getAttribute("data-reset-provider");
+    const model = btn.getAttribute("data-reset-model");
+    const period = statPeriodSelect.value || "today";
+    if (!confirm(`Reset the displayed statistic for ${provider} · ${model}? Past usage history will be kept.`)) {
+      return;
+    }
+    btn.disabled = true;
+    try {
+      await api("/api/llm-usage/reset", {
+        method: "POST",
+        body: JSON.stringify({ provider, model, period, bucket: periodBucket(period) }),
+      });
+      await refreshBoard();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // --- Orchestrator Chat ---
+  const messagesEl = $("#messages");
+  const chatForm = $("#chat-form");
+  const chatInput = $("#chat-input");
+
+  function renderChatMessages(messages, pendingLabel = "") {
+    if (!messages.length && !pendingLabel) {
+      messagesEl.innerHTML = `
+        <div class="welcome-message">
+          <div class="welcome-icon">✳</div>
+          <h3>Talk through the work</h3>
+          <p>Ask for help clarifying a request, planning acceptance checks, or understanding the board.</p>
+        </div>`;
+      return;
+    }
+    let html = messages
+      .map(
+        (m) => `
+        <div class="message ${m.role === "user" ? "user-message" : "assistant-message"}">
+          <div class="message-role">${m.role === "user" ? "You" : "Orchestrator"}</div>
+          <div class="message-content">${escapeHtml(m.content)}</div>
+        </div>`
+      )
+      .join("");
+    if (pendingLabel) {
+      html += `<div class="message assistant-message pending-message">${escapeHtml(pendingLabel)}</div>`;
+    }
+    messagesEl.innerHTML = html;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  let chatMessages = [];
+  async function loadChat() {
+    try {
+      const res = await api("/api/chat");
+      chatMessages = res.messages || [];
+      renderChatMessages(chatMessages);
+    } catch (err) {
+      messagesEl.innerHTML = `<div class="inline-error">Could not load chat history: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  chatForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = chatInput.value.trim();
+    if (!text) return;
+    chatInput.value = "";
+    $("#send-button").disabled = true;
+    $("#pm-button").disabled = true;
+    chatMessages = [...chatMessages, { role: "user", content: text }];
+    renderChatMessages(chatMessages, "Orchestrator is thinking…");
+    try {
+      const res = await api("/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: text }),
+      });
+      chatMessages = res.messages || chatMessages;
+      renderChatMessages(chatMessages);
+    } catch (err) {
+      chatMessages = [...chatMessages, { role: "assistant", content: err.message }];
+      renderChatMessages(chatMessages);
+    } finally {
+      $("#send-button").disabled = false;
+      $("#pm-button").disabled = false;
+      chatInput.focus();
+    }
+  });
+
+  chatInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      chatForm.requestSubmit();
+    }
+  });
+
+  $("#pm-button")?.addEventListener("click", async () => {
+    const text = chatInput.value.trim();
+    if (!text) {
+      alert("Describe the project request first.");
+      return;
+    }
+    $("#send-button").disabled = true;
+    $("#pm-button").disabled = true;
+    renderChatMessages(chatMessages, "Sending the project request to PM/PO…");
+    try {
+      await api("/api/pm-requests", {
+        method: "POST",
+        body: JSON.stringify({ request: text, project_id: state.activeProjectId }),
+      });
+      chatInput.value = "";
+      await Promise.all([loadChat(), refreshBoard()]);
+    } catch (err) {
+      renderChatMessages(chatMessages);
+      alert(`Could not send the request to PM/PO: ${err.message}`);
+    } finally {
+      $("#send-button").disabled = false;
+      $("#pm-button").disabled = false;
+      chatInput.focus();
+    }
+  });
+
+  $("#clear-chat")?.addEventListener("click", async () => {
+    if (!confirm("Clear the saved Orchestrator conversation? This keeps all tasks and agent reply files.")) {
+      return;
+    }
+    try {
+      await api("/api/chat", { method: "DELETE" });
+      await loadChat();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // --- Boot ---
+  void loadConfig();
+  void refreshBoard();
+  void loadChat();
+  void refreshStatus();
+  setInterval(() => void refreshBoard(), 5000);
+  setInterval(() => void refreshStatus(), 2000);
+})();
