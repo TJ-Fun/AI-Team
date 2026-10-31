@@ -12,6 +12,7 @@
     tasks: [],
     projects: [{ id: "default", name: "Main project", repository: "", context: "", modules: [] }],
     activeProjectId: localStorage.getItem("ai_team_active_project") || "default",
+    activeModuleId: localStorage.getItem("ai_team_active_subproject") || "",
     localModel: "orchestrator",
     localCalls: [],
     statResets: [],
@@ -223,13 +224,50 @@
     }
   });
 
-  // --- Projects & Active Project Selector ---
+  // --- Projects & Active Project / Sub-project Selectors ---
+  function renderActiveSubprojectSelect() {
+    const wrap = $("#active-subproject-wrap");
+    const select = $("#active-subproject");
+    if (!wrap || !select) return;
+
+    const activeProj = state.projects.find((p) => p.id === state.activeProjectId);
+    const modules = activeProj?.modules || [];
+    if (!modules.length) {
+      if (state.activeModuleId) {
+        state.activeModuleId = "";
+        localStorage.setItem("ai_team_active_subproject", "");
+      }
+      wrap.hidden = true;
+      select.innerHTML = `<option value="">Whole project</option>`;
+      return;
+    }
+
+    if (state.activeModuleId && !modules.some((m) => m.id === state.activeModuleId)) {
+      state.activeModuleId = "";
+      localStorage.setItem("ai_team_active_subproject", "");
+    }
+
+    select.innerHTML =
+      `<option value=""${state.activeModuleId === "" ? " selected" : ""}>Whole project</option>` +
+      modules
+        .map(
+          (m) =>
+            `<option value="${escapeHtml(m.id)}"${m.id === state.activeModuleId ? " selected" : ""}>${escapeHtml(
+              m.name
+            )}</option>`
+        )
+        .join("");
+    wrap.hidden = false;
+  }
+
   function renderActiveProjectSelect() {
     const select = $("#active-project");
     if (!select) return;
     if (!state.projects.some((p) => p.id === state.activeProjectId)) {
       state.activeProjectId = state.projects[0]?.id || "default";
       localStorage.setItem("ai_team_active_project", state.activeProjectId);
+      state.activeModuleId = "";
+      localStorage.setItem("ai_team_active_subproject", "");
     }
     select.innerHTML = state.projects
       .map(
@@ -237,15 +275,25 @@
           `<option value="${escapeHtml(p.id)}"${p.id === state.activeProjectId ? " selected" : ""}>${escapeHtml(p.name)}</option>`
       )
       .join("");
+    renderActiveSubprojectSelect();
   }
 
   $("#active-project")?.addEventListener("change", (e) => {
     state.activeProjectId = e.target.value;
     localStorage.setItem("ai_team_active_project", state.activeProjectId);
+    state.activeModuleId = "";
+    localStorage.setItem("ai_team_active_subproject", "");
+    renderActiveSubprojectSelect();
     renderTasks();
     if ($("#repository-view-dialog")?.open) {
       void openRepositoryView(state.repoMode);
     }
+  });
+
+  $("#active-subproject")?.addEventListener("change", (e) => {
+    state.activeModuleId = e.target.value;
+    localStorage.setItem("ai_team_active_subproject", state.activeModuleId);
+    renderTasks();
   });
 
   // --- Task Board ---
@@ -258,8 +306,17 @@
 
   function renderTasks() {
     const allTasks = state.tasks || [];
-    const overviewExists = allTasks.some((t) => t.task_type === "project_overview");
-    const plannedWork = allTasks.filter((t) => t.task_type === "work" && t.status !== "Canceled");
+    const activeProj = state.projects.find((p) => p.id === state.activeProjectId);
+    const modules = activeProj?.modules || [];
+    const effectiveModuleId = modules.some((m) => m.id === state.activeModuleId) ? state.activeModuleId : "";
+
+    const projectTasks = allTasks.filter((t) => (t.project_id || "default") === state.activeProjectId);
+    const visibleTasks = effectiveModuleId
+      ? projectTasks.filter((t) => (t.module_id || "") === effectiveModuleId)
+      : projectTasks;
+
+    const overviewExists = projectTasks.some((t) => t.task_type === "project_overview");
+    const plannedWork = visibleTasks.filter((t) => t.task_type === "work" && t.status !== "Canceled");
     const completedWork = plannedWork.filter((t) => t.status === "Done").length;
     const pct = plannedWork.length ? Math.round((completedWork * 100) / plannedWork.length) : 0;
 
@@ -272,18 +329,30 @@
       }
     }
 
-    $("#task-summary").textContent = `${allTasks.length} ${allTasks.length === 1 ? "task" : "tasks"}`;
+    $("#task-summary").textContent = `${visibleTasks.length} ${visibleTasks.length === 1 ? "task" : "tasks"}`;
     const listEl = $("#task-list");
     const emptyEl = $("#empty-state");
 
-    if (!allTasks.length) {
+    if (!visibleTasks.length) {
       listEl.innerHTML = "";
-      emptyEl.hidden = false;
+      if (emptyEl) {
+        const emptyTitle = emptyEl.querySelector("h3");
+        const emptyCopy = emptyEl.querySelector("p");
+        if (emptyTitle) {
+          emptyTitle.textContent = effectiveModuleId ? "No tasks in this sub-project yet" : "No tasks yet";
+        }
+        if (emptyCopy) {
+          emptyCopy.textContent = effectiveModuleId
+            ? "Create a task for this sub-project or switch back to Whole project."
+            : "Create a task to start keeping the project plan in one place.";
+        }
+        emptyEl.hidden = false;
+      }
       return;
     }
-    emptyEl.hidden = true;
+    if (emptyEl) emptyEl.hidden = true;
 
-    listEl.innerHTML = allTasks
+    listEl.innerHTML = visibleTasks
       .map((task) => {
         const proj = state.projects.find((p) => p.id === (task.project_id || "default"));
         const mod = proj?.modules?.find((m) => m.id === task.module_id);
@@ -495,7 +564,13 @@
     $("#form-error").textContent = "";
 
     const projId = task?.project_id || state.activeProjectId || state.projects[0]?.id || "default";
-    populateTaskProjectOptions(projId, task?.module_id || "");
+    const projObj = state.projects.find((p) => p.id === projId);
+    const defaultModId = task
+      ? task.module_id || ""
+      : state.activeModuleId && projObj?.modules?.some((m) => m.id === state.activeModuleId)
+        ? state.activeModuleId
+        : "";
+    populateTaskProjectOptions(projId, defaultModId);
 
     taskForm.elements.title.value = task?.title || "";
     taskForm.elements.request.value = task?.request || "";
