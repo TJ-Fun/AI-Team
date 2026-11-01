@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.23 · Updated 2026-11-01  
+Version 0.24 · Updated 2026-11-01  
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
 ## 1. Overview
@@ -74,6 +74,8 @@ The service must have both systemd write permission (`ReadWritePaths`) and Unix 
 ### 4.6 Logs and Statistics
 
 **Settings → Logs** lets an operator set the minimum level stored, filter displayed levels, load recent log entries, and clear logs. Logs are written to `TEAM_DATA_DIR/logs/app.log` and rotated daily with seven backups.
+
+The Settings dialog uses Projects, Connections, Routing, Logs, and About tabs. A shared Close button remains at the bottom of the dialog. Long log and documentation lines wrap within their viewers to avoid horizontal scrolling.
 
 **Statistics** is available directly from the header. Its period selector filters provider request, successful reply, and average response-time summaries. Deliverable QA pass rates are shown from recorded provider quality results. Usage reset changes a display baseline for the selected provider/model and period; it does not delete historical records.
 

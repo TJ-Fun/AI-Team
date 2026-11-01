@@ -248,7 +248,7 @@
           <datalist id="github-repo-options"></datalist>
           <button class="secondary" type="button" id="add-project">＋ Add project</button>
           <div class="form-error" id="projects-error" role="alert"></div>
-          <div class="dialog-actions"><button class="secondary" type="button" id="cancel-projects">Close settings</button><button class="primary" type="submit">Save projects</button></div>
+          <div class="dialog-actions"><button class="primary" type="submit">Save projects</button></div>
         </form>
       </section>
       <section class="settings-tab-panel" id="settings-panel-connections" role="tabpanel" aria-labelledby="settings-tab-connections" hidden>
@@ -259,7 +259,6 @@
           <div class="dialog-actions"><button class="secondary" type="button" id="test-github">Test GitHub connection</button></div>
           <div class="prompt-feedback" id="connections-success" hidden role="status"></div>
           <div class="form-error" id="connections-error" role="alert"></div>
-          <div class="dialog-actions"><button class="secondary" type="button" id="cancel-connections">Close settings</button></div>
         </form>
       </section>
       <section class="settings-tab-panel" id="settings-panel-routing" role="tabpanel" aria-labelledby="settings-tab-routing" hidden>
@@ -268,7 +267,7 @@
           <p class="draft-note">Set the provider rank order for each role. Unavailable connections are skipped automatically; changing a rank swaps the providers so each one appears once.</p>
           <div id="routing-roles"></div>
           <div class="form-error" id="routing-error" role="alert"></div>
-          <div class="dialog-actions"><button class="secondary" type="button" id="cancel-routing">Close settings</button><button class="primary" type="submit">Save routing</button></div>
+          <div class="dialog-actions"><button class="primary" type="submit">Save routing</button></div>
         </form>
       </section>
       <section class="settings-tab-panel" id="settings-panel-logs" role="tabpanel" aria-labelledby="settings-tab-logs" hidden>
@@ -325,8 +324,10 @@
             <input id="app-working-dir" type="text" placeholder="/opt/personal-ai-team" readonly>
           </label>
           <button type="button" class="secondary" id="save-app-config">Save configuration</button>
-          <button type="button" class="primary" id="update-app">Update App</button>
-          <button type="button" class="danger" id="restart-app">Restart App</button>
+          <div class="app-update-actions">
+            <button type="button" class="primary" id="update-app">Update App</button>
+            <button type="button" class="danger" id="restart-app">Restart App</button>
+          </div>
           <div id="update-status" class="update-status"></div>
           <div id="restart-status" class="restart-status"></div>
         </div>

@@ -1417,6 +1417,7 @@
 
   async function openRepositoryView(mode) {
     state.repoMode = mode;
+    repoDialog.classList.remove("document-file-view");
     $("#repository-view-eyebrow").textContent =
       mode === "documentation" ? "LOCAL DOCUMENTATION FOLDER" : "LOCAL PROJECT FOLDER";
     $("#repository-view-title").textContent =
@@ -1427,6 +1428,7 @@
 
   async function openDocumentationFile(filePath, title) {
     state.repoMode = "documentation";
+    repoDialog.classList.add("document-file-view");
     $("#repository-view-eyebrow").textContent = "LOCAL APP DOCUMENTATION";
     $("#repository-view-title").textContent = title;
     $("#repository-view-meta").textContent = filePath;
@@ -1679,8 +1681,6 @@
     }
   });
 
-  $("#cancel-connections")?.addEventListener("click", () => $("#settings-dialog").close());
-
   connectionsForm?.addEventListener("submit", (e) => e.preventDefault());
 
   routingForm?.addEventListener("submit", async (e) => {
@@ -1697,7 +1697,6 @@
       $("#routing-error").textContent = err.message;
     }
   });
-  $("#cancel-routing")?.addEventListener("click", () => $("#settings-dialog").close());
 
   // --- Projects & Sub-projects Dialog ---
   const projectsForm = $("#projects-form");
@@ -1983,8 +1982,6 @@
     });
     renderProjectEditors();
   });
-
-  $("#cancel-projects")?.addEventListener("click", () => $("#settings-dialog").close());
 
   projectsForm?.addEventListener("submit", async (e) => {
     e.preventDefault();

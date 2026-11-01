@@ -1,5 +1,13 @@
 # Version log
 
+## 0.24 — 2026-11-01
+
+- Removed duplicate Close settings actions from the Projects, Connections, and Routing tabs; the shared Settings Close action remains.
+- Wrapped log, version-log, and documentation text to prevent horizontal overflow.
+- Removed the unused file-list column from the About document viewer.
+- Aligned the Update App and Restart App buttons.
+- Updated the About version to 0.24.
+
 ## 0.23 — 2026-11-01
 
 - Reorganized Settings into Projects, Connections, Routing, Logs, and About tabs; kept the active-project selector on the main board.

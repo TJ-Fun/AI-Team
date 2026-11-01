@@ -68,6 +68,9 @@
 .repository-entry span{color:var(--muted,#64748b);white-space:nowrap}
 #repository-file-content{overflow:auto;white-space:pre;tab-size:2;margin:0;border:1px solid var(--line,#d7dee8);border-radius:10px;padding:14px;background:#f8fafc;font:12px/1.5 ui-monospace,monospace}
 @media(max-width:700px){.repository-view-body{grid-template-columns:1fr;max-height:75vh}#repository-file-list{max-height:24vh}#repository-file-content{min-height:38vh}}
+.repository-view-dialog.document-file-view .repository-view-body{grid-template-columns:minmax(0,1fr);min-height:0}
+.repository-view-dialog.document-file-view #repository-file-list{display:none}
+.repository-view-dialog.document-file-view #repository-file-content{min-width:0;max-width:100%;overflow-x:hidden;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
 
 /* Compact header notifications trigger, issues modal, and task detail provider selector */
 .header-notifications-trigger{height:38px;max-width:280px;display:inline-flex;align-items:center;gap:8px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:#fbfcfa;color:#4e574e;font:600 11px/1.2 system-ui,sans-serif;cursor:pointer;transition:.15s}
@@ -104,7 +107,7 @@
 .settings-section .log-control-label{display:flex;flex-direction:row;align-items:center;gap:6px;margin:0!important;color:#6f786d;font-size:10px}
 .log-controls select{border:1px solid #dfe4dc;border-radius:7px;padding:7px;background:#fff;color:#586353;font:11px system-ui,sans-serif}
 .log-controls button{font-size:10px;padding:7px 9px;height:32px;min-height:32px}
-.log-output{background:#f8f9f6;border:1px solid #e9ece6;border-radius:8px;padding:10px;margin:0;min-height:200px;max-height:400px;overflow:auto;font:11px/1.4 ui-monospace,monospace;color:#475447}
+.log-output{background:#f8f9f6;border:1px solid #e9ece6;border-radius:8px;padding:10px;margin:0;min-height:200px;max-height:400px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:11px/1.4 ui-monospace,monospace;color:#475447}
 .log-output .muted{color:#929990}
 .log-critical{color:#a34e40;font-weight:700}
 .log-error{color:#c45f55;font-weight:600}
@@ -134,8 +137,10 @@
 .settings-section input:not([type="checkbox"]),.settings-section select,.settings-section textarea{width:100%;border:1px solid #dfe4dc;border-radius:8px;padding:10px 11px;background:#fff;color:var(--ink);font:13px/1.5 system-ui,sans-serif;outline:0}
 .settings-section input:not([type="checkbox"]):focus,.settings-section select:focus,.settings-section textarea:focus{border-color:#94b395;box-shadow:0 0 0 3px #edf4ec}
 .settings-section input[readonly]{background:#f4f5f2;color:#697168}
-.settings-section #restart-app{margin:10px 0 0 8px;vertical-align:middle}
-.settings-section #update-app{margin-right:4px}
+.app-update-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.app-update-actions #update-app,.app-update-actions #restart-app{height:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;margin:0;padding:0 14px;font-size:12px}
+.app-update-actions #restart-app{margin-left:0}
+.settings-section #update-app{margin-right:0}
 .about-content{max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #e9ece6;border-radius:8px;padding:12px;background:#fff;color:#596157;font:11px/1.6 ui-monospace,monospace}
 .about-project-link{display:inline-block;margin-top:10px;color:var(--green);font-size:11px;font-weight:650}
 .about-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
