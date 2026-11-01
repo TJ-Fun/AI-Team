@@ -1,5 +1,14 @@
 # Version log
 
+## 0.25 — 2026-11-01
+
+- Accept valid PM/PO plans with unknown sub-project IDs by assigning those tasks to the whole project, and report precise schema validation errors.
+- Clarified PM/PO response schema and sub-project ID instructions; aligned shared agent response guidance with task-provided output formats.
+- Added notifications for tasks in Rework needed.
+- Logged every task creation and status transition in the activity event log and application log; logged when agent reply files are saved.
+- Updated the documentation for task logging, project-specific context, PM/PO plans, and the Agent prompts settings tab.
+- Updated the About version to 0.25.
+
 ## 0.24 — 2026-11-01
 
 - Removed duplicate Close settings actions from the Projects, Connections, and Routing tabs; the shared Settings Close action remains.

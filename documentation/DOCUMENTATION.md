@@ -1,6 +1,7 @@
 # Personal AI Team — Project Documentation
 
-Version 0.24 · Updated 2026-11-01  
+Version 0.25 · Updated 2026-11-01
+
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
 ## 1. Overview
@@ -28,7 +29,7 @@ The application is intended for a trusted, single-user environment. The default 
 
 The server uses Python's `ThreadingHTTPServer`; the frontend is served from `static/`. The browser communicates with JSON endpoints under `/api/`. Long-running project Git clones are handled as background jobs so the browser can poll for progress and completion without holding the request open.
 
-`TEAM_DATA_DIR` sets the writable application data root. The default is `data/` beside `server.py`; the supplied systemd unit sets it to `/var/lib/personal-ai-team`. The server stores tasks, replies, projects, prompts, context documents, chat history, credentials, usage/reset records, and rotating logs there. Data is separate from application source so app updates do not replace user content.
+`TEAM_DATA_DIR` sets the writable application data root. The default is `data/` beside `server.py`; the supplied systemd unit sets it to `/var/lib/personal-ai-team`. The server stores tasks, replies, projects, prompts, per-project context documents and history, chat history, credentials, usage/reset records, activity events, and rotating application logs there. Data is separate from application source so app updates do not replace user content.
 
 Saved credentials are encrypted with Fernet when the `cryptography` dependency is available. The encryption key is generated under `TEAM_DATA_DIR/settings/secret.key` with owner-only permissions. Back up the data directory and key together; losing the key makes saved encrypted credentials unreadable. Provider keys may alternatively be supplied using environment variables such as `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, and `GITHUB_TOKEN`.
 
@@ -39,20 +40,20 @@ The supplied service runs as the unprivileged `ubuntu` user, uses `ProtectSystem
 ### 4.1 Projects and board
 
 1. Select the active project from the selector on the task board. The selector remains outside Settings because switching projects is a frequent board action.
-2. Use **Settings → Projects** to add or edit project definitions, repository URLs, local checkout paths, sub-projects, and focused project context.
+2. Use **Settings → Projects** to add or edit project definitions, repository URLs, local checkout paths, and sub-projects. Use **Project context** on the board to edit that project's durable documents.
 3. Use **New task** to create a draft with a role, provider preference, project/sub-project, request, and optional acceptance checks.
 4. A task remains a draft until reviewed and marked Ready. Deliverable work requires acceptance checks before it can enter the agent queue.
 5. Follow status, attempts, agent replies, validation results, and activity from the board/task details. Browser polling refreshes board and runtime status.
 
 ### 4.2 Orchestrator and PM/PO
 
-The Orchestrator chat is local to the configured Ollama instance and uses the selected Project Board project's context. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a draft backlog. Review the response and task drafts before starting work. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data.
+The Orchestrator chat is local to the configured Ollama instance and uses the selected Project Board project's context. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a draft backlog. Review the response and task drafts before starting work. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data. PM/PO plans must follow the JSON schema supplied with the request; unknown sub-project IDs are safely assigned to the whole project rather than rejecting the entire plan.
 
 ### 4.3 Provider connections and routing
 
 1. Open **Settings → Connections** to add, replace, test, or clear provider credentials. Supported connection families are Gemini/Antigravity, GroqCloud, OpenRouter, and the GitHub repository connector.
 2. Open **Settings → Routing** to set provider rank order per work role. Unavailable providers are skipped by the dispatcher.
-3. A task can request automatic selection or a specific provider. Provider attempts and quality outcomes feed the Statistics view.
+3. A task can request automatic selection or a specific provider. Provider attempts and quality outcomes feed the Statistics view. Task creation and status transitions are always written to `TEAM_DATA_DIR/logs/activity.jsonl` and to `app.log` when the configured capture level includes INFO. Agent reply text is saved under `TEAM_DATA_DIR/replies/<task_id>/<provider>/` and shown in task details; `app.log` records when that reply file is saved, not the full reply body.
 
 ### 4.4 GitHub repository work
 

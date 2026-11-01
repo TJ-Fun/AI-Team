@@ -232,8 +232,9 @@ PM_PLANNING_CONTRACT = (
     '{"type":"plan","summary":"brief plan summary","project_overview":{"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log"},'
     '"tasks":[{"title":"task title","request":"bounded implementation request",'
-    '"role":"Frontend developer","module_id":"optional sub-project id","acceptance_checks":["observable check"],"produces_deliverable":true}]}. '
+    '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true}]}. '
     "Use only these work roles: PM/PO, Frontend developer, Backend developer, QA, UI designer, Documentation. "
+    "Use only sub-project IDs listed in the project context; use an empty module_id for the whole project. "
     "Propose 1 to 12 small tasks. When writing the overview, preserve confirmed existing context, separate facts from assumptions, "
     "and provide concise complete content for all three documents. Do not claim the tasks have already been created."
 )
@@ -571,7 +572,49 @@ def read_task(task_id: str) -> dict[str, Any] | None:
 def write_task(task: dict[str, Any]) -> None:
     ensure_data()
     with STATE_LOCK:
-        atomic_json(DATA / "tasks" / f"{task['id']}.json", task)
+        task_path = DATA / "tasks" / f"{task['id']}.json"
+        previous = read_task(str(task["id"]))
+        atomic_json(task_path, task)
+        timestamp = str(task.get("updated_at") or now_iso())
+        if previous is None:
+            status = str(task.get("status") or "Unknown")
+            append_event(
+                {
+                    "at": timestamp,
+                    "type": "task_created",
+                    "task_id": task["id"],
+                    "status": status,
+                    "project_id": task.get("project_id") or "default",
+                    "task_type": task.get("task_type") or "work",
+                }
+            )
+            logger.info(
+                "Task created task_id=%s status=%s project_id=%s",
+                task["id"],
+                status,
+                task.get("project_id") or "default",
+            )
+        else:
+            old_status = str(previous.get("status") or "Unknown")
+            new_status = str(task.get("status") or "Unknown")
+            if old_status != new_status:
+                append_event(
+                    {
+                        "at": timestamp,
+                        "type": "task_status_changed",
+                        "task_id": task["id"],
+                        "from": old_status,
+                        "to": new_status,
+                        "project_id": task.get("project_id") or "default",
+                    }
+                )
+                logger.info(
+                    "Task status changed task_id=%s from=%s to=%s project_id=%s",
+                    task["id"],
+                    old_status,
+                    new_status,
+                    task.get("project_id") or "default",
+                )
 
 
 def next_task_id() -> str:
@@ -1872,6 +1915,34 @@ def get_notifications() -> list[dict[str, Any]]:
                     "task_id": tid,
                 }
             )
+        if t.get("status") == "Rework needed":
+            validation = t.get("validation") or {}
+            validation_checks = validation.get("checks", [])
+            if not isinstance(validation_checks, list):
+                validation_checks = []
+            failed_check = next(
+                (
+                    check
+                    for check in validation_checks
+                    if isinstance(check, dict) and check.get("passed") is False
+                ),
+                None,
+            )
+            reason = (
+                t.get("planning_error")
+                or (failed_check or {}).get("message")
+                or "Task needs changes before it can be completed."
+            )
+            items.append(
+                {
+                    "id": f"task:{tid}:rework:{upd}",
+                    "kind": "rework",
+                    "severity": "high",
+                    "title": f"{tid} needs rework",
+                    "message": str(reason),
+                    "task_id": tid,
+                }
+            )
         if t.get("status") == "Waiting for capacity":
             atts = t.get("attempts") or []
             prov = atts[-1].get("provider", "Provider") if atts else "Provider"
@@ -2155,6 +2226,7 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
         proj = next((p for p in read_projects() if p.get("id") == project_id), None)
         valid_mods = {m["id"] for m in (proj or {}).get("modules", [])}
         norm_t = []
+        warnings: list[str] = []
         for t in tasks:
             if not isinstance(t, dict):
                 raise ValueError("Each proposed task must be an object.")
@@ -2163,8 +2235,24 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
             role = str(t.get("role", "")).strip()
             mid = str(t.get("module_id", "")).strip()
             checks = t.get("acceptance_checks", [])
-            if not title or not req or role not in WORK_ROLES or not isinstance(checks, list) or (mid and mid not in valid_mods):
-                raise ValueError("Each proposed task needs a title, request, valid work role, and acceptance-check list.")
+            if not title:
+                raise ValueError("Each proposed task needs a non-empty title.")
+            if not req:
+                raise ValueError(f"Proposed task '{title}' needs a non-empty request.")
+            if role not in WORK_ROLES:
+                raise ValueError(f"Proposed task '{title}' has an invalid work role: {role or '(empty)'}.")
+            if not isinstance(checks, list):
+                raise ValueError(f"Proposed task '{title}' acceptance_checks must be a list.")
+            if mid and mid not in valid_mods:
+                warnings.append(
+                    f"Task '{title}' referenced unknown sub-project '{mid}' and was assigned to the whole project."
+                )
+                logger.warning(
+                    "PM/PO proposed unknown sub-project task_title=%s module_id=%s; assigning task to whole project",
+                    title,
+                    mid,
+                )
+                mid = ""
             clean_checks = [str(c).strip()[:500] for c in checks if str(c).strip()][:20]
             produces = t["produces_deliverable"] if isinstance(t.get("produces_deliverable"), bool) else (role != "PM/PO")
             if produces and not clean_checks:
@@ -2188,7 +2276,13 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
             if not isinstance(val, str) or not val.strip() or len(val) > 20000:
                 raise ValueError(f"The project overview needs non-empty {slug} text under 20,000 characters.")
             ov_docs[slug] = val.strip()
-        return {"type": "plan", "summary": summary, "tasks": norm_t, "project_overview": ov_docs}
+        return {
+            "type": "plan",
+            "summary": summary,
+            "tasks": norm_t,
+            "project_overview": ov_docs,
+            "warnings": warnings,
+        }
 
     raise ValueError("PM/PO response type must be 'questions' or 'plan'.")
 
@@ -2227,7 +2321,6 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                     "activity": [{"at": ts, "type": "created", "message": "PM/PO clarification question; awaiting your answer."}],
                 }
                 write_task(child)
-                append_event({"at": ts, "task_id": cid, "type": "created", "status": "Needs answer", "parent_task_id": task["id"]})
             task["child_task_ids"] = ids
             task["planning_result_type"] = "questions"
             task["planning_summary"] = res["summary"]
@@ -2293,14 +2386,28 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
         task["child_task_ids"] = ids
         task["planning_result_type"] = "plan"
         task["planning_summary"] = res["summary"]
+        task["planning_warnings"] = res["warnings"]
         task["validation"] = {
             "status": "passed",
             "checks": [{"check": "PM/PO response structure", "kind": "schema", "passed": True, "message": "Response parsed and saved."}],
             "validated_at": ts,
         }
-        return "Done", f"PM/PO created project overview {ov_id} and {len(work_ids)} draft work task(s): {', '.join(work_ids)}."
+        message = f"PM/PO created project overview {ov_id} and {len(work_ids)} draft work task(s): {', '.join(work_ids)}."
+        if res["warnings"]:
+            message += " " + " ".join(res["warnings"])
+        return "Done", message
     except Exception as exc:
         msg = str(exc)
+        logger.warning("PM/PO result rejected task_id=%s provider=%s: %s", task.get("id"), provider, msg)
+        append_event(
+            {
+                "at": now_iso(),
+                "type": "pm_plan_rejected",
+                "task_id": task.get("id"),
+                "provider": provider,
+                "error": msg[:1000],
+            }
+        )
         task["validation"] = {
             "status": "failed",
             "checks": [{"check": "PM/PO response structure", "kind": "schema", "passed": False, "message": msg}],
@@ -3067,6 +3174,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
                         **meta,
                     },
                 )
+                logger.info("Agent reply stored task_id=%s provider=%s attempt=%s file=%s", tid, provider, attempt_num, rel)
                 for att in fresh.get("attempts") or []:
                     if att.get("number") == attempt_num:
                         att["state"] = "succeeded"
@@ -3638,7 +3746,6 @@ class Handler(BaseHTTPRequestHandler):
                 "activity": [{"at": ts, "type": "created", "message": "Task created as Draft."}],
             }
             write_task(task)
-            append_event({"at": ts, "task_id": tid, "type": "created", "status": "Draft"})
             return self.send_json({"task": task}, HTTPStatus.CREATED)
 
         if path == "/api/pm-requests":
@@ -3673,7 +3780,6 @@ class Handler(BaseHTTPRequestHandler):
                 "activity": [{"at": ts, "type": "created", "message": "Project request sent to PM/PO from Orchestrator chat."}],
             }
             write_task(task)
-            append_event({"at": ts, "task_id": tid, "type": "pm_request_created", "status": "Ready"})
             hist = read_chat_history()
             hist.extend(
                 [
@@ -4067,7 +4173,6 @@ class Handler(BaseHTTPRequestHandler):
                     {"at": ts, "type": "status_changed", "from": cur, "to": target, "message": msg}
                 )
                 write_task(task)
-                append_event({"at": ts, "task_id": tid, "type": "status_changed", "from": cur, "to": target})
             if target == "Ready":
                 DISPATCH_EVENT.set()
             return self.send_json({"task": task})

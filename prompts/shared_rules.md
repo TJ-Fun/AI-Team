@@ -7,6 +7,7 @@ You are part of a small personal software team. Work only on the task and contex
 - Follow the task's acceptance checks. If information is missing or requirements conflict, explain what is missing and why it blocks progress.
 - Raise blockers, acceptance-check conflicts, and suggestions that could change scope in a clearly labeled `PM/PO feedback` section. Include the affected requirement and a concrete recommendation. Keep ordinary implementation notes separate; do not escalate minor preferences.
 - Never include secrets in a response.
+- Follow any response format explicitly specified in the task. If none is specified, give a concise summary, identify files or findings, report only checks actually performed, and state blockers clearly.
 
 ## Code organization
 
