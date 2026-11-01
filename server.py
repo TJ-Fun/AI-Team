@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
+import logging.handlers
 import os
 import re
 import shutil
+import subprocess
 import threading
 import time
 import urllib.error
@@ -94,6 +97,39 @@ CONNECTION_SPECS: dict[str, tuple[str, str]] = {
     "openrouter": ("OpenRouter", "OPENROUTER_API_KEY"),
     "github": ("GitHub repository connector", "GITHUB_TOKEN"),
 }
+
+# --- Logging Setup ---
+LOG_DIR = DATA / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "app.log"
+
+# Configure logging with 1-week retention using TimedRotatingFileHandler
+logger = logging.getLogger("personal_ai_team")
+logger.setLevel(logging.DEBUG)
+
+# File handler with daily rotation, 7 days retention
+file_handler = logging.handlers.TimedRotatingFileHandler(
+    LOG_FILE,
+    when="midnight",
+    interval=1,
+    backupCount=7,
+    encoding="utf-8",
+)
+file_handler.setLevel(logging.DEBUG)
+file_handler.suffix = "%Y-%m-%d"
+file_formatter = logging.Formatter(
+    "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+# Console handler for critical errors
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.ERROR)
+console_formatter = logging.Formatter("%(levelname)s: %(message)s")
+console_handler.setFormatter(console_formatter)
+logger.addHandler(console_handler)
 
 TRANSITIONS: dict[str, set[str]] = {
     "Draft": {"Ready", "Blocked", "Canceled"},
@@ -474,6 +510,7 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
         pid = re.sub(r"[^a-z0-9-]+", "-", str(raw.get("id", "")).lower()).strip("-")[:40]
         name = str(raw.get("name", "")).strip()[:100]
         repository = str(raw.get("repository", "")).strip()
+        local_path = str(raw.get("local_path", "")).strip()
         modules = raw.get("modules", [])
         if not pid or pid in seen or not name or not isinstance(modules, list):
             raise ValueError("Project names and unique IDs are required; modules must be a list.")
@@ -481,6 +518,11 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
             r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?", repository
         ):
             raise ValueError(f"Repository for {name} must be a GitHub https URL.")
+        if local_path:
+            # Validate local path is safe
+            expanded = Path(local_path).expanduser().resolve()
+            if ".." in str(expanded) or not str(expanded).startswith("/"):
+                raise ValueError(f"Local path for {name} must be an absolute path without '..'.")
         clean_modules: list[dict[str, str]] = []
         mod_ids: set[str] = set()
         for mod in modules:
@@ -512,6 +554,7 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
                 "id": pid,
                 "name": name,
                 "repository": repository,
+                "local_path": local_path,
                 "context": context,
                 "modules": clean_modules,
             }
@@ -801,6 +844,148 @@ def github_project(project_id: str) -> dict[str, Any]:
     if not project or not project.get("repository"):
         raise ValueError("This project does not have a GitHub repository configured.")
     return project
+
+
+# --- Git Operations ---
+def git_project_path(project_id: str) -> Path:
+    project = next((p for p in read_projects() if p.get("id") == project_id), None)
+    if not project:
+        raise ValueError("Project not found.")
+    local_path = str(project.get("local_path", "")).strip()
+    if not local_path:
+        raise ValueError("Local path is not configured for this project.")
+    path = Path(local_path).expanduser().resolve()
+    if not path.is_dir():
+        raise ValueError(f"Local path does not exist or is not a directory: {local_path}")
+    return path
+
+
+def git_status(project_id: str) -> dict[str, Any]:
+    path = git_project_path(project_id)
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "--branch"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        lines = result.stdout.strip().split("\n") if result.stdout.strip() else []
+        branch_line = next((l for l in lines if l.startswith("##")), "## unknown")
+        branch = branch_line[3:].split("...")[0] if "..." in branch_line else branch_line[3:]
+        modified = [l for l in lines if not l.startswith("##")]
+        ahead = "ahead" in branch_line
+        behind = "behind" in branch_line
+        return {
+            "branch": branch,
+            "modified": len(modified),
+            "ahead": ahead,
+            "behind": behind,
+            "clean": len(modified) == 0 and not ahead and not behind,
+        }
+    except subprocess.TimeoutExpired:
+        raise ValueError("Git status timed out.")
+    except FileNotFoundError:
+        raise ValueError("Git is not installed on this system.")
+    except Exception as exc:
+        raise ValueError(f"Git status failed: {exc}")
+
+
+def git_pull(project_id: str) -> dict[str, Any]:
+    path = git_project_path(project_id)
+    token = get_provider_key("github")
+    env = os.environ.copy()
+    if token:
+        # Configure git to use the token for authentication
+        env["GIT_ASKPASS"] = "echo"
+        env["GIT_TERMINAL_PROMPT"] = "0"
+    try:
+        result = subprocess.run(
+            ["git", "pull"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=env,
+        )
+        if result.returncode != 0:
+            raise ValueError(f"Git pull failed: {result.stderr}")
+        status = git_status(project_id)
+        return {"success": True, "output": result.stdout, "status": status}
+    except subprocess.TimeoutExpired:
+        raise ValueError("Git pull timed out.")
+    except FileNotFoundError:
+        raise ValueError("Git is not installed on this system.")
+    except Exception as exc:
+        raise ValueError(f"Git pull failed: {exc}")
+
+
+def git_push(project_id: str) -> dict[str, Any]:
+    path = git_project_path(project_id)
+    token = get_provider_key("github")
+    env = os.environ.copy()
+    if token:
+        # Configure git to use the token for authentication
+        env["GIT_ASKPASS"] = "echo"
+        env["GIT_TERMINAL_PROMPT"] = "0"
+    try:
+        result = subprocess.run(
+            ["git", "push"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=env,
+        )
+        if result.returncode != 0:
+            raise ValueError(f"Git push failed: {result.stderr}")
+        status = git_status(project_id)
+        return {"success": True, "output": result.stdout, "status": status}
+    except subprocess.TimeoutExpired:
+        raise ValueError("Git push timed out.")
+    except FileNotFoundError:
+        raise ValueError("Git is not installed on this system.")
+    except Exception as exc:
+        raise ValueError(f"Git push failed: {exc}")
+
+
+def git_clone(project_id: str) -> dict[str, Any]:
+    project = next((p for p in read_projects() if p.get("id") == project_id), None)
+    if not project or not project.get("repository"):
+        raise ValueError("Project repository is not configured.")
+    local_path = str(project.get("local_path", "")).strip()
+    if not local_path:
+        raise ValueError("Local path is not configured for this project.")
+    target_path = Path(local_path).expanduser().resolve()
+    if target_path.exists():
+        raise ValueError(f"Local path already exists: {local_path}")
+    
+    token = get_provider_key("github")
+    repo_url = project["repository"]
+    
+    # If token is available, inject it into the URL for authentication
+    # GitHub OAuth token format: https://oauth2:TOKEN@github.com/user/repo
+    if token:
+        repo_url = repo_url.replace("https://github.com/", f"https://oauth2:{token}@github.com/")
+    
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            ["git", "clone", repo_url, str(target_path)],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            stderr = result.stderr or result.stdout
+            raise ValueError(f"Git clone failed: {stderr}")
+        return {"success": True, "output": result.stdout}
+    except subprocess.TimeoutExpired:
+        raise ValueError("Git clone timed out.")
+    except FileNotFoundError:
+        raise ValueError("Git is not installed on this system.")
+    except Exception as exc:
+        raise ValueError(f"Git clone failed: {exc}")
 
 
 def github_file_listing(project_id: str, folder_path: str = "") -> dict[str, Any]:
@@ -2968,6 +3153,181 @@ class Handler(BaseHTTPRequestHandler):
             append_ai_stat_reset(reset)
             append_event({"at": reset["reset_at"], "type": "ai_statistic_reset", **reset})
             return self.send_json({"reset": reset})
+
+        # Git operation endpoints
+        m_git_status = re.fullmatch(r"/api/git/([a-z0-9-]+)/status", path)
+        if m_git_status:
+            pid = m_git_status.group(1)
+            try:
+                status = git_status(pid)
+                return self.send_json({"status": status})
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+        m_git_pull = re.fullmatch(r"/api/git/([a-z0-9-]+)/pull", path)
+        if m_git_pull:
+            pid = m_git_pull.group(1)
+            try:
+                result = git_pull(pid)
+                append_event({"at": now_iso(), "type": "git_pull", "project_id": pid, "success": True})
+                return self.send_json(result)
+            except ValueError as exc:
+                append_event({"at": now_iso(), "type": "git_pull", "project_id": pid, "success": False, "error": str(exc)[:300]})
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+        m_git_push = re.fullmatch(r"/api/git/([a-z0-9-]+)/push", path)
+        if m_git_push:
+            pid = m_git_push.group(1)
+            try:
+                result = git_push(pid)
+                append_event({"at": now_iso(), "type": "git_push", "project_id": pid, "success": True})
+                return self.send_json(result)
+            except ValueError as exc:
+                append_event({"at": now_iso(), "type": "git_push", "project_id": pid, "success": False, "error": str(exc)[:300]})
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+        m_git_clone = re.fullmatch(r"/api/git/([a-z0-9-]+)/clone", path)
+        if m_git_clone:
+            pid = m_git_clone.group(1)
+            try:
+                result = git_clone(pid)
+                append_event({"at": now_iso(), "type": "git_clone", "project_id": pid, "success": True})
+                return self.send_json(result)
+            except ValueError as exc:
+                append_event({"at": now_iso(), "type": "git_clone", "project_id": pid, "success": False, "error": str(exc)[:300]})
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+        # Settings API endpoints
+        if path == "/api/settings/logs":
+            level = str(body.get("level", "all")).strip().lower()
+            lines = int(body.get("lines", 1000))
+            if lines > 5000:
+                return self.send_json({"error": "Maximum 5000 lines allowed."}, HTTPStatus.BAD_REQUEST)
+            try:
+                log_lines = []
+                log_files = sorted(LOG_DIR.glob("app.log*"), reverse=True)
+                for log_file in log_files:
+                    if not log_file.is_file():
+                        continue
+                    content = log_file.read_text(encoding="utf-8", errors="replace")
+                    for line in content.splitlines():
+                        if level != "all" and level.upper() not in line:
+                            continue
+                        log_lines.append(line)
+                        if len(log_lines) >= lines:
+                            break
+                    if len(log_lines) >= lines:
+                        break
+                return self.send_json({"logs": log_lines[-lines:]})
+            except Exception as exc:
+                return self.send_json({"error": f"Failed to read logs: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        if path == "/api/settings/logs/clear":
+            try:
+                for log_file in LOG_DIR.glob("app.log*"):
+                    log_file.unlink(missing_ok=True)
+                logger.info("Logs cleared by user")
+                return self.send_json({"cleared": True})
+            except Exception as exc:
+                return self.send_json({"error": f"Failed to clear logs: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        if path == "/api/settings/restart":
+            try:
+                logger.info("App restart requested by user")
+                # Execute systemctl commands
+                commands = [
+                    ["sudo", "systemctl", "stop", "personal-ai-team"],
+                    ["sudo", "systemctl", "daemon-reload"],
+                    ["sudo", "systemctl", "enable", "--now", "personal-ai-team"],
+                ]
+                results = []
+                for cmd in commands:
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                    results.append({
+                        "command": " ".join(cmd),
+                        "returncode": result.returncode,
+                        "stdout": result.stdout,
+                        "stderr": result.stderr
+                    })
+                    if result.returncode != 0:
+                        raise ValueError(f"Command failed: {' '.join(cmd)} - {result.stderr}")
+                # Get status
+                status_result = subprocess.run(
+                    ["sudo", "systemctl", "status", "personal-ai-team", "--no-pager"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                results.append({
+                    "command": "systemctl status",
+                    "returncode": status_result.returncode,
+                    "stdout": status_result.stdout,
+                    "stderr": status_result.stderr
+                })
+                logger.info("App restart completed successfully")
+                return self.send_json({"success": True, "results": results})
+            except subprocess.TimeoutExpired:
+                return self.send_json({"error": "Restart command timed out."}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            except Exception as exc:
+                return self.send_json({"error": f"Restart failed: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        if path == "/api/settings/update":
+            app_repo = str(body.get("app_repo", "")).strip()
+            app_working_dir = str(body.get("app_working_dir", "")).strip()
+            if not app_repo or not app_working_dir:
+                return self.send_json({"error": "App repository and working directory are required."}, HTTPStatus.BAD_REQUEST)
+            if not re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?", app_repo):
+                return self.send_json({"error": "Invalid GitHub repository URL."}, HTTPStatus.BAD_REQUEST)
+            
+            try:
+                logger.info(f"App update requested: repo={app_repo}, dir={app_working_dir}")
+                working_path = Path(app_working_dir).expanduser().resolve()
+                if not working_path.exists():
+                    return self.send_json({"error": f"Working directory does not exist: {app_working_dir}"}, HTTPStatus.BAD_REQUEST)
+                
+                token = get_provider_key("github")
+                if not token:
+                    return self.send_json({"error": "GitHub token is not configured."}, HTTPStatus.BAD_REQUEST)
+                
+                # Inject token into URL for authentication
+                repo_url = app_repo.replace("https://github.com/", f"https://oauth2:{token}@github.com/")
+                
+                # Pull latest changes
+                pull_result = subprocess.run(
+                    ["git", "pull"],
+                    cwd=working_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=120
+                )
+                if pull_result.returncode != 0:
+                    raise ValueError(f"Git pull failed: {pull_result.stderr}")
+                
+                # Restart the service
+                restart_commands = [
+                    ["sudo", "systemctl", "stop", "personal-ai-team"],
+                    ["sudo", "systemctl", "daemon-reload"],
+                    ["sudo", "systemctl", "enable", "--now", "personal-ai-team"],
+                ]
+                for cmd in restart_commands:
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                    if result.returncode != 0:
+                        raise ValueError(f"Restart command failed: {' '.join(cmd)} - {result.stderr}")
+                
+                logger.info("App update and restart completed successfully")
+                return self.send_json({
+                    "success": True,
+                    "pull_output": pull_result.stdout,
+                    "message": "App updated and restarted successfully."
+                })
+            except subprocess.TimeoutExpired:
+                return self.send_json({"error": "Update command timed out."}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            except Exception as exc:
+                return self.send_json({"error": f"Update failed: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         m_status = re.fullmatch(r"/api/tasks/(T-\d{4,})/status", path)
         if m_status:

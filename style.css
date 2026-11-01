@@ -89,3 +89,28 @@
 .detail-provider-feedback{font-size:11px;font-weight:600;color:#286b39}
 @media(max-width:720px){.header-notifications-trigger{max-width:100%}}
 
+/* Git controls styling */
+.git-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0;padding:8px 10px;border:1px solid #e9ece6;border-radius:8px;background:#fafbf9}
+.git-controls button{font-size:10px;padding:7px 9px;height:32px;min-height:32px;white-space:nowrap}
+.git-status{font-size:10px;color:#6f786d;margin-left:auto;padding:4px 8px;border-radius:6px;background:#f4f5f2}
+.git-status-clean{color:#286b39;background:#e3f3e6}
+.git-status-dirty{color:#8b5c13;background:#fff4e5}
+
+/* Settings dialog styling */
+.settings-section{border:1px solid #e9ece6;border-radius:8px;padding:14px;margin:12px 0;background:#fafbf9}
+.settings-section h3{font:700 13px system-ui,sans-serif;margin:0 0 8px;color:#475447}
+.settings-section .draft-note{margin:0 0 10px}
+.log-controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center}
+.log-controls select{border:1px solid #dfe4dc;border-radius:7px;padding:7px;background:#fff;color:#586353;font:11px system-ui,sans-serif}
+.log-controls button{font-size:10px;padding:7px 9px;height:32px;min-height:32px}
+.log-output{background:#f8f9f6;border:1px solid #e9ece6;border-radius:8px;padding:10px;margin:0;min-height:200px;max-height:400px;overflow:auto;font:11px/1.4 ui-monospace,monospace;color:#475447}
+.log-output .muted{color:#929990}
+.log-critical{color:#a34e40;font-weight:700}
+.log-error{color:#c45f55;font-weight:600}
+.log-warning{color:#d1a34a}
+.log-info{color:#6f786d}
+.log-debug{color:#929990}
+.restart-status,.update-status{margin-top:8px;padding:8px 10px;border-radius:6px;font-size:11px}
+.restart-status.success,.update-status.success{background:#e3f3e6;color:#286b39}
+.restart-status.error,.update-status.error{background:#fde3df;color:#9b382c}
+.restart-status.info,.update-status.info{background:#f3f6ed;color:#777344}

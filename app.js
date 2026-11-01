@@ -1434,9 +1434,9 @@
     }
   });
 
-  // --- Connections & Routing Dialog ---
-  const settingsDialog = $("#settings-dialog");
-  const settingsForm = $("#settings-form");
+  // --- Connections Dialog ---
+  const connectionsDialog = $("#connections-dialog");
+  const connectionsForm = $("#connections-form");
 
   function isProviderConnected(providerName) {
     return state.connections.some((c) => {
@@ -1448,8 +1448,8 @@
     });
   }
 
-  function setSettingsSuccess(message = "") {
-    const el = $("#settings-success");
+  function setConnectionsSuccess(message = "") {
+    const el = $("#connections-success");
     if (!el) return;
     if (message) {
       el.textContent = message;
@@ -1539,14 +1539,14 @@
     renderConnectionsAndRouting();
   }
 
-  $("#open-settings")?.addEventListener("click", async () => {
-    $("#settings-error").textContent = "";
-    setSettingsSuccess("");
+  $("#open-connections")?.addEventListener("click", async () => {
+    $("#connections-error").textContent = "";
+    setConnectionsSuccess("");
     try {
       await reloadSettingsData();
-      if (!settingsDialog.open) settingsDialog.showModal();
+      if (!connectionsDialog.open) connectionsDialog.showModal();
     } catch (err) {
-      alert(`Could not load settings: ${err.message}`);
+      alert(`Could not load connections: ${err.message}`);
     }
   });
 
@@ -1557,12 +1557,12 @@
       const input = document.querySelector(`[data-conn-input="${id}"]`);
       const secret = input?.value?.trim() || "";
       if (!secret) {
-        setSettingsSuccess("");
-        $("#settings-error").textContent = "Paste a key or token before clicking Save.";
+        setConnectionsSuccess("");
+        $("#connections-error").textContent = "Paste a key or token before clicking Save.";
         return;
       }
-      $("#settings-error").textContent = "";
-      setSettingsSuccess("");
+      $("#connections-error").textContent = "";
+      setConnectionsSuccess("");
       try {
         await api(`/api/connections/${encodeURIComponent(id)}`, {
           method: "PUT",
@@ -1571,9 +1571,9 @@
         if (input) input.value = "";
         await reloadSettingsData();
         await refreshStatus();
-        setSettingsSuccess("Saved encrypted credential.");
+        setConnectionsSuccess("Saved encrypted credential.");
       } catch (err) {
-        $("#settings-error").textContent = err.message;
+        $("#connections-error").textContent = err.message;
       }
       return;
     }
@@ -1584,18 +1584,18 @@
       const origLabel = testBtn.textContent;
       testBtn.disabled = true;
       testBtn.textContent = "Testing…";
-      $("#settings-error").textContent = "";
-      setSettingsSuccess("");
+      $("#connections-error").textContent = "";
+      setConnectionsSuccess("");
       try {
         const res = await api(`/api/connections/${encodeURIComponent(id)}/test`, {
           method: "POST",
           body: "{}",
         });
         const msg = res.message || (res.login ? `GitHub connected as ${res.login}.` : "Connection verified.");
-        setSettingsSuccess(msg);
+        setConnectionsSuccess(msg);
         alert(msg);
       } catch (err) {
-        $("#settings-error").textContent = err.message;
+        $("#connections-error").textContent = err.message;
       } finally {
         testBtn.disabled = false;
         testBtn.textContent = origLabel || "Test";
@@ -1607,15 +1607,15 @@
     if (clearBtn) {
       const id = clearBtn.getAttribute("data-clear-conn");
       if (!confirm("Remove the saved credential from this VM?")) return;
-      $("#settings-error").textContent = "";
-      setSettingsSuccess("");
+      $("#connections-error").textContent = "";
+      setConnectionsSuccess("");
       try {
         await api(`/api/connections/${encodeURIComponent(id)}`, { method: "DELETE" });
         await reloadSettingsData();
         await refreshStatus();
-        setSettingsSuccess("Removed saved credential.");
+        setConnectionsSuccess("Removed saved credential.");
       } catch (err) {
-        $("#settings-error").textContent = err.message;
+        $("#connections-error").textContent = err.message;
       }
     }
   });
@@ -1640,33 +1640,33 @@
   });
 
   $("#test-github")?.addEventListener("click", async () => {
-    $("#settings-error").textContent = "";
-    setSettingsSuccess("");
+    $("#connections-error").textContent = "";
+    setConnectionsSuccess("");
     try {
       const res = await api("/api/connections/github/test", { method: "POST", body: "{}" });
       const msg = res.message || `GitHub connected as ${res.login}.`;
-      setSettingsSuccess(msg);
+      setConnectionsSuccess(msg);
       alert(msg);
     } catch (err) {
-      $("#settings-error").textContent = err.message;
+      $("#connections-error").textContent = err.message;
     }
   });
 
-  $("#close-settings")?.addEventListener("click", () => settingsDialog.close());
-  $("#cancel-settings")?.addEventListener("click", () => settingsDialog.close());
+  $("#close-connections")?.addEventListener("click", () => connectionsDialog.close());
+  $("#cancel-connections")?.addEventListener("click", () => connectionsDialog.close());
 
-  settingsForm?.addEventListener("submit", async (e) => {
+  connectionsForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("#settings-error").textContent = "";
+    $("#connections-error").textContent = "";
     try {
       await api("/api/routing", {
         method: "POST",
         body: JSON.stringify({ routing: state.routing }),
       });
-      settingsDialog.close();
+      connectionsDialog.close();
       await refreshBoard();
     } catch (err) {
-      $("#settings-error").textContent = err.message;
+      $("#connections-error").textContent = err.message;
     }
   });
 
@@ -1700,6 +1700,17 @@
               )}" placeholder="https://github.com/owner/repository">
             </label>
           </div>
+          <label>Local file path <span class="muted">Absolute path to local git clone (e.g., /home/ubuntu/projects/my-repo)</span>
+            <input data-proj-field="local_path" value="${escapeHtml(d.local_path || "")}" placeholder="/home/ubuntu/projects/my-repo">
+          </label>
+          ${d.repository && d.local_path ? `
+          <div class="git-controls">
+            <button type="button" class="secondary" data-proj-pull="${idx}">↓ Pull from GitHub</button>
+            <button type="button" class="secondary" data-proj-push="${idx}">↑ Push to GitHub</button>
+            <button type="button" class="secondary" data-proj-clone="${idx}">Clone repository</button>
+            <span class="git-status" data-proj-status="${idx}">Checking status…</span>
+          </div>
+          ` : ''}
           <label>Project background notes
             <textarea rows="4" maxlength="20000" data-proj-field="context" placeholder="Goals, product shape, stack, shared conventions">${escapeHtml(
               d.context
@@ -1736,6 +1747,29 @@
         </section>`
       )
       .join("");
+    
+    // Load git status for projects with local paths
+    projectDrafts.forEach(async (d, idx) => {
+      if (d.repository && d.local_path && d.id) {
+        try {
+          const res = await api(`/api/git/${encodeURIComponent(d.id)}/status`);
+          const statusEl = document.querySelector(`[data-proj-status="${idx}"]`);
+          if (statusEl) {
+            const s = res.status;
+            let statusText = s.branch;
+            if (s.modified) statusText += ` · ${s.modified} modified`;
+            if (s.ahead) statusText += " · ahead";
+            if (s.behind) statusText += " · behind";
+            if (s.clean) statusText = "Clean";
+            statusEl.textContent = statusText;
+            statusEl.className = `git-status git-status-${s.clean ? 'clean' : 'dirty'}`;
+          }
+        } catch {
+          const statusEl = document.querySelector(`[data-proj-status="${idx}"]`);
+          if (statusEl) statusEl.textContent = "Status unavailable";
+        }
+      }
+    });
   }
 
   $("#project-editors")?.addEventListener("input", (e) => {
@@ -1763,6 +1797,58 @@
       }
       projectDrafts.splice(Number(rmBtn.getAttribute("data-proj-remove")), 1);
       renderProjectEditors();
+      return;
+    }
+
+    const pullBtn = e.target.closest("[data-proj-pull]");
+    if (pullBtn) {
+      const d = projectDrafts[Number(pullBtn.getAttribute("data-proj-pull"))];
+      if (!d?.id) return;
+      const statusEl = document.querySelector(`[data-proj-status="${pullBtn.getAttribute('data-proj-pull')}"]`);
+      if (statusEl) statusEl.textContent = "Pulling…";
+      try {
+        const res = await api(`/api/git/${encodeURIComponent(d.id)}/pull`, { method: "POST" });
+        alert(`Pull successful:\n${res.output}`);
+        renderProjectEditors();
+      } catch (err) {
+        alert(`Pull failed: ${err.message}`);
+        if (statusEl) statusEl.textContent = "Pull failed";
+      }
+      return;
+    }
+
+    const pushBtn = e.target.closest("[data-proj-push]");
+    if (pushBtn) {
+      const d = projectDrafts[Number(pushBtn.getAttribute("data-proj-push"))];
+      if (!d?.id) return;
+      const statusEl = document.querySelector(`[data-proj-status="${pushBtn.getAttribute('data-proj-push')}"]`);
+      if (statusEl) statusEl.textContent = "Pushing…";
+      try {
+        const res = await api(`/api/git/${encodeURIComponent(d.id)}/push`, { method: "POST" });
+        alert(`Push successful:\n${res.output}`);
+        renderProjectEditors();
+      } catch (err) {
+        alert(`Push failed: ${err.message}`);
+        if (statusEl) statusEl.textContent = "Push failed";
+      }
+      return;
+    }
+
+    const cloneBtn = e.target.closest("[data-proj-clone]");
+    if (cloneBtn) {
+      const d = projectDrafts[Number(cloneBtn.getAttribute("data-proj-clone"))];
+      if (!d?.id) return;
+      if (!confirm(`Clone repository to ${d.local_path}? This will create a new git clone.`)) return;
+      const statusEl = document.querySelector(`[data-proj-status="${cloneBtn.getAttribute('data-proj-clone')}"]`);
+      if (statusEl) statusEl.textContent = "Cloning…";
+      try {
+        const res = await api(`/api/git/${encodeURIComponent(d.id)}/clone`, { method: "POST" });
+        alert(`Clone successful:\n${res.output}`);
+        renderProjectEditors();
+      } catch (err) {
+        alert(`Clone failed: ${err.message}`);
+        if (statusEl) statusEl.textContent = "Clone failed";
+      }
       return;
     }
 
@@ -1830,6 +1916,7 @@
             id: p.id || "",
             name: p.name || "",
             repository: p.repository || "",
+            local_path: p.local_path || "",
             context: p.context || "",
             modulesText: (p.modules || [])
               .map((m) => `${m.name} | ${m.path || ""} | ${m.context || ""}`)
@@ -1885,6 +1972,7 @@
           id: d.id || slugify(name),
           name,
           repository: d.repository.trim(),
+          local_path: d.local_path.trim(),
           context: d.context.trim(),
           modules,
         };
@@ -2145,6 +2233,101 @@
       await loadChat();
     } catch (err) {
       alert(err.message);
+    }
+  });
+
+  // --- Settings Dialog ---
+  const settingsDialog = $("#settings-dialog");
+  const settingsForm = $("#settings-form");
+
+  $("#open-settings")?.addEventListener("click", async () => {
+    $("#settings-error").textContent = "";
+    if (!settingsDialog.open) settingsDialog.showModal();
+  });
+
+  $("#close-settings")?.addEventListener("click", () => settingsDialog.close());
+  $("#cancel-settings")?.addEventListener("click", () => settingsDialog.close());
+
+  // Load logs
+  $("#load-logs")?.addEventListener("click", async () => {
+    const level = $("#log-level")?.value || "all";
+    $("#log-output").textContent = "Loading logs…";
+    try {
+      const res = await api("/api/settings/logs", {
+        method: "POST",
+        body: JSON.stringify({ level, lines: 1000 }),
+      });
+      const logs = res.logs || [];
+      if (logs.length === 0) {
+        $("#log-output").innerHTML = `<span class="muted">No logs found.</span>`;
+      } else {
+        $("#log-output").innerHTML = logs
+          .map((line) => {
+            let className = "log-info";
+            if (line.includes("CRITICAL")) className = "log-critical";
+            else if (line.includes("ERROR")) className = "log-error";
+            else if (line.includes("WARNING")) className = "log-warning";
+            else if (line.includes("DEBUG")) className = "log-debug";
+            return `<span class="${className}">${escapeHtml(line)}</span>`;
+          })
+          .join("\n");
+      }
+    } catch (err) {
+      $("#log-output").innerHTML = `<span class="log-error">Failed to load logs: ${escapeHtml(err.message)}</span>`;
+    }
+  });
+
+  // Clear logs
+  $("#clear-logs")?.addEventListener("click", async () => {
+    if (!confirm("Clear all application logs? This cannot be undone.")) return;
+    try {
+      await api("/api/settings/logs/clear", { method: "POST" });
+      $("#log-output").innerHTML = `<span class="muted">Logs cleared.</span>`;
+    } catch (err) {
+      alert(`Failed to clear logs: ${err.message}`);
+    }
+  });
+
+  // Restart app
+  $("#restart-app")?.addEventListener("click", async () => {
+    if (!confirm("Restart the application? This will briefly interrupt the service.")) return;
+    const statusEl = $("#restart-status");
+    statusEl.textContent = "Restarting…";
+    statusEl.className = "restart-status info";
+    try {
+      const res = await api("/api/settings/restart", { method: "POST" });
+      statusEl.textContent = "Restart completed successfully. The page will reload in a few seconds.";
+      statusEl.className = "restart-status success";
+      setTimeout(() => location.reload(), 3000);
+    } catch (err) {
+      statusEl.textContent = `Restart failed: ${err.message}`;
+      statusEl.className = "restart-status error";
+    }
+  });
+
+  // Update app
+  $("#update-app")?.addEventListener("click", async () => {
+    const appRepo = $("#app-repo-url")?.value?.trim();
+    const appWorkingDir = $("#app-working-dir")?.value?.trim();
+    if (!appRepo || !appWorkingDir) {
+      alert("Please fill in both the app repository URL and working directory.");
+      return;
+    }
+    if (!confirm(`Update the app from ${appRepo} and restart? This will pull the latest changes and restart the service.`)) return;
+    const statusEl = $("#update-status");
+    statusEl.textContent = "Updating…";
+    statusEl.className = "update-status info";
+    try {
+      const res = await api("/api/settings/update", {
+        method: "POST",
+        body: JSON.stringify({ app_repo: appRepo, app_working_dir: appWorkingDir }),
+      });
+      statusEl.textContent = `Update successful: ${res.message}. The page will reload in a few seconds.`;
+      statusEl.className = "update-status success";
+      setTimeout(() => location.reload(), 3000);
+    } catch (err) {
+      statusEl.textContent = `Update failed: ${err.message}`;
+      statusEl.className = "update-status error";
     }
   });
 

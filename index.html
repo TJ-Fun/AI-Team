@@ -20,9 +20,10 @@
         <strong id="cpu-value">—</strong>
         <span id="llm-state" class="llm-state">Idle</span>
       </div>
-      <button class="secondary header-statistics-button" id="open-projects" type="button">Projects &amp; modules</button>
-      <button class="secondary header-statistics-button" id="open-settings" type="button">Connections &amp; routing</button>
+      <button class="secondary header-statistics-button" id="open-projects" type="button">Projects</button>
+      <button class="secondary header-statistics-button" id="open-connections" type="button">Connections</button>
       <button class="secondary header-statistics-button" id="open-statistics" type="button">Statistics</button>
+      <button class="secondary header-statistics-button" id="open-settings" type="button">Settings</button>
       <button type="button" class="header-notifications-trigger" id="open-notifications" aria-label="Open issues modal">
         <span class="notification-counter" id="notification-count">0 issues</span>
         <span class="notification-latest-title" id="notification-latest-title">Checking…</span>
@@ -223,29 +224,77 @@
     </section>
   </dialog>
 
-  <dialog id="settings-dialog">
-    <form id="settings-form" class="task-form">
-      <div class="dialog-heading"><div><p class="eyebrow">ENCRYPTED ON YOUR VM</p><h2>Connections &amp; routing</h2></div><button class="icon-button" type="button" id="close-settings" aria-label="Close">×</button></div>
-      <p class="draft-note" id="settings-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. Configure default provider rank order per role below; unavailable connections are skipped automatically.</p>
+  <dialog id="connections-dialog">
+    <form id="connections-form" class="task-form">
+      <div class="dialog-heading"><div><p class="eyebrow">ENCRYPTED ON YOUR VM</p><h2>Connections</h2></div><button class="icon-button" type="button" id="close-connections" aria-label="Close">×</button></div>
+      <p class="draft-note" id="connections-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. Configure default provider rank order per role below; unavailable connections are skipped automatically.</p>
       <div id="connection-list"></div>
       <div class="dialog-actions"><button class="secondary" type="button" id="test-github">Test GitHub connection</button></div>
       <label>Default provider order for each role <span class="muted">Select provider rank order in each row; swapping ranks keeps every provider listed once.</span></label>
       <div id="routing-roles"></div>
-      <div class="prompt-feedback" id="settings-success" hidden role="status"></div>
-      <div class="form-error" id="settings-error" role="alert"></div>
-      <div class="dialog-actions"><button class="secondary" type="button" id="cancel-settings">Close</button><button class="primary" type="submit">Save routing</button></div>
+      <div class="prompt-feedback" id="connections-success" hidden role="status"></div>
+      <div class="form-error" id="connections-error" role="alert"></div>
+      <div class="dialog-actions"><button class="secondary" type="button" id="cancel-connections">Close</button><button class="primary" type="submit">Save routing</button></div>
     </form>
   </dialog>
 
   <dialog id="projects-dialog">
     <form id="projects-form" class="task-form">
-      <div class="dialog-heading"><div><p class="eyebrow">PROJECTS ON YOUR VM</p><h2>Projects &amp; sub-projects</h2></div><button class="icon-button" type="button" id="close-projects" aria-label="Close">×</button></div>
+      <div class="dialog-heading"><div><p class="eyebrow">PROJECTS ON YOUR VM</p><h2>Projects</h2></div><button class="icon-button" type="button" id="close-projects" aria-label="Close">×</button></div>
       <p class="draft-note">Each project points to one GitHub repository. Add sub-projects to scope tasks to a repository folder and store focused background notes. GitHub credentials are shared.</p>
       <div id="project-editors"></div>
       <datalist id="github-repo-options"></datalist>
       <button class="secondary" type="button" id="add-project">＋ Add project</button>
       <div class="form-error" id="projects-error" role="alert"></div>
       <div class="dialog-actions"><button class="secondary" type="button" id="cancel-projects">Close</button><button class="primary" type="submit">Save projects</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="settings-dialog">
+    <form id="settings-form" class="task-form">
+      <div class="dialog-heading"><div><p class="eyebrow">APP MANAGEMENT</p><h2>Settings</h2></div><button class="icon-button" type="button" id="close-settings" aria-label="Close">×</button></div>
+      <p class="draft-note">Manage application logs, restart the service, or update the application from GitHub.</p>
+      
+      <div class="settings-section">
+        <h3>Logs</h3>
+        <p class="draft-note">View application logs with 1-week retention. Logs are automatically rotated.</p>
+        <div class="log-controls">
+          <select id="log-level" aria-label="Log level">
+            <option value="all">All levels</option>
+            <option value="critical">Critical</option>
+            <option value="error">Error</option>
+            <option value="warning">Warning</option>
+            <option value="info">Info</option>
+            <option value="debug">Debug</option>
+          </select>
+          <button type="button" class="secondary" id="load-logs">Load logs</button>
+          <button type="button" class="secondary" id="clear-logs">Clear logs</button>
+        </div>
+        <pre id="log-output" class="log-output"><span class="muted">Load logs to view them.</span></pre>
+      </div>
+      
+      <div class="settings-section">
+        <h3>App Restart</h3>
+        <p class="draft-note">Restart the application service using systemctl. This will briefly interrupt the service.</p>
+        <button type="button" class="danger" id="restart-app">Restart App</button>
+        <div id="restart-status" class="restart-status"></div>
+      </div>
+      
+      <div class="settings-section">
+        <h3>App Update</h3>
+        <p class="draft-note">Update the application from GitHub. This will pull the latest changes and restart the service.</p>
+        <label>App GitHub repository URL
+          <input id="app-repo-url" type="text" placeholder="https://github.com/user/repo">
+        </label>
+        <label>App working directory
+          <input id="app-working-dir" type="text" placeholder="/home/ubuntu/personal-ai-team">
+        </label>
+        <button type="button" class="primary" id="update-app">Update App</button>
+        <div id="update-status" class="update-status"></div>
+      </div>
+      
+      <div class="form-error" id="settings-error" role="alert"></div>
+      <div class="dialog-actions"><button class="secondary" type="button" id="cancel-settings">Close</button></div>
     </form>
   </dialog>
 
