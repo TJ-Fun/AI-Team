@@ -246,6 +246,8 @@ ACTIVE_CHAT_LOCK = threading.Lock()
 ACTIVE_CHAT_COUNT = 0
 ACTIVE_GEMINI_COUNT = 0
 ACTIVE_OPENROUTER_COUNT = 0
+ACTIVE_REPOSITORY_TASKS: set[str] = set()
+MAX_QA_FAILURES = 3
 
 WATCHDOG_STATUS: dict[str, Any] = {
     "last_run": None,
@@ -920,6 +922,8 @@ def read_task_replies(task_id: str) -> list[dict[str, Any]]:
 
 
 def task_provider(task: dict[str, Any]) -> str:
+    if task.get("workflow_phase") == "qa":
+        return provider_for_role(task, "QA", "qa_routing_cycle_start")
     val = str(task.get("provider", ""))
     configured = configured_providers()
     if val in PROVIDERS:
@@ -933,18 +937,56 @@ def task_provider(task: dict[str, Any]) -> str:
         return ""
     attempts = task.get("attempts") or []
     start = max(0, int(task.get("routing_cycle_start") or 0))
-    tried = {str(a.get("provider", "")) for a in attempts[start:]}
+    tried = {
+        str(a.get("provider", ""))
+        for a in attempts[start:]
+        if str(a.get("role") or role) == role
+    }
     order = get_routing().get(role or "PM/PO", PROVIDERS)
     return next((p for p in order if p in configured and p not in tried), "")
+
+
+def provider_for_role(task: dict[str, Any], role: str, cycle_key: str) -> str:
+    configured = configured_providers()
+    attempts = task.get("attempts") or []
+    start = max(0, int(task.get(cycle_key, len(attempts)) or 0))
+    tried = {
+        str(attempt.get("provider", ""))
+        for attempt in attempts[start:]
+        if str(attempt.get("role") or task.get("assigned_role") or "") == role
+    }
+    return next((provider for provider in get_routing().get(role, []) if provider in configured and provider not in tried), "")
 
 
 def has_untried_alternate(task: dict[str, Any], failed_provider: str) -> bool:
     configured = configured_providers()
     attempts = task.get("attempts") or []
-    start = max(0, int(task.get("routing_cycle_start") or 0))
-    tried = {str(a.get("provider", "")) for a in attempts[start:]}
-    order = get_routing().get(str(task.get("assigned_role") or "PM/PO"), [])
+    role = str(task.get("assigned_role") or "PM/PO")
+    cycle_key = "qa_routing_cycle_start" if role == "QA" else "routing_cycle_start"
+    start = max(0, int(task.get(cycle_key, 0) or 0))
+    tried = {
+        str(a.get("provider", ""))
+        for a in attempts[start:]
+        if str(a.get("role") or role) == role
+    }
+    order = get_routing().get(role, [])
     return any(p != failed_provider and p not in tried and p in configured for p in order)
+
+
+def task_repository_key(task: dict[str, Any]) -> str:
+    if task.get("task_type") in ("pm_planning", "project_overview", "clarification_question"):
+        return ""
+    role = str(task.get("assigned_role") or "")
+    if role == "QA":
+        role = str(task.get("qa_return_role") or "")
+    if role not in ("Frontend developer", "Backend developer", "Documentation", "QA"):
+        return ""
+    project_id = str(task.get("project_id") or "default")
+    project = next((p for p in read_projects() if p.get("id") == project_id), None)
+    if not project or not project.get("repository"):
+        return ""
+    owner, repo = repository_parts(str(project["repository"]))
+    return f"{owner.casefold()}/{repo.casefold()}"
 
 
 # --- GitHub Helpers ---
@@ -1637,12 +1679,17 @@ def github_read_text_file(project_id: str, file_path: str) -> dict[str, Any]:
     return {"branch": branch, "path": clean_path, "content": decoded_bytes.decode("utf-8", errors="replace")}
 
 
-def github_task_context(task: dict[str, Any]) -> str:
+def github_task_context(
+    task: dict[str, Any],
+    branch: str = "",
+    max_files: int = 16,
+    max_bytes: int = 24000,
+) -> str:
     project = github_project(str(task.get("project_id") or "default"))
     owner, repo = repository_parts(project["repository"])
     has_token = bool(get_provider_key("github"))
     meta = github_api(f"/repos/{owner}/{repo}", require_auth=has_token)
-    branch = str(meta.get("default_branch") or "main")
+    branch = branch or str(meta.get("default_branch") or "main")
     mod = next((m for m in project.get("modules", []) if m.get("id") == task.get("module_id")), None)
     scope = safe_repo_path(str((mod or {}).get("path", "")))
     tree_resp = github_api(
@@ -1673,9 +1720,9 @@ def github_task_context(task: dict[str, Any]) -> str:
     files.sort(key=lambda x: (0 if str(x.get("path", "")).split("/")[-1] in prio else 1, str(x.get("path", ""))))
     chunks: list[str] = []
     total = 0
-    for item in files[:16]:
+    for item in files[:max_files]:
         sz = int(item.get("size") or 0)
-        if sz > 12000 or total + sz > 24000:
+        if sz > 16000 or total + sz > max_bytes:
             continue
         ipath = str(item.get("path", ""))
         enc_path = "/".join(urllib.parse.quote(seg, safe="") for seg in ipath.split("/"))
@@ -1695,7 +1742,7 @@ def github_task_context(task: dict[str, Any]) -> str:
         except Exception:
             continue
     return (
-        f"Repository: {owner}/{repo}, default branch: {branch}, editable scope: {scope or '/'}\n"
+        f"Repository: {owner}/{repo}, reviewed ref: {branch}, editable scope: {scope or '/'}\n"
         + ("\n\n".join(chunks) if chunks else "No readable source files were found in the selected scope.")
     )
 
@@ -1768,6 +1815,20 @@ def apply_repository_manifest(task: dict[str, Any], reply: str, provider: str, a
     )
     enc_branch = "/".join(urllib.parse.quote(seg, safe="") for seg in branch.split("/"))
     github_api(f"/repos/{owner}/{repo}/git/refs/heads/{enc_branch}", "PATCH", {"sha": commit["sha"], "force": False})
+    previous_pull = task.get("pull_request")
+    if isinstance(previous_pull, dict) and previous_pull.get("number") and previous_pull.get("state") == "open":
+        github_api(
+            f"/repos/{owner}/{repo}/pulls/{int(previous_pull['number'])}",
+            "PATCH",
+            {"state": "closed"},
+        )
+        task.setdefault("activity", []).append(
+            {
+                "at": now_iso(),
+                "type": "pull_request_superseded",
+                "message": f"Closed pull request #{previous_pull['number']} after creating a new rework attempt branch.",
+            }
+        )
     pull = github_api(
         f"/repos/{owner}/{repo}/pulls",
         "POST",
@@ -1791,6 +1852,129 @@ def apply_repository_manifest(task: dict[str, Any], reply: str, provider: str, a
     }
     task["repository_change_summary"] = str(manifest.get("summary", ""))[:2000]
     write_task(task)
+
+
+def sync_local_checkout_after_merge(task_id: str) -> bool:
+    task = read_task(task_id)
+    if not task:
+        return False
+    project = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
+    if not project or not project.get("local_path"):
+        return True
+    repo_url = normalize_github_repo_url(str(project.get("repository") or ""))
+    if not repo_url:
+        return True
+    owner, repo = repository_parts(repo_url)
+    meta = github_api(f"/repos/{owner}/{repo}")
+    branch = str(meta.get("default_branch") or "main")
+    target = Path(str(project["local_path"])).expanduser().resolve()
+    token = get_provider_key("github")
+    git_env = git_auth_environment(token)
+    staging_dir: Path | None = None
+
+    def run_git(args: list[str], cwd: Path | None = None, timeout: int = 120) -> str:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=git_env,
+        )
+        if result.returncode:
+            detail = redact_git_output(result.stderr or result.stdout or "", token).strip()
+            raise ValueError(detail or f"git {' '.join(args)} exited with status {result.returncode}")
+        return redact_git_output(result.stdout or "", token).strip()
+
+    try:
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            staging_dir = Path(tempfile.mkdtemp(prefix=f".{target.name}.sync-", dir=target.parent))
+            staged_checkout = staging_dir / target.name
+            run_git(
+                ["clone", "--single-branch", "--branch", branch, repo_url, str(staged_checkout)],
+                timeout=300,
+            )
+            if canonical_github_repository(run_git(["remote", "get-url", "origin"], cwd=staged_checkout)) != (
+                owner.casefold(),
+                repo.casefold(),
+            ):
+                raise ValueError("The new local checkout origin does not match the configured GitHub repository.")
+            if target.exists():
+                raise ValueError(f"Local checkout path appeared during sync; left it untouched: {target}")
+            staged_checkout.rename(target)
+            action = "cloned"
+        else:
+            if not target.is_dir():
+                raise ValueError(f"Configured local checkout path is not a directory: {target}")
+            if run_git(["rev-parse", "--is-inside-work-tree"], cwd=target) != "true":
+                raise ValueError(f"Configured local path is not a Git checkout: {target}")
+            origin = run_git(["remote", "get-url", "origin"], cwd=target)
+            if canonical_github_repository(origin) != (owner.casefold(), repo.casefold()):
+                raise ValueError("Local checkout origin does not match the configured GitHub repository.")
+            current_branch = run_git(["symbolic-ref", "--short", "HEAD"], cwd=target)
+            if current_branch != branch:
+                raise ValueError(
+                    f"Local checkout is on '{current_branch}', not the default branch '{branch}'; "
+                    "switch it manually before automatic sync."
+                )
+            if run_git(["status", "--porcelain"], cwd=target):
+                raise ValueError("Local checkout has uncommitted changes; automatic sync left it untouched.")
+            run_git(
+                ["fetch", "origin", f"{branch}:refs/remotes/origin/{branch}"],
+                cwd=target,
+                timeout=300,
+            )
+            ancestry = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", "HEAD", f"refs/remotes/origin/{branch}"],
+                cwd=target,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=git_env,
+            )
+            if ancestry.returncode != 0:
+                raise ValueError(
+                    "Local checkout has commits that are not on the GitHub default branch; "
+                    "automatic sync refused to overwrite or reconcile them."
+                )
+            run_git(["merge", "--ff-only", f"refs/remotes/origin/{branch}"], cwd=target)
+            action = "fast-forwarded"
+
+        updated = read_task(task_id)
+        if updated:
+            ts = now_iso()
+            updated.pop("local_sync_error", None)
+            updated["local_sync"] = {"branch": branch, "at": ts, "action": action}
+            updated["updated_at"] = ts
+            updated.setdefault("activity", []).append(
+                {
+                    "at": ts,
+                    "type": "local_checkout_synced",
+                    "message": f"Local checkout {action} to the validated {branch} branch.",
+                }
+            )
+            write_task(updated)
+            append_event({"at": ts, "task_id": task_id, "type": "local_checkout_synced", "branch": branch})
+        logger.info("Local repository checkout synced task_id=%s project_id=%s action=%s", task_id, project["id"], action)
+        return True
+    except Exception as exc:
+        msg = str(exc)[:1000]
+        updated = read_task(task_id)
+        if updated:
+            ts = now_iso()
+            updated["local_sync_error"] = msg
+            updated["updated_at"] = ts
+            updated.setdefault("activity", []).append(
+                {"at": ts, "type": "local_sync_error", "message": f"Local checkout sync failed: {msg[:500]}"}
+            )
+            write_task(updated)
+            append_event({"at": ts, "task_id": task_id, "type": "local_sync_error", "error": msg[:500]})
+        logger.error("Local repository checkout sync failed task_id=%s project_id=%s: %s", task_id, project.get("id"), msg)
+        return False
+    finally:
+        if staging_dir and staging_dir.exists():
+            shutil.rmtree(staging_dir, ignore_errors=True)
 
 
 def github_postprocess_task(task_id: str, create_pr: bool = False) -> None:
@@ -1865,6 +2049,11 @@ def github_postprocess_task(task_id: str, create_pr: bool = False) -> None:
         return
     try:
         owner, repo = repository_parts(project["repository"])
+        if refreshed.get("qa_reviewed_head_sha"):
+            latest_pull = github_api(f"/repos/{owner}/{repo}/pulls/{pull['number']}")
+            latest_head = str(((latest_pull.get("head") or {}).get("sha") or "")) if isinstance(latest_pull, dict) else ""
+            if latest_head != refreshed["qa_reviewed_head_sha"]:
+                raise ValueError("The pull request changed after QA reviewed it; rerun QA before merging.")
         merged = github_api(
             f"/repos/{owner}/{repo}/pulls/{pull['number']}/merge",
             "PUT",
@@ -1884,8 +2073,34 @@ def github_postprocess_task(task_id: str, create_pr: bool = False) -> None:
         )
         write_task(refreshed)
         append_event({"at": now_iso(), "task_id": task_id, "type": "pull_request_merged", "pull_request": pull["number"]})
+        sync_local_checkout_after_merge(task_id)
     except Exception as exc:
         msg = str(exc)[:500]
+        if "changed after QA reviewed it" in msg:
+            latest = read_task(task_id)
+            if latest:
+                ts = now_iso()
+                latest["status"] = "Needs validation"
+                latest["validation"] = {
+                    "status": "pending_qa",
+                    "method": "agent_qa",
+                    "checks": [],
+                    "validated_at": ts,
+                }
+                latest.pop("qa_reviewed_head_sha", None)
+                latest["updated_at"] = ts
+                latest.setdefault("activity", []).append(
+                    {
+                        "at": ts,
+                        "type": "qa_required",
+                        "from": "Done",
+                        "to": "Needs validation",
+                        "message": "Pull request changed after QA; the updated commit is queued for another QA review.",
+                    }
+                )
+                write_task(latest)
+                DISPATCH_EVENT.set()
+            return
         refreshed["github_error"] = msg
         refreshed.setdefault("activity", []).append(
             {"at": now_iso(), "type": "github_error", "message": f"Automatic merge failed: {msg[:350]}"}
@@ -1967,6 +2182,28 @@ def get_notifications() -> list[dict[str, Any]]:
                     "task_id": tid,
                 }
             )
+        if t.get("local_sync_error"):
+            items.append(
+                {
+                    "id": f"task:{tid}:local-sync:{upd}",
+                    "kind": "local_sync",
+                    "severity": "high",
+                    "title": f"Local checkout needs attention for {tid}",
+                    "message": str(t["local_sync_error"]),
+                    "task_id": tid,
+                }
+            )
+        if t.get("status") == "Needs validation" and not task_provider({**t, "workflow_phase": "qa"}):
+            items.append(
+                {
+                    "id": f"task:{tid}:qa-provider:{upd}",
+                    "kind": "provider",
+                    "severity": "high",
+                    "title": f"{tid} is waiting for QA",
+                    "message": "No provider in the QA routing order is connected. Configure a QA provider to continue validation.",
+                    "task_id": tid,
+                }
+            )
 
     avail = set(configured_providers())
     if not avail and any(t.get("status") == "Ready" for t in all_tasks):
@@ -2034,8 +2271,8 @@ def dismiss_notification(nid: str) -> None:
 def get_provider_quality() -> list[dict[str, Any]]:
     grouped: dict[tuple[str, str], dict[str, Any]] = {}
     for t in read_tasks():
-        role = str(t.get("assigned_role") or "Unknown")
         for att in t.get("attempts") or []:
+            role = str(att.get("role") or t.get("assigned_role") or "Unknown")
             prov = str(att.get("provider", ""))
             if prov not in PROVIDERS:
                 continue
@@ -2369,7 +2606,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                     "provider": "Automatic",
                     "acceptance_checks": item["acceptance_checks"],
                     "produces_deliverable": item["produces_deliverable"],
-                    "status": "Draft",
+                    "status": "Ready",
                     "planning_root_id": task.get("planning_root_id"),
                     "source_plan_task_id": task["id"],
                     "project_id": task.get("project_id") or "default",
@@ -2378,7 +2615,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                     "updated_at": ts,
                     "attempts": [],
                     "validation": None,
-                    "activity": [{"at": ts, "type": "created", "message": f"Proposed by PM/PO in {task['id']}; review before marking Ready."}],
+                    "activity": [{"at": ts, "type": "created", "message": f"Proposed by PM/PO in {task['id']}; automatically queued for execution."}],
                 }
             )
         task["project_overview_task_id"] = ov_id
@@ -2392,7 +2629,8 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
             "checks": [{"check": "PM/PO response structure", "kind": "schema", "passed": True, "message": "Response parsed and saved."}],
             "validated_at": ts,
         }
-        message = f"PM/PO created project overview {ov_id} and {len(work_ids)} draft work task(s): {', '.join(work_ids)}."
+        DISPATCH_EVENT.set()
+        message = f"PM/PO created project overview {ov_id} and queued {len(work_ids)} work task(s): {', '.join(work_ids)}."
         if res["warnings"]:
             message += " " + " ".join(res["warnings"])
         return "Done", message
@@ -2425,7 +2663,7 @@ def deterministic_validation(checks: list[str], reply: str) -> dict[str, Any]:
         cmd_lower = cmd.strip().lower()
         exp = expected.strip()
         if not sep or cmd_lower not in ("exact", "contains", "not_contains"):
-            results.append({"check": raw, "kind": "manual", "passed": None, "message": "Requires manual validation."})
+            results.append({"check": raw, "kind": "qa", "passed": None, "message": "Requires independent QA review."})
             continue
         if cmd_lower == "exact":
             passed = reply.strip() == exp
@@ -2440,11 +2678,116 @@ def deterministic_validation(checks: list[str], reply: str) -> dict[str, Any]:
 
     failed = any(r["passed"] is False for r in results)
     all_auto = bool(results) and all(r["passed"] is not None for r in results)
-    status = "failed" if failed else ("passed" if all_auto else "pending_manual")
+    status = "failed" if failed else ("passed" if all_auto else "pending_qa")
     return {"status": status, "checks": results, "validated_at": now_iso()}
 
 
+def build_qa_review_instructions(task: dict[str, Any]) -> str:
+    rel = str(task.get("qa_subject_reply_file") or "")
+    reply_path = (DATA / rel).resolve() if rel else None
+    if not reply_path or not str(reply_path).startswith(str(DATA)) or not reply_path.is_file():
+        agent_reply = "The original agent reply could not be loaded."
+    else:
+        try:
+            saved = json.loads(reply_path.read_text(encoding="utf-8"))
+            agent_reply = str(saved.get("text") or saved.get("error") or "")[:30000]
+        except (OSError, ValueError, TypeError) as exc:
+            agent_reply = f"The original agent reply could not be loaded: {exc}"
+
+    repository_context = ""
+    pull = task.get("pull_request")
+    project = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
+    repository_required = bool(
+        project
+        and project.get("repository")
+        and task.get("qa_return_role") in ("Frontend developer", "Backend developer", "Documentation")
+    )
+    if isinstance(pull, dict) and pull.get("number") and project and project.get("repository"):
+        owner, repo = repository_parts(project["repository"])
+        pull_data = github_api(f"/repos/{owner}/{repo}/pulls/{int(pull['number'])}")
+        head = pull_data.get("head") if isinstance(pull_data, dict) else {}
+        branch = str((head or {}).get("ref") or pull.get("branch") or "")
+        head_sha = str((head or {}).get("sha") or "")
+        if not branch or not head_sha:
+            raise ValueError(f"GitHub did not provide the head branch and commit for {task['id']}'s pull request.")
+        latest = read_task(str(task["id"]))
+        if latest:
+            latest["qa_reviewed_head_sha"] = head_sha
+            latest["qa_reviewed_at"] = now_iso()
+            write_task(latest)
+            task["qa_reviewed_head_sha"] = head_sha
+        repository_context = (
+            f"Pull request branch: {branch}\nReviewed commit: {head_sha}\n"
+            + github_task_context(task, head_sha, max_files=32, max_bytes=48000)
+        )
+    elif repository_required:
+        repository_context = "No GitHub pull request is linked to this repository-changing task yet."
+
+    checks = task.get("acceptance_checks") or []
+    return (
+        "\n\nQA review task:\n"
+        + f"Original work role: {task.get('qa_return_role', 'Unknown')}\n"
+        + f"Task request:\n{task.get('request', '')}\n\nAcceptance checks:\n"
+        + ("\n".join(f"- {check}" for check in checks) if checks else "- No acceptance checks were provided.")
+        + f"\n\nOriginal agent reply:\n{agent_reply}"
+        + (f"\n\nCurrent pull-request branch source snapshot:\n{repository_context}" if repository_context else "")
+        + "\n\nReview the provided evidence and criteria. Do not claim to run tests or inspect files beyond what is included. "
+        + "Return only JSON with this shape: "
+        + '{"decision":"pass" or "fail","summary":"brief rationale","checks":[{"check":"criterion or finding",'
+        + '"passed":true or false,"message":"specific evidence or required correction"}]}. '
+        + "Use decision pass only when the evidence supports every acceptance check. If repository changes are required but no PR and branch snapshot are supplied, fail the review for missing evidence. List actionable, reproducible issues as failed checks."
+    )
+
+
+def parse_qa_result(reply: str) -> dict[str, Any]:
+    clean = reply.strip()
+    if clean.startswith("```"):
+        clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", clean, flags=re.IGNORECASE)
+    try:
+        result = json.loads(clean)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("QA response must be a JSON object with a pass/fail decision and checks.") from exc
+    if not isinstance(result, dict) or result.get("decision") not in ("pass", "fail"):
+        raise ValueError("QA response decision must be 'pass' or 'fail'.")
+    raw_checks = result.get("checks")
+    if not isinstance(raw_checks, list) or not raw_checks:
+        raise ValueError("QA response must include at least one check.")
+    checks: list[dict[str, Any]] = []
+    for item in raw_checks[:30]:
+        if not isinstance(item, dict) or not str(item.get("check", "")).strip():
+            raise ValueError("Each QA check must include a description.")
+        if not isinstance(item.get("passed"), bool):
+            raise ValueError("Each QA check must have a boolean passed value.")
+        checks.append(
+            {
+                "check": str(item["check"]).strip()[:500],
+                "kind": "qa",
+                "passed": item["passed"],
+                "message": str(item.get("message", "")).strip()[:2000],
+            }
+        )
+    passed = result["decision"] == "pass" and all(item["passed"] for item in checks)
+    if result["decision"] == "fail" and all(item["passed"] for item in checks):
+        checks.append(
+            {
+                "check": "QA decision",
+                "kind": "qa",
+                "passed": False,
+                "message": str(result.get("summary") or "QA requested changes.")[:2000],
+            }
+        )
+    return {
+        "status": "passed" if passed else "failed",
+        "method": "agent_qa",
+        "summary": str(result.get("summary") or "")[:2000],
+        "checks": checks,
+        "validated_at": now_iso(),
+    }
+
+
 def build_repo_agent_instructions(task: dict[str, Any], provider: str) -> str:
+    if task.get("qa_attempt_active"):
+        return build_qa_review_instructions(task)
     if (
         provider == "Antigravity"
         or task.get("task_type") == "pm_planning"
@@ -2631,6 +2974,8 @@ def call_antigravity_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         )
         if task.get("task_type") == "pm_planning":
             text += "\n\n" + PM_PLANNING_CONTRACT
+        if task.get("qa_attempt_active"):
+            text += build_qa_review_instructions(task)
         if repository and with_mounted_repo:
             if is_repo_write_task:
                 mod = next((m for m in (proj or {}).get("modules", []) if m.get("id") == task.get("module_id")), None)
@@ -2657,11 +3002,10 @@ def call_antigravity_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     if repository:
         env_obj: dict[str, Any] = {
             "type": "remote",
-            "sources": [
-                {"type": "inline", "target": ".agents/AGENTS.md", "content": sys_inst},
-                {"type": "repository", "source": repository, "target": "/workspace/project"},
-            ],
+            "sources": [{"type": "inline", "target": ".agents/AGENTS.md", "content": sys_inst}],
         }
+        if not task.get("qa_attempt_active"):
+            env_obj["sources"].append({"type": "repository", "source": repository, "target": "/workspace/project"})
         github_token = get_provider_key("github")
         if github_token:
             git_basic_ok, api_bearer_ok = sync_antigravity_github_credentials(api_key, github_token)
@@ -2694,10 +3038,10 @@ def call_antigravity_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     interaction: dict[str, Any] | None = None
     last_failure: ProviderFailure | None = None
     for attempt in range(1, 4):
-        use_mounted_repo = bool(repository)
+        use_mounted_repo = bool(repository) and not task.get("qa_attempt_active")
         env_to_send: str | dict[str, Any] = repo_env_spec
         fallback_snap = ""
-        if attempt == 3 and repository and not is_repo_write_task:
+        if attempt == 3 and repository and not is_repo_write_task and not task.get("qa_attempt_active"):
             use_mounted_repo = False
             env_to_send = "remote"
             try:
@@ -3093,35 +3437,125 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
     }
     model = model_map[provider]
     with STATE_LOCK:
-        for summary in reversed(read_tasks()):
-            if summary.get("status") != "Ready" or task_provider(summary) != provider:
-                continue
-            task = read_task(summary["id"])
-            if not task or task.get("status") != "Ready" or task_provider(task) != provider:
-                continue
-            attempts = task.setdefault("attempts", [])
-            attempt_num = max((int(a.get("number", 0)) for a in attempts), default=0) + 1
-            ts = now_iso()
-            attempts.append(
-                {
-                    "number": attempt_num,
-                    "provider": provider,
-                    "model": model,
-                    "state": "in_progress",
-                    "started_at": ts,
-                }
+        summaries = reversed(read_tasks())
+        qa_candidates = [
+            item for item in summaries
+            if item.get("produces_deliverable")
+            and (
+                item.get("status") == "Needs validation"
+                or (item.get("status") == "Ready" and item.get("workflow_phase") == "qa")
             )
-            task["status"] = "In progress"
-            task["updated_at"] = ts
-            task["attempt_timeout_seconds"] = 3600 if provider == "Antigravity" else 900
-            task["dispatch_note"] = f"{provider} is working on this task."
-            task.setdefault("activity", []).append(
-                {"at": ts, "type": "dispatched", "message": f"Task sent to {provider} ({model}), attempt {attempt_num}."}
-            )
-            write_task(task)
-            append_event({"at": ts, "task_id": task["id"], "type": "dispatched", "provider": provider, "attempt": attempt_num})
-            return task
-    return None
+        ]
+        all_tasks = read_tasks()
+        for summary in qa_candidates:
+            task = read_task(str(summary.get("id", "")))
+            if not task:
+                continue
+            if task.get("status") == "Needs validation":
+                task["qa_routing_cycle_start"] = len(task.get("attempts") or [])
+                task["qa_return_role"] = str(task.get("assigned_role") or "Unknown")
+                task["assigned_role"] = "QA"
+                task["workflow_phase"] = "qa"
+            selected_provider = provider_for_role(task, "QA", "qa_routing_cycle_start")
+            if selected_provider != provider:
+                continue
+            repo_key = task_repository_key(task)
+            if repo_key and repo_key in ACTIVE_REPOSITORY_TASKS:
+                continue
+            if repo_key:
+                ACTIVE_REPOSITORY_TASKS.add(repo_key)
+                task["_repository_key"] = repo_key
+            task["qa_attempt_active"] = True
+            task.pop("qa_subject_reply_file", None)
+            if task.get("latest_reply_file"):
+                task["qa_subject_reply_file"] = task["latest_reply_file"]
+            break
+        else:
+            task = None
+
+        if task is None:
+            for summary in reversed(all_tasks):
+                if summary.get("status") != "Ready":
+                    continue
+                candidate = read_task(str(summary.get("id", "")))
+                if not candidate or candidate.get("status") != "Ready":
+                    continue
+                if candidate.get("workflow_phase") == "qa":
+                    continue
+                if task_provider(candidate) != provider:
+                    continue
+                repo_key = task_repository_key(candidate)
+                if repo_key and repo_key in ACTIVE_REPOSITORY_TASKS:
+                    continue
+                if repo_key and any(
+                    (
+                        other.get("status") == "Needs validation"
+                        or (other.get("status") == "Ready" and other.get("workflow_phase") == "qa")
+                    )
+                    and task_repository_key(other) == repo_key
+                    for other in all_tasks
+                ):
+                    continue
+                if repo_key and any(
+                    other.get("status") == "Ready"
+                    and other.get("workflow_phase") != "qa"
+                    and task_repository_key(other) == repo_key
+                    and str(other.get("created_at") or "") < str(candidate.get("created_at") or "")
+                    and task_provider(other)
+                    for other in all_tasks
+                ):
+                    continue
+                task = candidate
+                if repo_key:
+                    ACTIVE_REPOSITORY_TASKS.add(repo_key)
+                    task["_repository_key"] = repo_key
+                break
+        if task is None:
+            return None
+
+        attempts = task.setdefault("attempts", [])
+        attempt_num = max((int(a.get("number", 0)) for a in attempts), default=0) + 1
+        ts = now_iso()
+        attempts.append(
+            {
+                "number": attempt_num,
+                "provider": provider,
+                "model": model,
+                "role": str(task.get("assigned_role") or "PM/PO"),
+                "state": "in_progress",
+                "started_at": ts,
+            }
+        )
+        task["status"] = "In progress"
+        task["updated_at"] = ts
+        task["attempt_timeout_seconds"] = 3600 if provider == "Antigravity" else 900
+        task["dispatch_note"] = f"{provider} is working on this task."
+        task.setdefault("activity", []).append(
+            {
+                "at": ts,
+                "type": "qa_dispatched" if task.get("qa_attempt_active") else "dispatched",
+                "message": (
+                    f"Task sent to QA ({provider}, {model}), attempt {attempt_num}."
+                    if task.get("qa_attempt_active")
+                    else f"Task sent to {provider} ({model}), attempt {attempt_num}."
+                ),
+            }
+        )
+        repo_key = task.get("_repository_key") or task_repository_key(task)
+        task.pop("_repository_key", None)
+        write_task(task)
+        append_event(
+            {
+                "at": ts,
+                "task_id": task["id"],
+                "type": "qa_dispatched" if task.get("qa_attempt_active") else "dispatched",
+                "provider": provider,
+                "attempt": attempt_num,
+            }
+        )
+        if repo_key:
+            task["_repository_key"] = repo_key
+        return task
 
 
 def dispatch_one_for_provider(provider: str) -> bool:
@@ -3130,7 +3564,9 @@ def dispatch_one_for_provider(provider: str) -> bool:
     if not task:
         return False
     tid = task["id"]
+    repository_key = str(task.pop("_repository_key", ""))
     attempt_num = int(task["attempts"][-1]["number"])
+    qa_active = bool(task.get("qa_attempt_active"))
     if provider == "Gemini":
         ACTIVE_GEMINI_COUNT += 1
     else:
@@ -3146,11 +3582,59 @@ def dispatch_one_for_provider(provider: str) -> bool:
         else:
             reply, actual_model, meta = call_openai_compatible_task(task, provider)
 
+        with STATE_LOCK:
+            current = read_task(tid)
+            active_attempt = next(
+                (item for item in (current or {}).get("attempts", []) if int(item.get("number", 0)) == attempt_num),
+                None,
+            )
+            if not current or current.get("status") != "In progress" or not active_attempt or active_attempt.get("state") != "in_progress":
+                ts = now_iso()
+                folder = provider.lower().replace(" ", "")
+                rel = f"replies/{tid}/{folder}/attempt-{attempt_num:03d}.json"
+                atomic_json(
+                    DATA / rel,
+                    {
+                        "task_id": tid,
+                        "provider": provider,
+                        "model": actual_model,
+                        "attempt": attempt_num,
+                        "at": ts,
+                        "state": "stale",
+                        "text": reply,
+                        **meta,
+                    },
+                )
+                logger.info("Late agent reply ignored task_id=%s provider=%s attempt=%s", tid, provider, attempt_num)
+                append_event(
+                    {"at": ts, "task_id": tid, "type": "stale_agent_reply_ignored", "provider": provider, "attempt": attempt_num}
+                )
+                if current:
+                    for item in current.get("attempts") or []:
+                        if int(item.get("number", 0)) == attempt_num:
+                            item["stale_reply_file"] = rel
+                            if item.get("state") == "in_progress":
+                                item["state"] = "ignored"
+                                item["finished_at"] = ts
+                                item["error"] = "Task was no longer active when the response arrived."
+                    current.setdefault("activity", []).append(
+                        {
+                            "at": ts,
+                            "type": "stale_agent_reply_ignored",
+                            "message": f"Late {provider} response from attempt {attempt_num} was saved but not applied.",
+                        }
+                    )
+                    current["updated_at"] = ts
+                    write_task(current)
+                DISPATCH_EVENT.set()
+                return True
+
         proj = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
         if (
             provider != "Antigravity"
             and proj
             and proj.get("repository")
+            and not qa_active
             and task.get("assigned_role") in ("Frontend developer", "Backend developer", "Documentation")
         ):
             apply_repository_manifest(task, reply, provider, attempt_num)
@@ -3184,41 +3668,109 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 fresh["latest_reply_file"] = rel
                 fresh["updated_at"] = ts
 
-                if fresh.get("task_type") == "pm_planning":
+                if qa_active:
+                    try:
+                        val = parse_qa_result(reply)
+                    except ValueError as exc:
+                        val = {
+                            "status": "failed",
+                            "method": "agent_qa",
+                            "summary": "QA returned an invalid review result.",
+                            "checks": [
+                                {
+                                    "check": "QA response format",
+                                    "kind": "qa",
+                                    "passed": False,
+                                    "message": str(exc),
+                                }
+                            ],
+                            "validated_at": ts,
+                        }
+                    fresh["validation"] = val
+                    if val["status"] == "passed":
+                        next_status = "Done"
+                        msg = f"QA approved the deliverable after reviewing acceptance checks and available evidence."
+                        fresh["qa_routing_cycle_start"] = len(fresh.get("attempts") or [])
+                    else:
+                        failures = int(fresh.get("qa_failures") or 0) + 1
+                        fresh["qa_failures"] = failures
+                        val["qa_failures"] = failures
+                        if failures >= MAX_QA_FAILURES:
+                            next_status = "Blocked"
+                            msg = f"QA failed {failures} times; user intervention is required."
+                            fresh["block_reason"] = msg
+                        else:
+                            next_status = "Ready"
+                            msg = f"QA requested changes (failure {failures} of {MAX_QA_FAILURES}); returned to the original work role."
+                            if fresh.get("provider") == "Automatic":
+                                fresh["routing_cycle_start"] = len(fresh.get("attempts") or [])
+                        fresh["assigned_role"] = str(fresh.pop("qa_return_role", "Unknown"))
+                        fresh.pop("workflow_phase", None)
+                    if next_status == "Done":
+                        fresh["assigned_role"] = str(fresh.pop("qa_return_role", "Unknown"))
+                        fresh.pop("workflow_phase", None)
+                    fresh.pop("qa_attempt_active", None)
+                elif fresh.get("task_type") == "pm_planning":
                     next_status, msg = finish_pm_planning_task(fresh, reply, provider)
                 elif fresh.get("produces_deliverable"):
                     val = deterministic_validation(fresh.get("acceptance_checks") or [], reply)
                     fresh["validation"] = val
-                    if val["status"] == "passed":
-                        next_status, msg = "Done", f"{provider} replied and all deterministic acceptance checks passed."
-                    elif val["status"] == "failed":
+                    if val["status"] == "failed":
                         next_status, msg = "Rework needed", f"{provider} replied, but deterministic acceptance checks failed."
                     else:
-                        next_status, msg = "Needs validation", f"{provider} replied; this deliverable needs manual validation."
+                        fresh["qa_routing_cycle_start"] = len(fresh.get("attempts") or [])
+                        fresh["qa_subject_reply_file"] = rel
+                        next_status, msg = "Needs validation", (
+                            f"{provider} replied and deterministic checks passed; this deliverable is queued for QA review."
+                            if val["status"] == "passed"
+                            else f"{provider} replied; this deliverable is queued for QA review."
+                        )
                 else:
                     fresh["validation"] = {"status": "not_required", "checks": [], "validated_at": ts}
                     next_status, msg = "Done", f"{provider} replied; no deliverable validation was required."
 
                 for att in fresh.get("attempts") or []:
                     if att.get("number") == attempt_num:
-                        att["quality_outcome"] = (
-                            "passed"
-                            if next_status == "Done" and fresh.get("produces_deliverable")
-                            else ("failed" if next_status in ("Rework needed", "Blocked") else "unknown")
-                        )
+                        if qa_active:
+                            att["quality_outcome"] = "passed" if val.get("status") == "passed" else "failed"
+                        else:
+                            att["quality_outcome"] = (
+                                "passed"
+                                if next_status == "Done" and fresh.get("produces_deliverable")
+                                else ("failed" if next_status in ("Rework needed", "Blocked") else "unknown")
+                            )
                 fresh["status"] = next_status
                 fresh.pop("dispatch_note", None)
+                if qa_active and next_status == "Ready":
+                    fresh["dispatch_note"] = msg
                 fresh.setdefault("activity", []).append(
-                    {"at": ts, "type": "agent_replied", "from": "In progress", "to": next_status, "message": msg}
+                    {
+                        "at": ts,
+                        "type": "qa_review" if qa_active else "agent_replied",
+                        "from": "In progress",
+                        "to": next_status,
+                        "message": msg,
+                    }
                 )
                 write_task(fresh)
-                append_event({"at": ts, "task_id": tid, "type": "agent_replied", "provider": provider, "to": next_status})
+                append_event(
+                    {
+                        "at": ts,
+                        "task_id": tid,
+                        "type": "qa_review" if qa_active else "agent_replied",
+                        "provider": provider,
+                        "to": next_status,
+                    }
+                )
+                if next_status in ("Needs validation", "Ready"):
+                    DISPATCH_EVENT.set()
 
         fresh_after = read_task(tid)
         if fresh_after and (
-            (provider == "Antigravity" and proj and proj.get("repository")) or fresh_after.get("pull_request")
+            (provider == "Antigravity" and proj and proj.get("repository") and not qa_active)
+            or fresh_after.get("pull_request")
         ):
-            github_postprocess_task(tid, create_pr=(provider == "Antigravity"))
+            github_postprocess_task(tid, create_pr=(provider == "Antigravity" and not qa_active))
 
     except Exception as exc:
         failure = exc if isinstance(exc, ProviderFailure) else ProviderFailure(provider, 503, str(exc)[:1000])
@@ -3228,7 +3780,9 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 ts = now_iso()
                 retryable = failure.status in (408, 429) or failure.status >= 500
                 fallbackable = retryable or failure.status in (400, 401, 403)
-                fallback = fallbackable and fresh.get("provider") == "Automatic" and has_untried_alternate(fresh, provider)
+                fallback = fallbackable and (
+                    qa_active or (fresh.get("provider") == "Automatic" and has_untried_alternate(fresh, provider))
+                ) and has_untried_alternate(fresh, provider)
                 next_status = "Ready" if fallback else ("Waiting for capacity" if retryable else "Blocked")
                 folder = provider.lower().replace(" ", "")
                 rel = f"replies/{tid}/{folder}/attempt-{attempt_num:03d}.json"
@@ -3251,7 +3805,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
                         att["reply_file"] = rel
                 msg = f"{provider} API error {failure.status}: {failure}."
                 if fallback:
-                    nxt = task_provider(fresh)
+                    nxt = provider_for_role(fresh, "QA", "qa_routing_cycle_start") if qa_active else task_provider(fresh)
                     fresh["dispatch_note"] = f"{provider} unavailable; switching to {nxt}."
                     msg = f"{msg} Trying {nxt} automatically."
                 elif retryable:
@@ -3262,6 +3816,11 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 fresh["status"] = next_status
                 fresh["updated_at"] = ts
                 fresh["latest_reply_file"] = rel
+                if qa_active:
+                    fresh.pop("qa_attempt_active", None)
+                    if not fallback and not retryable:
+                        fresh["assigned_role"] = str(fresh.pop("qa_return_role", "Unknown"))
+                        fresh.pop("workflow_phase", None)
                 fresh.setdefault("activity", []).append(
                     {"at": ts, "type": "agent_error", "from": "In progress", "to": next_status, "message": msg}
                 )
@@ -3274,6 +3833,10 @@ def dispatch_one_for_provider(provider: str) -> bool:
             ACTIVE_GEMINI_COUNT = max(0, ACTIVE_GEMINI_COUNT - 1)
         else:
             ACTIVE_OPENROUTER_COUNT = max(0, ACTIVE_OPENROUTER_COUNT - 1)
+        if repository_key:
+            with STATE_LOCK:
+                ACTIVE_REPOSITORY_TASKS.discard(repository_key)
+            DISPATCH_EVENT.set()
     return True
 
 
@@ -3312,12 +3875,18 @@ def run_watchdog_pass() -> int:
                     task["status"] = "Blocked"
                     reason = "Automatic retry limit reached after an agent timeout."
                     task["block_reason"] = reason
+                    if task.get("workflow_phase") == "qa":
+                        task["assigned_role"] = str(task.pop("qa_return_role", "Unknown"))
+                        task.pop("workflow_phase", None)
+                        task.pop("qa_attempt_active", None)
                 else:
                     wait_h = min(2 * (retries + 1), 6)
                     task["status"] = "Waiting for capacity"
                     task["retry_after"] = (datetime.now(timezone.utc) + timedelta(hours=wait_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
                     task["waiting_reason"] = "Agent attempt timed out."
                     reason = f"Agent attempt timed out; retry scheduled after {wait_h} hours."
+                    if task.get("workflow_phase") == "qa":
+                        task.pop("qa_attempt_active", None)
                 ts = now_iso()
                 task["updated_at"] = ts
                 task.setdefault("activity", []).append(
@@ -3333,6 +3902,8 @@ def run_watchdog_pass() -> int:
                 task["automatic_retries"] = int(task.get("automatic_retries") or 0) + 1
                 if task.get("provider") == "Automatic":
                     task["routing_cycle_start"] = len(task.get("attempts") or [])
+                if task.get("workflow_phase") == "qa":
+                    task["qa_routing_cycle_start"] = len(task.get("attempts") or [])
                 task["status"] = "Ready"
                 task.pop("retry_after", None)
                 task.pop("waiting_reason", None)
@@ -4141,11 +4712,19 @@ class Handler(BaseHTTPRequestHandler):
                 if target == "Ready":
                     task.pop("retry_after", None)
                     task.pop("waiting_reason", None)
-                    if cur == "Waiting for capacity" and (not task.get("provider") or task.get("provider") == "Automatic"):
+                    was_qa_blocked = cur == "Blocked" and int(task.get("qa_failures") or 0) > 0
+                    if cur in ("Waiting for capacity", "Blocked") and (not task.get("provider") or task.get("provider") == "Automatic"):
                         task["routing_cycle_start"] = len(task.get("attempts") or [])
+                    if cur == "Rework needed" and task.get("provider") == "Automatic":
+                        task["routing_cycle_start"] = len(task.get("attempts") or [])
+                    if cur == "Blocked":
+                        task["qa_failures"] = 0
+                        task.pop("block_reason", None)
                     sel = task_provider(task)
                     if cur == "Rework needed":
                         msg = "Task returned to the agent queue with its failed validation results included."
+                    elif was_qa_blocked:
+                        msg = "Task manually unblocked; QA failure count reset and the task queued for dispatch."
                     elif cur == "Waiting for capacity":
                         msg = "Manual retry requested; task queued for immediate dispatch."
                     else:
@@ -4222,49 +4801,38 @@ class Handler(BaseHTTPRequestHandler):
         m_val = re.fullmatch(r"/api/tasks/(T-\d{4,})/validation", path)
         if m_val:
             tid = m_val.group(1)
-            decision = str(body.get("decision", ""))
-            notes = str(body.get("notes", "")).strip()[:2000]
-            if decision not in ("pass", "rework"):
-                return self.send_json({"error": "Choose pass or rework."}, HTTPStatus.BAD_REQUEST)
-            if decision == "rework" and not notes:
-                return self.send_json({"error": "Add a short note describing what needs to change."}, HTTPStatus.BAD_REQUEST)
-            with STATE_LOCK:
-                task = read_task(tid)
-                if not task:
-                    return self.send_json({"error": "Task not found."}, HTTPStatus.NOT_FOUND)
-                if task.get("status") != "Needs validation" or not task.get("produces_deliverable"):
-                    return self.send_json({"error": "Only deliverables in Needs validation can be reviewed here."}, HTTPStatus.CONFLICT)
-                ts = now_iso()
-                passed = decision == "pass"
-                task["validation"] = {
-                    "status": "passed" if passed else "failed",
-                    "method": "manual",
-                    "reviewed_by": "User",
-                    "notes": notes or "Approved after manual review.",
-                    "checks": [
-                        {
-                            "check": "Manual review",
-                            "kind": "manual",
-                            "passed": passed,
-                            "message": notes or "Approved after manual review.",
-                        }
-                    ],
-                    "validated_at": ts,
-                }
-                task["status"] = "Done" if passed else "Rework needed"
-                for att in reversed(task.get("attempts") or []):
-                    if att.get("state") == "succeeded":
-                        att["quality_outcome"] = "passed" if passed else "failed"
-                        break
-                task["updated_at"] = ts
-                msg = "User approved the deliverable after manual review." if passed else f"User requested rework: {notes}"
-                task.setdefault("activity", []).append(
-                    {"at": ts, "type": "manual_validation", "from": "Needs validation", "to": task["status"], "message": msg}
+            task = read_task(tid)
+            if not task:
+                return self.send_json({"error": "Task not found."}, HTTPStatus.NOT_FOUND)
+            return self.send_json(
+                {"error": "Deliverable validation is performed automatically by the QA role."},
+                HTTPStatus.CONFLICT,
+            )
+
+        m_local_sync = re.fullmatch(r"/api/tasks/(T-\d{4,})/sync-local", path)
+        if m_local_sync:
+            tid = m_local_sync.group(1)
+            task = read_task(tid)
+            if not task:
+                return self.send_json({"error": "Task not found."}, HTTPStatus.NOT_FOUND)
+            pull = task.get("pull_request")
+            if (
+                task.get("status") != "Done"
+                or (task.get("validation") or {}).get("status") != "passed"
+                or not isinstance(pull, dict)
+                or pull.get("state") != "merged"
+            ):
+                return self.send_json(
+                    {"error": "Local sync can only be retried after QA passes and the pull request is merged."},
+                    HTTPStatus.CONFLICT,
                 )
-                write_task(task)
-            if task.get("pull_request"):
-                threading.Thread(target=github_postprocess_task, args=(tid, False), daemon=True).start()
-            return self.send_json({"task": task})
+            if not sync_local_checkout_after_merge(tid):
+                latest = read_task(tid) or task
+                return self.send_json(
+                    {"error": latest.get("local_sync_error") or "Local checkout sync failed."},
+                    HTTPStatus.BAD_REQUEST,
+                )
+            return self.send_json({"task": read_task(tid)})
 
         m_ans = re.fullmatch(r"/api/tasks/(T-\d{4,})/answer", path)
         if m_ans:

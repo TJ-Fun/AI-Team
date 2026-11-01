@@ -1,6 +1,6 @@
 # AI-Team
 
-Current application version: **0.25**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
+Current application version: **0.26**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
 
 The web client is served from `static/` (`index.html`, `app.js`, and `style.css`). The server keeps application data and logs under `TEAM_DATA_DIR` (default: `data/`).
 
@@ -13,6 +13,8 @@ Git clone runs as a background job so a slow network fetch does not hold the bro
 For the supplied systemd service, project clone paths may be placed under `/home/ubuntu/projects`; the service unit grants write access to that workspace while keeping the rest of `/home` read-only and the rest of the OS protected. The service still runs as the unprivileged `ubuntu` user, so normal Unix ownership and permissions apply. Create the workspace if needed with `sudo install -d -o ubuntu -g ubuntu -m 0750 /home/ubuntu/projects`. After installing an updated `personal-ai-team.service`, run `sudo systemctl daemon-reload` and `sudo systemctl restart personal-ai-team`. Ensure the workspace is writable by `ubuntu` (for example, check with `sudo -u ubuntu test -w /home/ubuntu/projects`). Do not run the app as root or grant it write access to the entire filesystem.
 
 Permission errors when checking or creating a clone are returned as actionable messages and logged, rather than as an unhandled server error. The local Files browser is read-only; filesystem write/delete capabilities are currently used by Git clone/pull/push, and changing systemd access alone does not add a general file editor or deletion UI.
+
+PM/PO-proposed work tasks are queued automatically; project-overview documents still wait for user approval. Deliverables needing validation are reviewed by the QA role. Failed QA reviews automatically return work to its original role, and three unsuccessful QA reviews block the task for user intervention. Repository-changing tasks are serialized per GitHub repository; unrelated repositories may work concurrently. After QA passes, the app merges the reviewed PR into the configured default branch, then fast-forwards the configured local checkout only if its origin and branch match and its worktree is clean. A dirty, divergent, or mismatched checkout is left untouched and raises a task notification; after resolving it, retry the guarded sync from task details.
 
 **App Update** uses the configured GitHub repository credential from **Connections**. Set **Local repository checkout directory** to a writable path for the service user (for example, `/home/ubuntu/projects/personal-ai-team-update`). The updater clones there on first use and fast-forward pulls on later updates, then copies files into the configured **App working directory**. For each file, the newer modification time wins; repository `.git`, virtual environments, caches, and dependency directories are not copied, and deployment-only files are never deleted. The checkout and working directories must be separate, non-overlapping paths.
 

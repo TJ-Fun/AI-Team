@@ -20,6 +20,7 @@
     notifications: [],
     editingTaskId: null,
     detailTaskId: null,
+    detailRenderedSnapshot: "",
     prompts: [],
     contextDocs: [],
     contextProjectId: "",
@@ -535,7 +536,42 @@
       }
       if (state.detailTaskId && $("#task-detail-dialog")?.open) {
         const updated = state.tasks.find((t) => t.id === state.detailTaskId);
-        if (updated) void renderTaskDetailContent(updated, false);
+        const snapshot = updated ? JSON.stringify(updated) : "";
+        if (updated && snapshot !== state.detailRenderedSnapshot) {
+          const dialog = $("#task-detail-dialog");
+          const dialogContent = dialog?.querySelector(".detail-dialog");
+          const scrollTop = dialogContent?.scrollTop || 0;
+          const hadFocusInsideDialog = Boolean(dialog?.contains(document.activeElement));
+          const focusedId = document.activeElement?.id || "";
+          const selectionStart = document.activeElement?.selectionStart;
+          const selectionEnd = document.activeElement?.selectionEnd;
+          state.detailRenderedSnapshot = snapshot;
+          void renderTaskDetailContent(updated, false).then(() => {
+            if (
+              state.detailTaskId !== updated.id ||
+              state.detailRenderedSnapshot !== snapshot
+            ) {
+              return;
+            }
+            if (
+              hadFocusInsideDialog &&
+              focusedId &&
+              (document.activeElement === document.body || document.activeElement === dialog)
+            ) {
+              const focusTarget = document.getElementById(focusedId);
+              focusTarget?.focus({ preventScroll: true });
+              if (
+                focusTarget &&
+                typeof selectionStart === "number" &&
+                typeof selectionEnd === "number" &&
+                typeof focusTarget.setSelectionRange === "function"
+              ) {
+                focusTarget.setSelectionRange(selectionStart, selectionEnd);
+              }
+            }
+            if (dialogContent) dialogContent.scrollTop = scrollTop;
+          });
+        }
       }
       const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       $("#board-updated").textContent = `Updated ${stamp} · refreshes every 5 seconds`;
@@ -658,11 +694,13 @@
     const task = state.tasks.find((t) => t.id === taskId);
     if (!task) return;
     state.detailTaskId = taskId;
+    state.detailRenderedSnapshot = JSON.stringify(task);
     await renderTaskDetailContent(task, true);
     if (!detailDialog.open) detailDialog.showModal();
   }
 
   async function renderTaskDetailContent(task, resetInputs = false) {
+    const renderSnapshot = JSON.stringify(task);
     const asked = getAskedProvider(task);
     $("#detail-eyebrow").textContent = `${task.id} · ${task.assigned_role} · ${asked}`;
     $("#detail-title").textContent = task.title;
@@ -835,9 +873,13 @@
     }
 
     const ghErr = $("#detail-github-error");
-    if (task.github_error) {
+    const repositoryErrors = [
+      task.github_error ? `GitHub: ${task.github_error}` : "",
+      task.local_sync_error ? `Local checkout: ${task.local_sync_error}` : "",
+    ].filter(Boolean);
+    if (repositoryErrors.length) {
       ghErr.hidden = false;
-      ghErr.textContent = `GitHub: ${task.github_error}`;
+      ghErr.textContent = repositoryErrors.join(" · ");
     } else {
       ghErr.hidden = true;
     }
@@ -849,6 +891,7 @@
     }
     try {
       const res = await api(`/api/tasks/${encodeURIComponent(task.id)}/replies`);
+      if (state.detailTaskId !== task.id || state.detailRenderedSnapshot !== renderSnapshot) return;
       const replies = res.replies || [];
       repliesEl.innerHTML = replies.length
         ? replies
@@ -864,7 +907,9 @@
             .join("")
         : `<span class="muted">No agent replies yet.</span>`;
     } catch (err) {
-      repliesEl.textContent = `Could not load replies: ${err.message}`;
+      if (state.detailTaskId === task.id && state.detailRenderedSnapshot === renderSnapshot) {
+        repliesEl.textContent = `Could not load replies: ${err.message}`;
+      }
     }
 
     // Activity
@@ -908,17 +953,15 @@
     }
 
     let actionHtml = "";
-    if (task.status === "Needs validation" && task.produces_deliverable) {
-      actionHtml += `
-        <button class="secondary" type="button" data-validation-decision="rework">Request rework</button>
-        <button class="primary" type="button" data-validation-decision="pass">Approve deliverable</button>`;
-    }
     actionHtml += actions
       .map(
         ([key, label, cls]) =>
           `<button class="${cls}" type="button" data-detail-status-action="${escapeHtml(key)}">${escapeHtml(label)}</button>`
       )
       .join("");
+    if (task.local_sync_error && task.pull_request?.state === "merged") {
+      actionHtml += `<button class="secondary" type="button" data-local-sync-retry="1">Retry local checkout sync</button>`;
+    }
     if (task.task_type === "project_overview" && task.status === "Needs approval") {
       actionHtml += `
         <button class="secondary" type="button" data-overview-action="save">Save edits</button>
@@ -984,6 +1027,23 @@
       return;
     }
 
+    if (e.target.closest("[data-local-sync-retry]")) {
+      const button = e.target.closest("[data-local-sync-retry]");
+      button.disabled = true;
+      try {
+        await api(`/api/tasks/${encodeURIComponent(task.id)}/sync-local`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        await refreshBoard();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        button.disabled = false;
+      }
+      return;
+    }
+
     const statusBtn = e.target.closest("[data-detail-status-action]");
     if (statusBtn) {
       const target = statusBtn.getAttribute("data-detail-status-action");
@@ -1006,33 +1066,6 @@
           body: JSON.stringify({ status: target, note }),
         });
         detailDialog.close();
-        await refreshBoard();
-      } catch (err) {
-        alert(err.message);
-      }
-      return;
-    }
-
-    const valBtn = e.target.closest("[data-validation-decision]");
-    if (valBtn) {
-      const decision = valBtn.getAttribute("data-validation-decision");
-      let notes = "";
-      if (decision === "pass") {
-        if (!confirm("Approve this deliverable and mark the task Done?")) return;
-      } else {
-        const input = prompt("What should the agent fix before you review it again?", "");
-        if (input === null) return;
-        notes = input.trim();
-        if (!notes) {
-          alert("Please describe what needs to change.");
-          return;
-        }
-      }
-      try {
-        await api(`/api/tasks/${encodeURIComponent(task.id)}/validation`, {
-          method: "POST",
-          body: JSON.stringify({ decision, notes }),
-        });
         await refreshBoard();
       } catch (err) {
         alert(err.message);

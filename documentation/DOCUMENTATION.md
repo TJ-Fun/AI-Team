@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.25 · Updated 2026-11-01
+Version 0.26 · Updated 2026-11-01
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -42,22 +42,26 @@ The supplied service runs as the unprivileged `ubuntu` user, uses `ProtectSystem
 1. Select the active project from the selector on the task board. The selector remains outside Settings because switching projects is a frequent board action.
 2. Use **Settings → Projects** to add or edit project definitions, repository URLs, local checkout paths, and sub-projects. Use **Project context** on the board to edit that project's durable documents.
 3. Use **New task** to create a draft with a role, provider preference, project/sub-project, request, and optional acceptance checks.
-4. A task remains a draft until reviewed and marked Ready. Deliverable work requires acceptance checks before it can enter the agent queue.
+4. User-created tasks remain drafts until reviewed and marked Ready. PM/PO-proposed work tasks enter the Ready queue automatically; their project-overview documents still require user approval. Deliverable work requires acceptance checks before it can enter the agent queue.
 5. Follow status, attempts, agent replies, validation results, and activity from the board/task details. Browser polling refreshes board and runtime status.
 
 ### 4.2 Orchestrator and PM/PO
 
-The Orchestrator chat is local to the configured Ollama instance and uses the selected Project Board project's context. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a draft backlog. Review the response and task drafts before starting work. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data. PM/PO plans must follow the JSON schema supplied with the request; unknown sub-project IDs are safely assigned to the whole project rather than rejecting the entire plan.
+The Orchestrator chat is local to the configured Ollama instance and uses the selected Project Board project's context. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a backlog. Valid proposed work tasks enter the queue automatically; project-overview documents remain pending user approval. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data. PM/PO plans must follow the JSON schema supplied with the request; unknown sub-project IDs are safely assigned to the whole project rather than rejecting the entire plan.
 
 ### 4.3 Provider connections and routing
 
 1. Open **Settings → Connections** to add, replace, test, or clear provider credentials. Supported connection families are Gemini/Antigravity, GroqCloud, OpenRouter, and the GitHub repository connector.
-2. Open **Settings → Routing** to set provider rank order per work role. Unavailable providers are skipped by the dispatcher.
-3. A task can request automatic selection or a specific provider. Provider attempts and quality outcomes feed the Statistics view. Task creation and status transitions are always written to `TEAM_DATA_DIR/logs/activity.jsonl` and to `app.log` when the configured capture level includes INFO. Agent reply text is saved under `TEAM_DATA_DIR/replies/<task_id>/<provider>/` and shown in task details; `app.log` records when that reply file is saved, not the full reply body.
+2. Open **Settings → Routing** to set provider rank order per work role. Unavailable providers are skipped by the dispatcher. The QA role uses its own routing order.
+3. A task can request automatic selection or a specific provider. Provider attempts and quality outcomes feed the Statistics view. Tasks entering **Needs validation** are sent to QA automatically. QA reviews the acceptance checks, original agent reply, and available repository evidence without modifying files or claiming to run tests. A failed review returns the task to its original work role automatically. After three failed QA reviews the task becomes **Blocked** for user intervention; manually returning it to Ready resets the QA-failure count. Task creation and status transitions are always written to `TEAM_DATA_DIR/logs/activity.jsonl` and to `app.log` when the configured capture level includes INFO. Agent reply text is saved under `TEAM_DATA_DIR/replies/<task_id>/<provider>/` and shown in task details; `app.log` records when that reply file is saved, not the full reply body.
 
 ### 4.4 GitHub repository work
 
 Projects can point to GitHub repositories and local checkout folders. The GitHub connection configured in Connections is shared by repository listing, clone, pull, push, repository reads, and app updates. Clone operations expose progress and actionable Git errors in the UI/logs. Local Files and Documentation browsing is read-only.
+
+For code and documentation tasks, the app creates a task/attempt branch from the repository's configured default branch, commits provider-supplied file manifests where supported, and opens a PR targeting that default branch. Gemini, GroqCloud, and OpenRouter receive a limited source snapshot fetched from GitHub; the app applies their returned file manifest. Antigravity works in a remote repository environment and pushes its task branch. Neither flow edits the configured local checkout. PM/PO planning receives saved project context and board information; Antigravity additionally receives a read-only remote repository mount when the project has a repository configured. No agent reads from or edits the configured local checkout. Repository-changing work and QA are serialized per repository, and eligible work is selected oldest-first within that repository; unrelated repositories may run concurrently. QA reviews the current PR head using a bounded GitHub source snapshot (up to 32 files and 48 KB) plus the original agent response. The app verifies that the reviewed PR head has not changed before merging. A changed PR is queued for another QA pass. The app merges only after QA passes.
+
+After a validated PR is merged, the app synchronizes the configured local checkout to the default branch. If the checkout does not exist, the app clones it to a staging directory and installs it only after a successful clone. Existing checkouts are updated only when the GitHub origin matches, the checked-out branch is the repository default branch, the worktree is clean, and a fast-forward is possible. Dirty, divergent, branch-mismatched, or wrong-origin checkouts are left untouched; the task receives a local-sync error notification for user resolution. After resolving the issue, use **Retry local checkout sync** in that task's details to retry the same guarded operation. A failed local sync does not undo a successful GitHub merge. No local sync occurs before QA approves and the PR merges.
 
 Use the configured service user's permitted paths. The example service grants project work under `/home/ubuntu/projects`; it does not grant unrestricted filesystem access.
 
@@ -78,7 +82,7 @@ The service must have both systemd write permission (`ReadWritePaths`) and Unix 
 
 The Settings dialog uses Projects, Connections, Routing, Logs, and About tabs. A shared Close button remains at the bottom of the dialog. Long log and documentation lines wrap within their viewers to avoid horizontal scrolling.
 
-**Statistics** is available directly from the header. Its period selector filters provider request, successful reply, and average response-time summaries. Deliverable QA pass rates are shown from recorded provider quality results. Usage reset changes a display baseline for the selected provider/model and period; it does not delete historical records.
+**Statistics** is available directly from the header. Its period selector filters provider request, successful reply, and average response-time summaries. Deliverable QA pass rates are shown from recorded provider quality results, with QA attempts attributed to the QA role. Usage reset changes a display baseline for the selected provider/model and period; it does not delete historical records. Board polling refreshes the open task detail only when that task changes and restores focus and scroll position after the update.
 
 ## 5. Installation and deployment (Ubuntu/Oracle Cloud)
 

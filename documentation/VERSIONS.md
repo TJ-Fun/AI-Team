@@ -1,5 +1,15 @@
 # Version log
 
+## 0.26 — 2026-11-01
+
+- Automatically queued valid PM/PO work tasks while keeping proposed project overviews behind user approval.
+- Added automatic QA review for deliverables in Needs validation, routed through the QA provider settings.
+- Returned failed QA reviews to the original work role and blocked tasks after three unsuccessful QA reviews for user intervention.
+- Serialized repository-changing tasks and QA per GitHub repository, prioritized QA before new work in that repository, and reviewed the exact PR head before merge.
+- Fast-forwarded the configured local checkout after a validated PR merge only when origin, default branch, and clean-worktree checks pass; added actionable local-sync notifications and a guarded task-detail retry action.
+- Updated task-detail polling to rerender only after task changes while restoring focus and scroll position.
+- Updated QA instructions, workflow documentation, and About version to 0.26.
+
 ## 0.25 — 2026-11-01
 
 - Accept valid PM/PO plans with unknown sub-project IDs by assigning those tasks to the whole project, and report precise schema validation errors.
