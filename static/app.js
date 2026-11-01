@@ -53,6 +53,21 @@
     return data;
   }
 
+  async function waitForAppRestart(statusEl, message, statusType = "restart-status") {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      try {
+        await api("/api/status");
+        location.reload();
+        return;
+      } catch (_err) {
+        statusEl.textContent = `${message} Waiting for the service to restart… (${(attempt + 1) * 2}s)`;
+      }
+    }
+    statusEl.textContent = `${message} The service did not respond within 60 seconds. Check the service logs.`;
+    statusEl.className = `${statusType} error`;
+  }
+
   function formatTime(value) {
     if (!value) return "";
     const d = new Date(value);
@@ -2265,6 +2280,7 @@
       const res = await api("/api/settings/config");
       const config = res.config || {};
       $("#app-repo-url").value = config.app_repo || "";
+      $("#app-clone-dir").value = config.app_clone_dir || "";
       $("#app-working-dir").value = config.app_working_dir || "";
       $("#log-capture-level").value = config.log_level || "INFO";
     } catch (err) {
@@ -2294,11 +2310,16 @@
   // Save app config
   $("#save-app-config")?.addEventListener("click", async () => {
     const appRepo = $("#app-repo-url")?.value?.trim();
+    const appCloneDir = $("#app-clone-dir")?.value?.trim();
     const appWorkingDir = $("#app-working-dir")?.value?.trim();
     try {
       await api("/api/settings/config", {
         method: "POST",
-        body: JSON.stringify({ app_repo: appRepo, app_working_dir: appWorkingDir }),
+        body: JSON.stringify({
+          app_repo: appRepo,
+          app_clone_dir: appCloneDir,
+          app_working_dir: appWorkingDir,
+        }),
       });
       alert("Configuration saved successfully.");
     } catch (err) {
@@ -2354,10 +2375,10 @@
     statusEl.textContent = "Restarting…";
     statusEl.className = "restart-status info";
     try {
-      const res = await api("/api/settings/restart", { method: "POST" });
-      statusEl.textContent = "Restart completed successfully. The page will reload in a few seconds.";
+      await api("/api/settings/restart", { method: "POST" });
+      statusEl.textContent = "Restart scheduled.";
       statusEl.className = "restart-status success";
-      setTimeout(() => location.reload(), 3000);
+      await waitForAppRestart(statusEl, "Restart scheduled.");
     } catch (err) {
       statusEl.textContent = `Restart failed: ${err.message}`;
       statusEl.className = "restart-status error";
@@ -2367,26 +2388,35 @@
   // Update app
   $("#update-app")?.addEventListener("click", async () => {
     const appRepo = $("#app-repo-url")?.value?.trim();
+    const appCloneDir = $("#app-clone-dir")?.value?.trim();
     const appWorkingDir = $("#app-working-dir")?.value?.trim();
-    if (!appRepo || !appWorkingDir) {
-      alert("Please fill in both the app repository URL and working directory.");
+    if (!appRepo || !appCloneDir || !appWorkingDir) {
+      alert("Please fill in the app repository URL and local checkout directory.");
       return;
     }
-    if (!confirm(`Update the app from ${appRepo} and restart? This will pull the latest changes and restart the service.`)) return;
+    if (!confirm(`Update ${appRepo} in ${appCloneDir}, copy newer files into ${appWorkingDir}, and restart the app?`)) return;
     const statusEl = $("#update-status");
+    const updateButton = $("#update-app");
+    updateButton.disabled = true;
     statusEl.textContent = "Updating…";
     statusEl.className = "update-status info";
     try {
       const res = await api("/api/settings/update", {
         method: "POST",
-        body: JSON.stringify({ app_repo: appRepo, app_working_dir: appWorkingDir }),
+        body: JSON.stringify({
+          app_repo: appRepo,
+          app_clone_dir: appCloneDir,
+          app_working_dir: appWorkingDir,
+        }),
       });
-      statusEl.textContent = `Update successful: ${res.message}. The page will reload in a few seconds.`;
+      statusEl.textContent = `${res.message} Restarting the service…`;
       statusEl.className = "update-status success";
-      setTimeout(() => location.reload(), 3000);
+      await waitForAppRestart(statusEl, res.message, "update-status");
     } catch (err) {
       statusEl.textContent = `Update failed: ${err.message}`;
       statusEl.className = "update-status error";
+    } finally {
+      updateButton.disabled = false;
     }
   });
 

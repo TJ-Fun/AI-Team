@@ -9,6 +9,7 @@ import logging
 import logging.handlers
 import os
 import re
+import signal
 import shutil
 import subprocess
 import tempfile
@@ -149,7 +150,7 @@ CLONE_TARGETS: set[str] = set()
 APP_CONFIG_FILE = DATA / "app_config.json"
 
 def read_app_config() -> dict[str, Any]:
-    """Read app configuration for settings like app repo URL and log level."""
+    """Read app configuration for repository paths and log level."""
     try:
         if APP_CONFIG_FILE.exists():
             config = json.loads(APP_CONFIG_FILE.read_text(encoding="utf-8"))
@@ -157,7 +158,12 @@ def read_app_config() -> dict[str, Any]:
                 return config
     except Exception as exc:
         logger.error(f"Failed to read app config: {exc}")
-    return {"app_repo": "", "app_working_dir": str(ROOT), "log_level": "INFO"}
+    return {
+        "app_repo": "",
+        "app_clone_dir": "",
+        "app_working_dir": str(ROOT),
+        "log_level": "INFO",
+    }
 
 
 def normalize_log_level(level: Any) -> str | None:
@@ -954,6 +960,153 @@ def git_auth_environment(token: str = "") -> dict[str, str]:
 
 def redact_git_output(output: str, token: str) -> str:
     return output.replace(token, "[redacted]") if token else output
+
+
+def canonical_github_repository(repository: str) -> tuple[str, str]:
+    remote = repository.strip()
+    ssh_match = re.fullmatch(r"(?:git@github\.com:|ssh://git@github\.com/)([^/]+)/([^/]+?)(?:\.git)?", remote)
+    if ssh_match:
+        return ssh_match.group(1).casefold(), ssh_match.group(2).casefold()
+    owner, name = repository_parts(normalize_github_repo_url(remote))
+    return owner.casefold(), name.casefold()
+
+
+def update_app_checkout(repository_url: str, checkout_path: Path, token: str) -> str:
+    """Clone the configured app repo or fast-forward its existing checkout."""
+    checkout_path = checkout_path.resolve()
+    git_env = git_auth_environment(token)
+    staging_path: Path | None = None
+    if checkout_path.exists():
+        if not checkout_path.is_dir():
+            raise ValueError(f"Repository checkout path is not a directory: {checkout_path}")
+        probe = subprocess.run(
+            ["git", "-C", str(checkout_path), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if probe.returncode != 0:
+            raise ValueError(
+                f"Repository checkout path exists but is not a Git repository: {checkout_path}. "
+                "Choose an empty directory or an existing checkout."
+            )
+        remote = subprocess.run(
+            ["git", "-C", str(checkout_path), "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if remote.returncode != 0:
+            raise ValueError(f"Could not read the origin remote for checkout: {remote.stderr.strip()}")
+        if canonical_github_repository(remote.stdout) != canonical_github_repository(repository_url):
+            raise ValueError(
+                f"The existing checkout at '{checkout_path}' belongs to a different repository. "
+                "Choose its matching repository URL or another checkout directory."
+            )
+        operation = "pull"
+        command = ["git", "-C", str(checkout_path), "pull", "--ff-only"]
+    else:
+        checkout_path.parent.mkdir(parents=True, exist_ok=True)
+        operation = "clone"
+        staging_path = Path(tempfile.mkdtemp(prefix=f".{checkout_path.name}.clone-", dir=checkout_path.parent))
+        command = ["git", "clone", "--progress", repository_url, str(staging_path)]
+
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=300, env=git_env,
+        )
+    except PermissionError as exc:
+        if staging_path is not None:
+            shutil.rmtree(staging_path, ignore_errors=True)
+        raise ValueError(
+            f"Permission denied accessing repository checkout '{checkout_path}'. "
+            "Ensure the service user can write there and systemd allows the path."
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        if staging_path is not None:
+            shutil.rmtree(staging_path, ignore_errors=True)
+        detail = redact_git_output((exc.stderr or "") if isinstance(exc.stderr, str) else "", token).strip()
+        raise ValueError(f"Git {operation} timed out after 300 seconds. {detail}".strip()) from exc
+    except FileNotFoundError as exc:
+        if staging_path is not None:
+            shutil.rmtree(staging_path, ignore_errors=True)
+        raise ValueError("Git is not installed or is not available to the application service.") from exc
+
+    output = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part and part.strip())
+    output = redact_git_output(output, token)
+    if result.returncode:
+        if staging_path is not None:
+            shutil.rmtree(staging_path, ignore_errors=True)
+        detail = output or f"git exited with status {result.returncode}"
+        logger.error("App repository %s failed (exit=%s): %s", operation, result.returncode, detail)
+        raise ValueError(f"Git {operation} failed: {detail}")
+    if staging_path is not None:
+        try:
+            os.replace(staging_path, checkout_path)
+        except Exception:
+            shutil.rmtree(staging_path, ignore_errors=True)
+            raise
+    logger.info("App repository %s completed (checkout=%s): %s", operation, checkout_path, output or "no changes")
+    return operation
+
+
+def copy_newer_app_files(source: Path, destination: Path) -> tuple[int, int]:
+    """Copy newer repository files without deleting files unique to the deployment."""
+    source = source.resolve(strict=True)
+    destination = destination.resolve(strict=True)
+    ignored_directories = {".git", ".venv", "venv", "__pycache__", "node_modules"}
+    copied = skipped = 0
+
+    def raise_walk_error(error: OSError) -> None:
+        raise error
+
+    for current, dirs, filenames in os.walk(source, followlinks=False, onerror=raise_walk_error):
+        current_path = Path(current)
+        dirs[:] = [
+            name for name in dirs
+            if name not in ignored_directories and not (current_path / name).is_symlink()
+        ]
+        relative_dir = current_path.relative_to(source)
+        target_dir = destination / relative_dir
+        if target_dir.is_symlink():
+            raise ValueError(f"Refusing to write through a symbolic link in the app directory: {target_dir}")
+        target_dir.mkdir(parents=True, exist_ok=True)
+        if not target_dir.resolve().is_relative_to(destination):
+            raise ValueError(f"Refusing to write outside the app working directory: {target_dir}")
+
+        for filename in filenames:
+            source_file = current_path / filename
+            if source_file.is_symlink():
+                continue
+            relative_file = source_file.relative_to(source)
+            target_file = destination / relative_file
+            if target_file.is_symlink():
+                raise ValueError(f"Refusing to overwrite a symbolic link in the app directory: {target_file}")
+            resolved_target = target_file.resolve(strict=False)
+            if not resolved_target.is_relative_to(destination):
+                raise ValueError(f"Refusing to write outside the app working directory: {target_file}")
+            source_stat = source_file.stat()
+            try:
+                target_stat = target_file.stat()
+            except FileNotFoundError:
+                target_stat = None
+            if target_stat and target_stat.st_mtime_ns >= source_stat.st_mtime_ns:
+                skipped += 1
+                continue
+            if target_stat and not target_file.is_file():
+                raise ValueError(f"Cannot replace non-file app path: {target_file}")
+
+            fd, temporary_name = tempfile.mkstemp(prefix=f".{filename}.", dir=target_dir)
+            os.close(fd)
+            temporary_file = Path(temporary_name)
+            try:
+                shutil.copy2(source_file, temporary_file)
+                os.replace(temporary_file, target_file)
+            finally:
+                temporary_file.unlink(missing_ok=True)
+            copied += 1
+    return copied, skipped
+
+
+def restart_service_process() -> None:
+    logger.info("Exiting app process; systemd will restart the service")
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 def update_clone_job(job_id: str, **updates: Any) -> None:
@@ -3694,60 +3847,51 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"error": f"Failed to clear logs: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         if path == "/api/settings/restart":
-            try:
-                logger.info("App restart requested by user")
-                # Execute systemctl commands
-                commands = [
-                    ["sudo", "systemctl", "stop", "personal-ai-team"],
-                    ["sudo", "systemctl", "daemon-reload"],
-                    ["sudo", "systemctl", "enable", "--now", "personal-ai-team"],
-                ]
-                results = []
-                for cmd in commands:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                    results.append({
-                        "command": " ".join(cmd),
-                        "returncode": result.returncode,
-                        "stdout": result.stdout,
-                        "stderr": result.stderr
-                    })
-                    if result.returncode != 0:
-                        raise ValueError(f"Command failed: {' '.join(cmd)} - {result.stderr}")
-                # Get status
-                status_result = subprocess.run(
-                    ["sudo", "systemctl", "status", "personal-ai-team", "--no-pager"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                results.append({
-                    "command": "systemctl status",
-                    "returncode": status_result.returncode,
-                    "stdout": status_result.stdout,
-                    "stderr": status_result.stderr
-                })
-                logger.info("App restart completed successfully")
-                return self.send_json({"success": True, "results": results})
-            except subprocess.TimeoutExpired:
-                return self.send_json({"error": "Restart command timed out."}, HTTPStatus.INTERNAL_SERVER_ERROR)
-            except ValueError as exc:
-                return self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
-            except Exception as exc:
-                return self.send_json({"error": f"Restart failed: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            logger.info("App restart requested by user")
+            self.send_json({"success": True, "message": "Service restart scheduled."})
+            threading.Timer(2.0, restart_service_process).start()
+            return None
 
         if path == "/api/settings/update":
             app_repo = str(body.get("app_repo", "")).strip()
+            app_clone_dir = str(body.get("app_clone_dir", "")).strip()
             app_working_dir = str(body.get("app_working_dir", "")).strip()
-            if not app_repo or not app_working_dir:
-                return self.send_json({"error": "App repository and working directory are required."}, HTTPStatus.BAD_REQUEST)
+            if not app_repo or not app_clone_dir or not app_working_dir:
+                return self.send_json(
+                    {"error": "App repository, local checkout directory, and working directory are required."},
+                    HTTPStatus.BAD_REQUEST,
+                )
             if not re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?", app_repo):
                 return self.send_json({"error": "Invalid GitHub repository URL."}, HTTPStatus.BAD_REQUEST)
             
             try:
-                logger.info(f"App update requested: repo={app_repo}, dir={app_working_dir}")
+                logger.info(
+                    "App update requested: repo=%s checkout=%s working_dir=%s",
+                    app_repo, app_clone_dir, app_working_dir,
+                )
+                checkout_path = Path(app_clone_dir).expanduser().resolve()
                 working_path = Path(app_working_dir).expanduser().resolve()
-                if not working_path.exists():
+                if not checkout_path.is_absolute() or not working_path.is_absolute():
+                    return self.send_json(
+                        {"error": "The local checkout and app working directory must be absolute paths."},
+                        HTTPStatus.BAD_REQUEST,
+                    )
+                if checkout_path == Path(checkout_path.anchor) or working_path == Path(working_path.anchor):
+                    return self.send_json(
+                        {"error": "A filesystem root cannot be used as an app directory."},
+                        HTTPStatus.BAD_REQUEST,
+                    )
+                if not working_path.is_dir():
                     return self.send_json({"error": f"Working directory does not exist: {app_working_dir}"}, HTTPStatus.BAD_REQUEST)
+                if (
+                    checkout_path == working_path
+                    or checkout_path.is_relative_to(working_path)
+                    or working_path.is_relative_to(checkout_path)
+                ):
+                    return self.send_json(
+                        {"error": "The local checkout directory and app working directory must not overlap."},
+                        HTTPStatus.BAD_REQUEST,
+                    )
                 
                 token = get_provider_key("github")
                 if not token:
@@ -3756,41 +3900,34 @@ class Handler(BaseHTTPRequestHandler):
                 app_repo_url = normalize_github_repo_url(app_repo)
                 owner, repo = repository_parts(app_repo_url)
                 app_repo_url = f"https://github.com/{owner}/{repo}.git"
-                
-                # Use the configured GitHub connection without putting credentials in the remote URL.
-                pull_result = subprocess.run(
-                    ["git", "pull", app_repo_url],
-                    cwd=working_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                    env=git_auth_environment(token),
+                operation = update_app_checkout(app_repo_url, checkout_path, token)
+                copied, skipped = copy_newer_app_files(checkout_path, working_path)
+                logger.info(
+                    "App files copied from checkout=%s to working_dir=%s (copied=%s, kept_newer_or_equal=%s)",
+                    checkout_path, working_path, copied, skipped,
                 )
-                if pull_result.returncode != 0:
-                    detail = redact_git_output(pull_result.stderr or "", token).strip()
-                    detail = detail or redact_git_output(pull_result.stdout or "", token).strip()
-                    logger.error("App update pull failed (exit=%s): %s", pull_result.returncode, detail)
-                    if not detail:
-                        detail = f"git exited with status {pull_result.returncode}"
-                    raise ValueError(f"Git pull failed: {detail}")
-                
-                # Restart the service
-                restart_commands = [
-                    ["sudo", "systemctl", "stop", "personal-ai-team"],
-                    ["sudo", "systemctl", "daemon-reload"],
-                    ["sudo", "systemctl", "enable", "--now", "personal-ai-team"],
-                ]
-                for cmd in restart_commands:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                    if result.returncode != 0:
-                        raise ValueError(f"Restart command failed: {' '.join(cmd)} - {result.stderr}")
-                
-                logger.info("App update and restart completed successfully")
-                return self.send_json({
+                response = {
                     "success": True,
-                    "pull_output": redact_git_output(pull_result.stdout or "", token),
-                    "message": "App updated and restarted successfully."
-                })
+                    "operation": operation,
+                    "copied_files": copied,
+                    "kept_files": skipped,
+                    "message": f"Repository {operation} completed; copied {copied} newer file(s), kept {skipped} newer or unchanged file(s).",
+                }
+                self.send_json(response)
+                threading.Timer(2.0, restart_service_process).start()
+                return None
+            except PermissionError as exc:
+                logger.exception("App update permission failure")
+                return self.send_json(
+                    {
+                        "error": (
+                            f"Permission denied at '{exc.filename or app_clone_dir or app_working_dir}'. "
+                            "Grant the ubuntu service user filesystem access and add the exact path "
+                            "to systemd ReadWritePaths."
+                        )
+                    },
+                    HTTPStatus.FORBIDDEN,
+                )
             except subprocess.TimeoutExpired:
                 logger.exception("App update command timed out")
                 return self.send_json({"error": "Update command timed out."}, HTTPStatus.INTERNAL_SERVER_ERROR)

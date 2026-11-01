@@ -14,13 +14,13 @@ Environment=TEAM_PORT=8765
 Environment=TEAM_DATA_DIR=/var/lib/personal-ai-team
 Environment=TEAM_SECRET_KEY_FILE=/etc/personal-ai-team/credential.key
 ExecStart=/usr/bin/python3 /opt/personal-ai-team/server.py
-Restart=on-failure
+Restart=always
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/var/lib/personal-ai-team /home/ubuntu/projects
+ReadWritePaths=/var/lib/personal-ai-team /home/ubuntu/projects /opt/personal-ai-team
 UMask=0027
 
 [Install]

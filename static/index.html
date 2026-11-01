@@ -294,12 +294,15 @@
       
       <div class="settings-section">
         <h3>App Update</h3>
-        <p class="draft-note">Update the application from GitHub. This will pull the latest changes and restart the service.</p>
+        <p class="draft-note">Fetch the repository into a local checkout, copy files newer than the deployed versions, then restart the service. Files that are newer in the app working directory are kept; files not present in the repository are not deleted.</p>
         <label>App GitHub repository URL
           <input id="app-repo-url" type="text" placeholder="https://github.com/user/repo">
         </label>
+        <label>Local repository checkout directory
+          <input id="app-clone-dir" type="text" placeholder="/home/ubuntu/projects/personal-ai-team-update">
+        </label>
         <label>App working directory
-          <input id="app-working-dir" type="text" placeholder="/home/ubuntu/personal-ai-team" readonly>
+          <input id="app-working-dir" type="text" placeholder="/opt/personal-ai-team" readonly>
         </label>
         <button type="button" class="secondary" id="save-app-config">Save configuration</button>
         <button type="button" class="primary" id="update-app">Update App</button>
