@@ -131,6 +131,36 @@ console_formatter = logging.Formatter("%(levelname)s: %(message)s")
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
 
+# Log startup
+logger.info("=" * 60)
+logger.info("Personal AI Team server starting")
+logger.info(f"ROOT: {ROOT}")
+logger.info(f"DATA: {DATA}")
+logger.info(f"LOG_DIR: {LOG_DIR}")
+logger.info(f"LOG_FILE: {LOG_FILE}")
+logger.info("=" * 60)
+
+# --- App Configuration ---
+APP_CONFIG_FILE = DATA / "app_config.json"
+
+def read_app_config() -> dict[str, Any]:
+    """Read app configuration for settings like app repo URL."""
+    try:
+        if APP_CONFIG_FILE.exists():
+            return json.loads(APP_CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.error(f"Failed to read app config: {exc}")
+    return {"app_repo": "", "app_working_dir": str(ROOT)}
+
+def save_app_config(config: dict[str, Any]) -> None:
+    """Save app configuration."""
+    try:
+        APP_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
+        logger.info(f"App config saved: {config}")
+    except Exception as exc:
+        logger.error(f"Failed to save app config: {exc}")
+        raise ValueError(f"Failed to save app config: {exc}")
+
 TRANSITIONS: dict[str, set[str]] = {
     "Draft": {"Ready", "Blocked", "Canceled"},
     "Ready": {"In progress", "Waiting for capacity", "Blocked", "Canceled"},
@@ -813,8 +843,10 @@ def safe_repo_path(value: str) -> str:
 
 
 def github_api(api_path: str, method: str = "GET", payload: Any = None, require_auth: bool = True) -> Any:
+    logger.debug(f"GitHub API request: {method} {api_path}")
     token = get_provider_key("github")
     if require_auth and not token:
+        logger.error("GitHub token is not configured")
         raise ValueError("GitHub token is not configured.")
     headers = {
         "Accept": "application/vnd.github+json",
@@ -823,6 +855,7 @@ def github_api(api_path: str, method: str = "GET", payload: Any = None, require_
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
+        logger.debug("Using GitHub token for authentication")
     data_bytes = None
     if payload is not None:
         headers["Content-Type"] = "application/json"
@@ -831,11 +864,14 @@ def github_api(api_path: str, method: str = "GET", payload: Any = None, require_
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
+            logger.debug(f"GitHub API response for {api_path}: {len(raw)} bytes")
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")[:500]
+        logger.error(f"GitHub API HTTP error {exc.code}: {body}")
         raise ValueError(f"GitHub returned HTTP {exc.code}: {body}") from exc
     except Exception as exc:
+        logger.error(f"GitHub API request failed: {exc}")
         raise ValueError(f"GitHub request failed: {exc}") from exc
 
 
@@ -950,23 +986,32 @@ def git_push(project_id: str) -> dict[str, Any]:
 
 
 def git_clone(project_id: str) -> dict[str, Any]:
+    logger.info(f"Git clone requested for project: {project_id}")
     project = next((p for p in read_projects() if p.get("id") == project_id), None)
     if not project or not project.get("repository"):
+        logger.error(f"Project repository not configured for {project_id}")
         raise ValueError("Project repository is not configured.")
     local_path = str(project.get("local_path", "")).strip()
     if not local_path:
+        logger.error(f"Local path not configured for project {project_id}")
         raise ValueError("Local path is not configured for this project.")
     target_path = Path(local_path).expanduser().resolve()
     if target_path.exists():
+        logger.error(f"Local path already exists: {local_path}")
         raise ValueError(f"Local path already exists: {local_path}")
     
     token = get_provider_key("github")
     repo_url = project["repository"]
     
+    logger.info(f"Cloning from {repo_url} to {target_path}")
+    
     # If token is available, inject it into the URL for authentication
-    # GitHub OAuth token format: https://oauth2:TOKEN@github.com/user/repo
+    # GitHub token format: https://TOKEN@github.com/user/repo
     if token:
-        repo_url = repo_url.replace("https://github.com/", f"https://oauth2:{token}@github.com/")
+        repo_url = repo_url.replace("https://github.com/", f"https://{token}@github.com/")
+        logger.debug(f"Using token-based authentication for GitHub")
+    else:
+        logger.warning("No GitHub token found, clone may fail if repo is private")
     
     try:
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -978,13 +1023,18 @@ def git_clone(project_id: str) -> dict[str, Any]:
         )
         if result.returncode != 0:
             stderr = result.stderr or result.stdout
+            logger.error(f"Git clone failed with return code {result.returncode}: {stderr}")
             raise ValueError(f"Git clone failed: {stderr}")
+        logger.info(f"Git clone successful for project {project_id}")
         return {"success": True, "output": result.stdout}
     except subprocess.TimeoutExpired:
+        logger.error(f"Git clone timed out for project {project_id}")
         raise ValueError("Git clone timed out.")
     except FileNotFoundError:
+        logger.error("Git is not installed on this system")
         raise ValueError("Git is not installed on this system.")
     except Exception as exc:
+        logger.error(f"Git clone exception: {exc}")
         raise ValueError(f"Git clone failed: {exc}")
 
 
@@ -2820,6 +2870,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path
         query = urllib.parse.parse_qs(parsed_url.query)
+        logger.debug(f"GET request: {path}")
 
         if path in ("/", "/index.html"):
             return self.serve_file(resolve_web_asset("index.html"), "text/html; charset=utf-8")
@@ -2950,6 +3001,13 @@ class Handler(BaseHTTPRequestHandler):
                 }
             )
 
+        if path == "/api/settings/logs":
+            return self.send_json({"logs": [], "info": "Use POST to load logs with filters"})
+
+        if path == "/api/settings/config":
+            config = read_app_config()
+            return self.send_json({"config": config})
+
         if path == "/api/chat":
             return self.send_json({"messages": read_chat_history()})
 
@@ -2958,9 +3016,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         global ACTIVE_CHAT_COUNT
         path = urllib.parse.urlparse(self.path).path
+        logger.debug(f"POST request: {path}")
         try:
             body = self.read_json_body()
         except ValueError as exc:
+            logger.warning(f"Invalid POST body for {path}: {exc}")
             return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
         if path == "/api/tasks":
@@ -2970,6 +3030,7 @@ class Handler(BaseHTTPRequestHandler):
             provider = str(body.get("provider", "Automatic")).strip()
             raw_checks = body.get("acceptance_checks", [])
             produces = bool(body.get("produces_deliverable"))
+            logger.info(f"Creating task: title='{title}', role={role}, provider={provider}")
             if not title or not req_text or len(title) > 160 or len(req_text) > 12000:
                 return self.send_json({"error": "Valid title and request are required."}, HTTPStatus.BAD_REQUEST)
             if role not in WORK_ROLES or provider not in TASK_PROVIDERS:
@@ -3292,7 +3353,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"error": "GitHub token is not configured."}, HTTPStatus.BAD_REQUEST)
                 
                 # Inject token into URL for authentication
-                repo_url = app_repo.replace("https://github.com/", f"https://oauth2:{token}@github.com/")
+                # GitHub token format: https://TOKEN@github.com/user/repo
+                repo_url = app_repo.replace("https://github.com/", f"https://{token}@github.com/")
                 
                 # Pull latest changes
                 pull_result = subprocess.run(
@@ -3328,6 +3390,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             except Exception as exc:
                 return self.send_json({"error": f"Update failed: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        if path == "/api/settings/config":
+            try:
+                config = body
+                save_app_config(config)
+                return self.send_json({"success": True, "config": config})
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
         m_status = re.fullmatch(r"/api/tasks/(T-\d{4,})/status", path)
         if m_status:

@@ -2242,11 +2242,34 @@
 
   $("#open-settings")?.addEventListener("click", async () => {
     $("#settings-error").textContent = "";
+    try {
+      const res = await api("/api/settings/config");
+      const config = res.config || {};
+      $("#app-repo-url").value = config.app_repo || "";
+      $("#app-working-dir").value = config.app_working_dir || "";
+    } catch (err) {
+      console.error("Failed to load app config:", err);
+    }
     if (!settingsDialog.open) settingsDialog.showModal();
   });
 
   $("#close-settings")?.addEventListener("click", () => settingsDialog.close());
   $("#cancel-settings")?.addEventListener("click", () => settingsDialog.close());
+
+  // Save app config
+  $("#save-app-config")?.addEventListener("click", async () => {
+    const appRepo = $("#app-repo-url")?.value?.trim();
+    const appWorkingDir = $("#app-working-dir")?.value?.trim();
+    try {
+      await api("/api/settings/config", {
+        method: "POST",
+        body: JSON.stringify({ app_repo: appRepo, app_working_dir: appWorkingDir }),
+      });
+      alert("Configuration saved successfully.");
+    } catch (err) {
+      alert(`Failed to save configuration: ${err.message}`);
+    }
+  });
 
   // Load logs
   $("#load-logs")?.addEventListener("click", async () => {
