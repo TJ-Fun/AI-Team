@@ -31,6 +31,7 @@ except ImportError:  # pragma: no cover
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 DATA = Path(os.environ.get("TEAM_DATA_DIR", str(ROOT / "data"))).expanduser().resolve()
+DOCUMENTATION_DIR = ROOT / "documentation"
 
 HOST = os.environ.get("TEAM_HOST", "127.0.0.1")
 PORT = int(os.environ.get("TEAM_PORT", "8765"))
@@ -47,6 +48,13 @@ ANTIGRAVITY_AGENT = (
     else _RAW_ANTIGRAVITY_AGENT
 )
 HTTP_USER_AGENT = os.environ.get("TEAM_USER_AGENT", "Personal-AI-Team/1.0").strip() or "Personal-AI-Team/1.0"
+LOG_LEVELS = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
 
 WATCHDOG_INTERVAL_SECONDS = 2 * 60 * 60
 DEFAULT_ATTEMPT_TIMEOUT_SECONDS = 2 * 60 * 60
@@ -115,7 +123,7 @@ file_handler = logging.handlers.TimedRotatingFileHandler(
     backupCount=7,
     encoding="utf-8",
 )
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 file_handler.suffix = "%Y-%m-%d"
 file_formatter = logging.Formatter(
     "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -131,7 +139,47 @@ console_formatter = logging.Formatter("%(levelname)s: %(message)s")
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
 
-# Log startup
+# --- App Configuration ---
+APP_CONFIG_FILE = DATA / "app_config.json"
+
+def read_app_config() -> dict[str, Any]:
+    """Read app configuration for settings like app repo URL and log level."""
+    try:
+        if APP_CONFIG_FILE.exists():
+            config = json.loads(APP_CONFIG_FILE.read_text(encoding="utf-8"))
+            if isinstance(config, dict):
+                return config
+    except Exception as exc:
+        logger.error(f"Failed to read app config: {exc}")
+    return {"app_repo": "", "app_working_dir": str(ROOT), "log_level": "INFO"}
+
+
+def normalize_log_level(level: Any) -> str | None:
+    normalized = str(level or "").strip().upper()
+    return normalized if normalized in LOG_LEVELS else None
+
+
+def configure_file_log_level(level: Any) -> str:
+    configured = normalize_log_level(level) or "INFO"
+    file_handler.setLevel(LOG_LEVELS[configured])
+    return configured
+
+def save_app_config(config: dict[str, Any]) -> None:
+    """Save app configuration."""
+    try:
+        merged = read_app_config()
+        merged.update(config)
+        merged["log_level"] = normalize_log_level(merged.get("log_level")) or "INFO"
+        atomic_json(APP_CONFIG_FILE, merged)
+        logger.info("App config saved")
+    except Exception as exc:
+        logger.error(f"Failed to save app config: {exc}")
+        raise ValueError(f"Failed to save app config: {exc}")
+
+
+configure_file_log_level(read_app_config().get("log_level", "INFO"))
+
+# Log startup after applying the persisted file log level.
 logger.info("=" * 60)
 logger.info("Personal AI Team server starting")
 logger.info(f"ROOT: {ROOT}")
@@ -139,27 +187,6 @@ logger.info(f"DATA: {DATA}")
 logger.info(f"LOG_DIR: {LOG_DIR}")
 logger.info(f"LOG_FILE: {LOG_FILE}")
 logger.info("=" * 60)
-
-# --- App Configuration ---
-APP_CONFIG_FILE = DATA / "app_config.json"
-
-def read_app_config() -> dict[str, Any]:
-    """Read app configuration for settings like app repo URL."""
-    try:
-        if APP_CONFIG_FILE.exists():
-            return json.loads(APP_CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception as exc:
-        logger.error(f"Failed to read app config: {exc}")
-    return {"app_repo": "", "app_working_dir": str(ROOT)}
-
-def save_app_config(config: dict[str, Any]) -> None:
-    """Save app configuration."""
-    try:
-        APP_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
-        logger.info(f"App config saved: {config}")
-    except Exception as exc:
-        logger.error(f"Failed to save app config: {exc}")
-        raise ValueError(f"Failed to save app config: {exc}")
 
 TRANSITIONS: dict[str, set[str]] = {
     "Draft": {"Ready", "Blocked", "Canceled"},
@@ -250,10 +277,9 @@ def parse_iso_epoch(value: str | None) -> float | None:
 
 
 def resolve_web_asset(filename: str) -> Path:
-    """Prefer root-level index.html/app.js/style.css over stale copies in static/."""
-    root_file = ROOT / filename
-    if root_file.is_file():
-        return root_file
+    """Resolve a known web asset from the static directory."""
+    if filename not in {"index.html", "app.js", "style.css"}:
+        raise ValueError("Unknown web asset.")
     return STATIC / filename
 
 
@@ -549,9 +575,8 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
         ):
             raise ValueError(f"Repository for {name} must be a GitHub https URL.")
         if local_path:
-            # Validate local path is safe
-            expanded = Path(local_path).expanduser().resolve()
-            if ".." in str(expanded) or not str(expanded).startswith("/"):
+            candidate = Path(local_path).expanduser()
+            if not candidate.is_absolute() or ".." in candidate.parts:
                 raise ValueError(f"Local path for {name} must be an absolute path without '..'.")
         clean_modules: list[dict[str, str]] = []
         mod_ids: set[str] = set()
@@ -844,6 +869,7 @@ def safe_repo_path(value: str) -> str:
 
 def github_api(api_path: str, method: str = "GET", payload: Any = None, require_auth: bool = True) -> Any:
     logger.debug(f"GitHub API request: {method} {api_path}")
+    request_started = time.monotonic()
     token = get_provider_key("github")
     if require_auth and not token:
         logger.error("GitHub token is not configured")
@@ -864,7 +890,10 @@ def github_api(api_path: str, method: str = "GET", payload: Any = None, require_
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
-            logger.debug(f"GitHub API response for {api_path}: {len(raw)} bytes")
+            logger.debug(
+                "GitHub API response: method=%s path=%s status=%s bytes=%s elapsed_ms=%s",
+                method, api_path, resp.status, len(raw), round((time.monotonic() - request_started) * 1000),
+            )
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")[:500]
@@ -894,6 +923,25 @@ def git_project_path(project_id: str) -> Path:
     if not path.is_dir():
         raise ValueError(f"Local path does not exist or is not a directory: {local_path}")
     return path
+
+
+def git_auth_environment(token: str = "") -> dict[str, str]:
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    if token:
+        auth = base64.b64encode(f"x-access-token:{token}".encode("utf-8")).decode("ascii")
+        try:
+            config_count = max(0, int(env.get("GIT_CONFIG_COUNT", "0")))
+        except ValueError:
+            config_count = 0
+        env[f"GIT_CONFIG_KEY_{config_count}"] = "http.https://github.com/.extraheader"
+        env[f"GIT_CONFIG_VALUE_{config_count}"] = f"AUTHORIZATION: Basic {auth}"
+        env["GIT_CONFIG_COUNT"] = str(config_count + 1)
+    return env
+
+
+def redact_git_output(output: str, token: str) -> str:
+    return output.replace(token, "[redacted]") if token else output
 
 
 def git_status(project_id: str) -> dict[str, Any]:
@@ -930,11 +978,6 @@ def git_status(project_id: str) -> dict[str, Any]:
 def git_pull(project_id: str) -> dict[str, Any]:
     path = git_project_path(project_id)
     token = get_provider_key("github")
-    env = os.environ.copy()
-    if token:
-        # Configure git to use the token for authentication
-        env["GIT_ASKPASS"] = "echo"
-        env["GIT_TERMINAL_PROMPT"] = "0"
     try:
         result = subprocess.run(
             ["git", "pull"],
@@ -942,16 +985,24 @@ def git_pull(project_id: str) -> dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=120,
-            env=env,
+            env=git_auth_environment(token),
         )
         if result.returncode != 0:
-            raise ValueError(f"Git pull failed: {result.stderr}")
+            stderr = redact_git_output(result.stderr or "", token)
+            stdout = redact_git_output(result.stdout or "", token)
+            detail = stderr.strip() or stdout.strip() or f"git exited with status {result.returncode}"
+            logger.error("Git pull failed (project=%s, exit=%s): %s", project_id, result.returncode, detail)
+            raise ValueError(f"Git pull failed: {detail}")
         status = git_status(project_id)
-        return {"success": True, "output": result.stdout, "status": status}
+        output = redact_git_output(result.stdout or "", token)
+        logger.info("Git pull succeeded (project=%s, output_bytes=%s)", project_id, len(output.encode("utf-8")))
+        return {"success": True, "output": output, "status": status}
     except subprocess.TimeoutExpired:
         raise ValueError("Git pull timed out.")
     except FileNotFoundError:
         raise ValueError("Git is not installed on this system.")
+    except ValueError:
+        raise
     except Exception as exc:
         raise ValueError(f"Git pull failed: {exc}")
 
@@ -959,11 +1010,6 @@ def git_pull(project_id: str) -> dict[str, Any]:
 def git_push(project_id: str) -> dict[str, Any]:
     path = git_project_path(project_id)
     token = get_provider_key("github")
-    env = os.environ.copy()
-    if token:
-        # Configure git to use the token for authentication
-        env["GIT_ASKPASS"] = "echo"
-        env["GIT_TERMINAL_PROMPT"] = "0"
     try:
         result = subprocess.run(
             ["git", "push"],
@@ -971,16 +1017,24 @@ def git_push(project_id: str) -> dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=120,
-            env=env,
+            env=git_auth_environment(token),
         )
         if result.returncode != 0:
-            raise ValueError(f"Git push failed: {result.stderr}")
+            stderr = redact_git_output(result.stderr or "", token)
+            stdout = redact_git_output(result.stdout or "", token)
+            detail = stderr.strip() or stdout.strip() or f"git exited with status {result.returncode}"
+            logger.error("Git push failed (project=%s, exit=%s): %s", project_id, result.returncode, detail)
+            raise ValueError(f"Git push failed: {detail}")
         status = git_status(project_id)
-        return {"success": True, "output": result.stdout, "status": status}
+        output = redact_git_output(result.stdout or "", token)
+        logger.info("Git push succeeded (project=%s, output_bytes=%s)", project_id, len(output.encode("utf-8")))
+        return {"success": True, "output": output, "status": status}
     except subprocess.TimeoutExpired:
         raise ValueError("Git push timed out.")
     except FileNotFoundError:
         raise ValueError("Git is not installed on this system.")
+    except ValueError:
+        raise
     except Exception as exc:
         raise ValueError(f"Git push failed: {exc}")
 
@@ -1001,18 +1055,16 @@ def git_clone(project_id: str) -> dict[str, Any]:
         raise ValueError(f"Local path already exists: {local_path}")
     
     token = get_provider_key("github")
-    repo_url = project["repository"]
-    
-    logger.info(f"Cloning from {repo_url} to {target_path}")
-    
-    # If token is available, inject it into the URL for authentication
-    # GitHub token format: https://TOKEN@github.com/user/repo
+    repo_url = normalize_github_repo_url(str(project["repository"]))
+    owner, repo = repository_parts(repo_url)
+    repo_url = f"https://github.com/{owner}/{repo}.git"
+    logger.info("Cloning GitHub repository (project=%s, repo=%s/%s, destination=%s)",
+                project_id, owner, repo, target_path)
     if token:
-        repo_url = repo_url.replace("https://github.com/", f"https://{token}@github.com/")
-        logger.debug(f"Using token-based authentication for GitHub")
+        logger.debug("Using the configured GitHub connection for clone authentication")
     else:
-        logger.warning("No GitHub token found, clone may fail if repo is private")
-    
+        logger.warning("GitHub connection is not configured; private repository clone may fail")
+
     try:
         target_path.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
@@ -1020,22 +1072,113 @@ def git_clone(project_id: str) -> dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=300,
+            env=git_auth_environment(token),
         )
-        if result.returncode != 0:
-            stderr = result.stderr or result.stdout
-            logger.error(f"Git clone failed with return code {result.returncode}: {stderr}")
-            raise ValueError(f"Git clone failed: {stderr}")
-        logger.info(f"Git clone successful for project {project_id}")
-        return {"success": True, "output": result.stdout}
-    except subprocess.TimeoutExpired:
-        logger.error(f"Git clone timed out for project {project_id}")
-        raise ValueError("Git clone timed out.")
-    except FileNotFoundError:
-        logger.error("Git is not installed on this system")
-        raise ValueError("Git is not installed on this system.")
+    except subprocess.TimeoutExpired as exc:
+        logger.exception("Git clone timed out (project=%s, repo=%s/%s)", project_id, owner, repo)
+        raise ValueError("Git clone timed out.") from exc
+    except FileNotFoundError as exc:
+        logger.exception("Git executable is unavailable during clone (project=%s)", project_id)
+        raise ValueError("Git is not installed on this system.") from exc
     except Exception as exc:
-        logger.error(f"Git clone exception: {exc}")
-        raise ValueError(f"Git clone failed: {exc}")
+        logger.exception("Git clone could not be started (project=%s)", project_id)
+        raise ValueError(f"Git clone failed: {exc}") from exc
+
+    stdout = redact_git_output(result.stdout or "", token)
+    stderr = redact_git_output(result.stderr or "", token)
+    if result.returncode != 0:
+        detail = stderr.strip() or stdout.strip() or f"git exited with status {result.returncode}"
+        logger.error(
+            "Git clone failed (project=%s, repo=%s/%s, exit=%s, stdout=%r, stderr=%r)",
+            project_id, owner, repo, result.returncode, stdout[-4000:], stderr[-4000:],
+        )
+        raise ValueError(f"Git clone failed: {detail}")
+    logger.info("Git clone succeeded (project=%s, repo=%s/%s, output_bytes=%s)",
+                project_id, owner, repo, len(stdout.encode("utf-8")))
+    return {"success": True, "output": stdout}
+
+
+def resolve_local_view_path(root: Path, relative_path: str) -> Path:
+    cleaned = str(relative_path or "").strip().replace("\\", "/")
+    if (
+        len(cleaned) > 500
+        or cleaned.startswith("/")
+        or (cleaned and (Path(cleaned).is_absolute() or re.match(r"^[A-Za-z]:", cleaned)))
+        or any(part in ("", ".", "..") or part.startswith(".") for part in cleaned.split("/") if cleaned)
+    ):
+        raise ValueError("Invalid or hidden local path.")
+    cleaned = cleaned.rstrip("/")
+    root_path = root.expanduser().resolve()
+    target = (root_path / cleaned).resolve()
+    try:
+        target.relative_to(root_path)
+    except ValueError as exc:
+        raise ValueError("The requested path is outside the local project folder.") from exc
+    return target
+
+
+def local_file_listing(root: Path, relative_path: str = "") -> dict[str, Any]:
+    root_path = root.expanduser().resolve()
+    if not root_path.is_dir():
+        raise ValueError(f"Local folder is not available: {root_path}")
+    folder = resolve_local_view_path(root_path, relative_path)
+    if not folder.is_dir():
+        raise ValueError("The requested local path is not a folder.")
+    entries = []
+    for item in sorted(folder.iterdir(), key=lambda entry: (not entry.is_dir(), entry.name.casefold())):
+        if item.name.startswith("."):
+            continue
+        try:
+            resolved = item.resolve()
+            resolved.relative_to(root_path)
+        except (OSError, ValueError):
+            continue
+        if not (resolved.is_dir() or resolved.is_file()):
+            continue
+        rel = resolved.relative_to(root_path).as_posix()
+        entries.append(
+            {
+                "name": item.name,
+                "path": rel,
+                "type": "dir" if resolved.is_dir() else "file",
+                "size": resolved.stat().st_size if resolved.is_file() else 0,
+            }
+        )
+    return {
+        "path": folder.relative_to(root_path).as_posix() if folder != root_path else "",
+        "entries": entries[:1000],
+        "truncated": len(entries) > 1000,
+    }
+
+
+def read_local_text_file(root: Path, relative_path: str) -> dict[str, str]:
+    root_path = root.expanduser().resolve()
+    file_path = resolve_local_view_path(root_path, relative_path)
+    if not file_path.is_file():
+        raise ValueError("The requested local path is not a file.")
+    size = file_path.stat().st_size
+    if size > 300000:
+        raise ValueError("This file is larger than the 300 KB viewer limit.")
+    try:
+        raw = file_path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"Could not read the local file: {exc}") from exc
+    if b"\x00" in raw:
+        raise ValueError("Binary files are not shown in the viewer.")
+    return {
+        "path": file_path.relative_to(root_path).as_posix(),
+        "content": raw.decode("utf-8", errors="replace"),
+    }
+
+
+def local_project_root(project_id: str) -> Path:
+    project = next((p for p in read_projects() if p.get("id") == project_id), None)
+    if not project:
+        raise ValueError("Project not found.")
+    local_path = str(project.get("local_path", "")).strip()
+    if not local_path:
+        raise ValueError("Local path is not configured for this project.")
+    return Path(local_path).expanduser().resolve()
 
 
 def github_file_listing(project_id: str, folder_path: str = "") -> dict[str, Any]:
@@ -2833,7 +2976,11 @@ def clean_overview_documents(body: dict[str, Any]) -> dict[str, str]:
 # --- HTTP Handler ---
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: Any) -> None:
-        return
+        message = fmt % args
+        match = re.search(r"\b([1-5]\d\d)\b", message)
+        status = int(match.group(1)) if match else 200
+        level = logging.ERROR if status >= 500 else (logging.WARNING if status >= 400 else logging.INFO)
+        logger.log(level, "HTTP client=%s %s", self.client_address[0], message)
 
     def send_json(self, payload: Any, status: int = HTTPStatus.OK) -> None:
         raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -2872,11 +3019,11 @@ class Handler(BaseHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed_url.query)
         logger.debug(f"GET request: {path}")
 
-        if path in ("/", "/index.html"):
+        if path in ("/", "/index.html", "/static/index.html"):
             return self.serve_file(resolve_web_asset("index.html"), "text/html; charset=utf-8")
-        if path == "/app.js":
+        if path == "/static/app.js":
             return self.serve_file(resolve_web_asset("app.js"), "text/javascript; charset=utf-8")
-        if path == "/style.css":
+        if path == "/static/style.css":
             return self.serve_file(resolve_web_asset("style.css"), "text/css; charset=utf-8")
 
         if path == "/api/config":
@@ -2939,6 +3086,28 @@ class Handler(BaseHTTPRequestHandler):
                 if f_q:
                     return self.send_json(github_read_text_file(pid, f_q))
                 return self.send_json(github_file_listing(pid, p_q))
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+        if path == "/api/documentation-files":
+            try:
+                file_path = query.get("file", [""])[0]
+                folder_path = query.get("path", [""])[0]
+                if file_path:
+                    return self.send_json(read_local_text_file(DOCUMENTATION_DIR, file_path))
+                return self.send_json(local_file_listing(DOCUMENTATION_DIR, folder_path))
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+        m_local_files = re.fullmatch(r"/api/projects/([a-z0-9-]+)/local-files", path)
+        if m_local_files:
+            try:
+                project_root = local_project_root(m_local_files.group(1))
+                file_path = query.get("file", [""])[0]
+                folder_path = query.get("path", [""])[0]
+                if file_path:
+                    return self.send_json(read_local_text_file(project_root, file_path))
+                return self.send_json(local_file_listing(project_root, folder_path))
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
@@ -3233,6 +3402,7 @@ class Handler(BaseHTTPRequestHandler):
                 append_event({"at": now_iso(), "type": "git_pull", "project_id": pid, "success": True})
                 return self.send_json(result)
             except ValueError as exc:
+                logger.exception("Git pull request failed (project=%s)", pid)
                 append_event({"at": now_iso(), "type": "git_pull", "project_id": pid, "success": False, "error": str(exc)[:300]})
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
@@ -3244,6 +3414,7 @@ class Handler(BaseHTTPRequestHandler):
                 append_event({"at": now_iso(), "type": "git_push", "project_id": pid, "success": True})
                 return self.send_json(result)
             except ValueError as exc:
+                logger.exception("Git push request failed (project=%s)", pid)
                 append_event({"at": now_iso(), "type": "git_push", "project_id": pid, "success": False, "error": str(exc)[:300]})
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
@@ -3255,41 +3426,79 @@ class Handler(BaseHTTPRequestHandler):
                 append_event({"at": now_iso(), "type": "git_clone", "project_id": pid, "success": True})
                 return self.send_json(result)
             except ValueError as exc:
+                logger.exception("Git clone request failed (project=%s)", pid)
                 append_event({"at": now_iso(), "type": "git_clone", "project_id": pid, "success": False, "error": str(exc)[:300]})
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
         # Settings API endpoints
         if path == "/api/settings/logs":
-            level = str(body.get("level", "all")).strip().lower()
-            lines = int(body.get("lines", 1000))
-            if lines > 5000:
-                return self.send_json({"error": "Maximum 5000 lines allowed."}, HTTPStatus.BAD_REQUEST)
+            level = str(body.get("level", "all")).strip().upper()
+            level_number = 0 if level == "ALL" else LOG_LEVELS.get(level)
+            if level_number is None:
+                return self.send_json({"error": "Choose a valid log display level."}, HTTPStatus.BAD_REQUEST)
             try:
-                log_lines = []
-                log_files = sorted(LOG_DIR.glob("app.log*"), reverse=True)
+                lines = int(body.get("lines", 1000))
+            except (TypeError, ValueError):
+                return self.send_json({"error": "Log line count must be an integer."}, HTTPStatus.BAD_REQUEST)
+            if not 1 <= lines <= 5000:
+                return self.send_json({"error": "Log line count must be between 1 and 5000."}, HTTPStatus.BAD_REQUEST)
+            try:
+                newest_lines = []
+                log_files = sorted(
+                    (path for path in LOG_DIR.glob("app.log*") if path.is_file()),
+                    key=lambda path: path.stat().st_mtime,
+                    reverse=True,
+                )
                 for log_file in log_files:
-                    if not log_file.is_file():
-                        continue
                     content = log_file.read_text(encoding="utf-8", errors="replace")
-                    for line in content.splitlines():
-                        if level != "all" and level.upper() not in line:
+                    for line in reversed(content.splitlines()):
+                        line_level = re.search(r"\|\s*(DEBUG|INFO|WARNING|ERROR|CRITICAL)\s*\|", line)
+                        if level_number and (
+                            not line_level or LOG_LEVELS[line_level.group(1)] < level_number
+                        ):
                             continue
-                        log_lines.append(line)
-                        if len(log_lines) >= lines:
+                        newest_lines.append(line)
+                        if len(newest_lines) >= lines:
                             break
-                    if len(log_lines) >= lines:
+                    if len(newest_lines) >= lines:
                         break
-                return self.send_json({"logs": log_lines[-lines:]})
+                return self.send_json({"logs": list(reversed(newest_lines))})
             except Exception as exc:
+                logger.exception("Failed to load application logs")
                 return self.send_json({"error": f"Failed to read logs: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        if path == "/api/settings/log-level":
+            level = normalize_log_level(body.get("level"))
+            if not level:
+                return self.send_json({"error": "Choose a valid log capture level."}, HTTPStatus.BAD_REQUEST)
+            config = read_app_config()
+            config["log_level"] = level
+            try:
+                save_app_config(config)
+                configure_file_log_level(level)
+                return self.send_json({"log_level": level})
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         if path == "/api/settings/logs/clear":
             try:
-                for log_file in LOG_DIR.glob("app.log*"):
-                    log_file.unlink(missing_ok=True)
+                file_handler.acquire()
+                try:
+                    file_handler.flush()
+                    if file_handler.stream:
+                        file_handler.stream.close()
+                        file_handler.stream = None
+                    for log_file in LOG_DIR.glob("app.log*"):
+                        log_file.unlink(missing_ok=True)
+                finally:
+                    try:
+                        file_handler.stream = file_handler._open()
+                    finally:
+                        file_handler.release()
                 logger.info("Logs cleared by user")
                 return self.send_json({"cleared": True})
             except Exception as exc:
+                logger.exception("Failed to clear application logs")
                 return self.send_json({"error": f"Failed to clear logs: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         if path == "/api/settings/restart":
@@ -3352,20 +3561,26 @@ class Handler(BaseHTTPRequestHandler):
                 if not token:
                     return self.send_json({"error": "GitHub token is not configured."}, HTTPStatus.BAD_REQUEST)
                 
-                # Inject token into URL for authentication
-                # GitHub token format: https://TOKEN@github.com/user/repo
-                repo_url = app_repo.replace("https://github.com/", f"https://{token}@github.com/")
+                app_repo_url = normalize_github_repo_url(app_repo)
+                owner, repo = repository_parts(app_repo_url)
+                app_repo_url = f"https://github.com/{owner}/{repo}.git"
                 
-                # Pull latest changes
+                # Use the configured GitHub connection without putting credentials in the remote URL.
                 pull_result = subprocess.run(
-                    ["git", "pull"],
+                    ["git", "pull", app_repo_url],
                     cwd=working_path,
                     capture_output=True,
                     text=True,
-                    timeout=120
+                    timeout=120,
+                    env=git_auth_environment(token),
                 )
                 if pull_result.returncode != 0:
-                    raise ValueError(f"Git pull failed: {pull_result.stderr}")
+                    detail = redact_git_output(pull_result.stderr or "", token).strip()
+                    detail = detail or redact_git_output(pull_result.stdout or "", token).strip()
+                    logger.error("App update pull failed (exit=%s): %s", pull_result.returncode, detail)
+                    if not detail:
+                        detail = f"git exited with status {pull_result.returncode}"
+                    raise ValueError(f"Git pull failed: {detail}")
                 
                 # Restart the service
                 restart_commands = [
@@ -3381,14 +3596,17 @@ class Handler(BaseHTTPRequestHandler):
                 logger.info("App update and restart completed successfully")
                 return self.send_json({
                     "success": True,
-                    "pull_output": pull_result.stdout,
+                    "pull_output": redact_git_output(pull_result.stdout or "", token),
                     "message": "App updated and restarted successfully."
                 })
             except subprocess.TimeoutExpired:
+                logger.exception("App update command timed out")
                 return self.send_json({"error": "Update command timed out."}, HTTPStatus.INTERNAL_SERVER_ERROR)
             except ValueError as exc:
+                logger.exception("App update failed")
                 return self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             except Exception as exc:
+                logger.exception("App update failed unexpectedly")
                 return self.send_json({"error": f"Update failed: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         if path == "/api/settings/config":

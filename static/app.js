@@ -1323,33 +1323,37 @@
     }
   });
 
-  // --- Repository View Dialog (Documentation & Files Buttons) ---
+  // --- Local Documentation and Project Files ---
   const repoDialog = $("#repository-view-dialog");
 
-  async function loadRepositoryFolder(folderPath, allowDocsFallback = false) {
+  function localFilesEndpoint() {
+    if (state.repoMode === "documentation") return "/api/documentation-files";
+    return `/api/projects/${encodeURIComponent(state.activeProjectId)}/local-files`;
+  }
+
+  async function loadRepositoryFolder(folderPath = "") {
     $("#repository-view-error").textContent = "";
     $("#repository-file-content").innerHTML = `<span class="muted">Choose a file to view it.</span>`;
     const activeProj = state.projects.find((p) => p.id === state.activeProjectId);
-    if (!activeProj || !activeProj.repository) {
-      $("#repository-view-meta").textContent = activeProj ? `${activeProj.name} · No repository linked` : "";
-      $("#repository-file-list").innerHTML = `<p class="muted">No GitHub repository linked.</p>`;
+    if (state.repoMode === "files" && !activeProj?.local_path) {
+      $("#repository-view-meta").textContent = activeProj ? `${activeProj.name} · No local project folder` : "";
+      $("#repository-file-list").innerHTML = `<p class="muted">No local project folder is configured.</p>`;
       $("#repository-view-error").textContent =
-        "This project does not have a GitHub repository URL configured yet. Open 'Projects & modules' to add a GitHub repository URL.";
+        "Set the project's local file path in Projects & modules. Clone the repository there first if needed.";
       return;
     }
 
     try {
-      const res = await api(
-        `/api/projects/${encodeURIComponent(state.activeProjectId)}/github-files?path=${encodeURIComponent(folderPath)}`
-      );
+      const res = await api(`${localFilesEndpoint()}?path=${encodeURIComponent(folderPath)}`);
       state.repoCurrentPath = res.path || "";
-      $("#repository-view-meta").textContent = `${activeProj.repository} · ${res.branch} · ${res.path || "/"}`;
+      const folderLabel = state.repoMode === "documentation" ? "Local documentation" : `${activeProj.name} · Local files`;
+      $("#repository-view-meta").textContent = `${folderLabel} · ${res.path || "/"}`;
 
       const entries = res.entries || [];
       const folders = entries.filter((item) => item.type === "dir");
-      let files = entries.filter((item) => item.type === "file");
-      if (state.repoMode === "documentation") {
-        files = files.filter((f) => /\.(md|txt)$/i.test(f.name));
+      const files = entries.filter((item) => item.type === "file");
+      if (res.truncated) {
+        $("#repository-view-error").textContent = "Only the first 1,000 entries are shown in this folder.";
       }
 
       const parentPath = state.repoCurrentPath.includes("/")
@@ -1358,7 +1362,7 @@
 
       let html = `<button type="button" class="repository-entry repository-parent" data-repository-path="${escapeHtml(
         parentPath
-      )}">↑ ${state.repoCurrentPath ? "Parent folder" : "Repository root"}</button>`;
+      )}">↑ ${state.repoCurrentPath ? "Parent folder" : "Local folder root"}</button>`;
 
       html += folders
         .map(
@@ -1383,10 +1387,6 @@
       }
       $("#repository-file-list").innerHTML = html;
     } catch (err) {
-      if (allowDocsFallback && folderPath === "docs") {
-        await loadRepositoryFolder("", false);
-        return;
-      }
       $("#repository-file-list").innerHTML = "";
       $("#repository-view-error").textContent = err.message;
     }
@@ -1395,15 +1395,11 @@
   async function openRepositoryView(mode) {
     state.repoMode = mode;
     $("#repository-view-eyebrow").textContent =
-      mode === "documentation" ? "VERSIONED PROJECT DOCUMENTS" : "GITHUB DEFAULT BRANCH";
+      mode === "documentation" ? "LOCAL DOCUMENTATION FOLDER" : "LOCAL PROJECT FOLDER";
     $("#repository-view-title").textContent =
       mode === "documentation" ? "Project documentation" : "Project files";
     if (!repoDialog.open) repoDialog.showModal();
-    if (mode === "documentation") {
-      await loadRepositoryFolder("docs", true);
-    } else {
-      await loadRepositoryFolder("", false);
-    }
+    await loadRepositoryFolder("");
   }
 
   $("#open-documentation")?.addEventListener("click", () => void openRepositoryView("documentation"));
@@ -1414,7 +1410,7 @@
     const folderBtn = e.target.closest("[data-repository-path]");
     if (folderBtn) {
       const nextPath = folderBtn.getAttribute("data-repository-path") || "";
-      await loadRepositoryFolder(nextPath, false);
+      await loadRepositoryFolder(nextPath);
       return;
     }
     const fileBtn = e.target.closest("[data-repository-file]");
@@ -1422,11 +1418,11 @@
       const filePath = fileBtn.getAttribute("data-repository-file");
       $("#repository-view-error").textContent = "";
       try {
-        const res = await api(
-          `/api/projects/${encodeURIComponent(state.activeProjectId)}/github-files?file=${encodeURIComponent(filePath)}`
-        );
+        const res = await api(`${localFilesEndpoint()}?file=${encodeURIComponent(filePath)}`);
         const activeProj = state.projects.find((p) => p.id === state.activeProjectId);
-        $("#repository-view-meta").textContent = `${activeProj?.repository || "Repository"} · ${res.branch} · ${res.path}`;
+        const folderLabel =
+          state.repoMode === "documentation" ? "Local documentation" : `${activeProj?.name || "Project"} · Local files`;
+        $("#repository-view-meta").textContent = `${folderLabel} · ${res.path}`;
         $("#repository-file-content").textContent = res.content;
       } catch (err) {
         $("#repository-view-error").textContent = err.message;
@@ -1700,8 +1696,8 @@
               )}" placeholder="https://github.com/owner/repository">
             </label>
           </div>
-          <label>Local file path <span class="muted">Absolute path to local git clone (e.g., /home/ubuntu/projects/my-repo)</span>
-            <input data-proj-field="local_path" value="${escapeHtml(d.local_path || "")}" placeholder="/home/ubuntu/projects/my-repo">
+          <label>Local file path <span class="muted">Absolute path to local git clone (e.g., C:/Users/you/projects/repo or /home/ubuntu/projects/repo)</span>
+            <input data-proj-field="local_path" value="${escapeHtml(d.local_path || "")}" placeholder="C:/Users/you/projects/repo">
           </label>
           ${d.repository && d.local_path ? `
           <div class="git-controls">
@@ -2247,6 +2243,7 @@
       const config = res.config || {};
       $("#app-repo-url").value = config.app_repo || "";
       $("#app-working-dir").value = config.app_working_dir || "";
+      $("#log-capture-level").value = config.log_level || "INFO";
     } catch (err) {
       console.error("Failed to load app config:", err);
     }
@@ -2255,6 +2252,21 @@
 
   $("#close-settings")?.addEventListener("click", () => settingsDialog.close());
   $("#cancel-settings")?.addEventListener("click", () => settingsDialog.close());
+
+  $("#log-capture-level")?.addEventListener("change", async (e) => {
+    const level = e.target.value;
+    const status = $("#log-settings-status");
+    status.textContent = "Saving log level…";
+    try {
+      const res = await api("/api/settings/log-level", {
+        method: "POST",
+        body: JSON.stringify({ level }),
+      });
+      status.textContent = `Logs will store ${res.log_level} and above.`;
+    } catch (err) {
+      status.textContent = `Could not change log level: ${err.message}`;
+    }
+  });
 
   // Save app config
   $("#save-app-config")?.addEventListener("click", async () => {
@@ -2287,10 +2299,11 @@
         $("#log-output").innerHTML = logs
           .map((line) => {
             let className = "log-info";
-            if (line.includes("CRITICAL")) className = "log-critical";
-            else if (line.includes("ERROR")) className = "log-error";
-            else if (line.includes("WARNING")) className = "log-warning";
-            else if (line.includes("DEBUG")) className = "log-debug";
+            const level = line.match(/\|\s*(DEBUG|INFO|WARNING|ERROR|CRITICAL)\s*\|/)?.[1];
+            if (level === "CRITICAL") className = "log-critical";
+            else if (level === "ERROR") className = "log-error";
+            else if (level === "WARNING") className = "log-warning";
+            else if (level === "DEBUG") className = "log-debug";
             return `<span class="${className}">${escapeHtml(line)}</span>`;
           })
           .join("\n");

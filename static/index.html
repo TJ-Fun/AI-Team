@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Personal AI Team</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header class="topbar">
@@ -210,14 +210,14 @@
     <section class="repository-view">
       <div class="dialog-heading">
         <div>
-          <p class="eyebrow" id="repository-view-eyebrow">GITHUB DEFAULT BRANCH</p>
+          <p class="eyebrow" id="repository-view-eyebrow">LOCAL PROJECT FILES</p>
           <h2 id="repository-view-title">Project files</h2>
         </div>
         <button class="icon-button" type="button" id="close-repository-view" aria-label="Close">×</button>
       </div>
       <p class="repository-view-meta" id="repository-view-meta"></p>
       <div class="repository-view-body">
-        <nav id="repository-file-list" aria-label="Repository files"></nav>
+        <nav id="repository-file-list" aria-label="Local files"></nav>
         <pre id="repository-file-content"><span class="muted">Choose a file to view it.</span></pre>
       </div>
       <div class="form-error" id="repository-view-error" role="alert"></div>
@@ -259,17 +259,29 @@
         <h3>Logs</h3>
         <p class="draft-note">View application logs with 1-week retention. Logs are automatically rotated.</p>
         <div class="log-controls">
-          <select id="log-level" aria-label="Log level">
-            <option value="all">All levels</option>
-            <option value="critical">Critical</option>
-            <option value="error">Error</option>
-            <option value="warning">Warning</option>
-            <option value="info">Info</option>
-            <option value="debug">Debug</option>
-          </select>
+          <label class="log-control-label">Store from
+            <select id="log-capture-level" aria-label="Minimum log level to store">
+              <option value="DEBUG">Debug</option>
+              <option value="INFO" selected>Info</option>
+              <option value="WARNING">Warning</option>
+              <option value="ERROR">Error</option>
+              <option value="CRITICAL">Critical</option>
+            </select>
+          </label>
+          <label class="log-control-label">Show
+            <select id="log-level" aria-label="Minimum log level to show">
+              <option value="all">All levels</option>
+              <option value="DEBUG">Debug and above</option>
+              <option value="INFO">Info and above</option>
+              <option value="WARNING">Warning and above</option>
+              <option value="ERROR">Error and above</option>
+              <option value="CRITICAL">Critical only</option>
+            </select>
+          </label>
           <button type="button" class="secondary" id="load-logs">Load logs</button>
           <button type="button" class="secondary" id="clear-logs">Clear logs</button>
         </div>
+        <div id="log-settings-status" class="muted" role="status"></div>
         <pre id="log-output" class="log-output"><span class="muted">Load logs to view them.</span></pre>
       </div>
       
@@ -299,6 +311,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js" defer></script>
+  <script src="/static/app.js" defer></script>
 </body>
 </html>
