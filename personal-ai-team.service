@@ -19,8 +19,8 @@ RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/personal-ai-team
+ProtectHome=read-only
+ReadWritePaths=/var/lib/personal-ai-team /home/ubuntu/projects
 UMask=0027
 
 [Install]

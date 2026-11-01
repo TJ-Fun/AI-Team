@@ -925,9 +925,15 @@ def git_project_path(project_id: str) -> Path:
     local_path = str(project.get("local_path", "")).strip()
     if not local_path:
         raise ValueError("Local path is not configured for this project.")
-    path = Path(local_path).expanduser().resolve()
-    if not path.is_dir():
-        raise ValueError(f"Local path does not exist or is not a directory: {local_path}")
+    try:
+        path = Path(local_path).expanduser().resolve()
+        if not path.is_dir():
+            raise ValueError(f"Local path does not exist or is not a directory: {local_path}")
+    except PermissionError as exc:
+        raise ValueError(
+            f"Permission denied accessing project path '{local_path}'. Check filesystem permissions "
+            "for the service user and its systemd ReadWritePaths allowlist."
+        ) from exc
     return path
 
 
@@ -1076,10 +1082,16 @@ def git_clone(project_id: str, job_id: str | None = None) -> dict[str, Any]:
     if not local_path:
         logger.error(f"Local path not configured for project {project_id}")
         raise ValueError("Local path is not configured for this project.")
-    target_path = Path(local_path).expanduser().resolve()
-    if target_path.exists():
-        logger.error(f"Local path already exists: {local_path}")
-        raise ValueError(f"Local path already exists: {local_path}")
+    try:
+        target_path = Path(local_path).expanduser().resolve()
+        if target_path.exists():
+            logger.error(f"Local path already exists: {local_path}")
+            raise ValueError(f"Local path already exists: {local_path}")
+    except PermissionError as exc:
+        raise ValueError(
+            f"Permission denied accessing clone destination '{local_path}'. Check filesystem permissions "
+            "for the service user and its systemd ReadWritePaths allowlist."
+        ) from exc
     
     token = get_provider_key("github")
     repo_url = normalize_github_repo_url(str(project["repository"]))
@@ -1144,6 +1156,13 @@ def git_clone(project_id: str, job_id: str | None = None) -> dict[str, Any]:
         if target_path.exists():
             raise ValueError(f"Local path appeared during clone and will not be overwritten: {target_path}")
         staging_path.replace(target_path)
+    except PermissionError as exc:
+        logger.error("Permission denied during Git clone (project=%s, destination=%s): %s",
+                     project_id, target_path, exc)
+        raise ValueError(
+            f"Permission denied creating clone at '{target_path}'. Ensure the service user can write to "
+            "the parent folder and that the path is allowed by the systemd ReadWritePaths setting."
+        ) from exc
     except subprocess.TimeoutExpired as exc:
         raise ValueError(str(exc)) from exc
     except FileNotFoundError as exc:
@@ -1170,9 +1189,17 @@ def start_git_clone(project_id: str) -> dict[str, str]:
     local_path = str(project.get("local_path", "")).strip()
     if not local_path:
         raise ValueError("Local path is not configured for this project.")
-    target_path = Path(local_path).expanduser().resolve()
-    if target_path.exists():
-        raise ValueError(f"Local path already exists: {target_path}")
+    try:
+        target_path = Path(local_path).expanduser().resolve()
+        if target_path.exists():
+            raise ValueError(f"Local path already exists: {target_path}")
+    except PermissionError as exc:
+        logger.error("Permission denied checking Git clone destination (project=%s, path=%s): %s",
+                     project_id, local_path, exc)
+        raise ValueError(
+            f"Permission denied accessing clone destination '{local_path}'. The service is sandboxed; "
+            "allow this directory in systemd ReadWritePaths and ensure the service user can access it."
+        ) from exc
     target_key = os.path.normcase(str(target_path))
     with CLONE_JOBS_LOCK:
         if target_key in CLONE_TARGETS:
