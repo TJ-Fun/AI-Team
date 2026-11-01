@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import errno
 import json
 import logging
 import logging.handlers
@@ -3928,6 +3929,17 @@ class Handler(BaseHTTPRequestHandler):
                     },
                     HTTPStatus.FORBIDDEN,
                 )
+            except OSError as exc:
+                logger.exception("App update filesystem failure")
+                if exc.errno == errno.EROFS:
+                    detail = (
+                        f"'{exc.filename or app_working_dir}' is read-only in the service's filesystem namespace. "
+                        "Install the updated personal-ai-team.service with this directory in ReadWritePaths, "
+                        "then run systemctl daemon-reload and restart the service before retrying."
+                    )
+                else:
+                    detail = f"Filesystem operation failed at '{exc.filename or app_working_dir}': {exc}"
+                return self.send_json({"error": detail}, HTTPStatus.INTERNAL_SERVER_ERROR)
             except subprocess.TimeoutExpired:
                 logger.exception("App update command timed out")
                 return self.send_json({"error": "Update command timed out."}, HTTPStatus.INTERNAL_SERVER_ERROR)
