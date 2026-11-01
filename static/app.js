@@ -22,6 +22,7 @@
     detailTaskId: null,
     prompts: [],
     contextDocs: [],
+    contextProjectId: "",
     connections: [],
     encryptionAvailable: true,
     routing: {},
@@ -1071,8 +1072,7 @@
     }
   });
 
-  // --- Agent Prompts Dialog (Custom Prompt + Reset to Default) ---
-  const promptDialog = $("#prompt-dialog");
+  // --- Agent Prompts ---
   const promptForm = $("#prompt-form");
   const promptSelect = promptForm?.elements.prompt_id;
   const promptTextarea = promptForm?.elements.content;
@@ -1123,23 +1123,20 @@
     }
   }
 
-  $("#open-prompts")?.addEventListener("click", async () => {
+  async function loadAgentPrompts() {
     $("#prompt-error").textContent = "";
     setPromptFeedback("");
-    try {
-      const res = await api("/api/prompts");
-      state.prompts = res.prompts || [];
-      const initial = state.prompts.find((p) => p.id === "orchestrator") || state.prompts[0];
-      if (initial) {
-        renderPromptOptions(initial.id);
-        promptTextarea.value = initial.content || "";
-        updatePromptStatusUI();
-      }
-      if (!promptDialog.open) promptDialog.showModal();
-    } catch (err) {
-      alert(`Could not load agent prompts: ${err.message}`);
+    const res = await api("/api/prompts");
+    state.prompts = res.prompts || [];
+    const initial = state.prompts.find((p) => p.id === promptSelect?.value) ||
+      state.prompts.find((p) => p.id === "orchestrator") ||
+      state.prompts[0];
+    if (initial) {
+      renderPromptOptions(initial.id);
+      promptTextarea.value = initial.content || "";
+      updatePromptStatusUI();
     }
-  });
+  }
 
   promptSelect?.addEventListener("change", () => {
     $("#prompt-error").textContent = "";
@@ -1153,9 +1150,6 @@
     setPromptFeedback("");
     updatePromptStatusUI();
   });
-
-  $("#close-prompts")?.addEventListener("click", () => promptDialog.close());
-  $("#cancel-prompts")?.addEventListener("click", () => promptDialog.close());
 
   promptForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1236,9 +1230,14 @@
   const contextTextarea = contextForm?.elements.content;
   const contextVersionSelect = $("#context-version");
 
+  function projectContextEndpoint(suffix = "") {
+    return `/api/projects/${encodeURIComponent(state.contextProjectId)}/context-documents${suffix}`;
+  }
+
   async function loadContextHistory(docId) {
+    $("#context-error").textContent = "";
     try {
-      const res = await api(`/api/project-context/${encodeURIComponent(docId)}/history`);
+      const res = await api(projectContextEndpoint(`/${encodeURIComponent(docId)}/history`));
       const history = res.history || [];
       if (!history.length) {
         contextVersionSelect.innerHTML = `<option value="">No saved versions</option>`;
@@ -1256,7 +1255,8 @@
         .join("");
       $("#restore-context-version").disabled = false;
       $("#delete-context-version").disabled = false;
-    } catch {
+    } catch (err) {
+      $("#context-error").textContent = `Could not load saved versions: ${err.message}`;
       contextVersionSelect.innerHTML = `<option value="">No saved versions</option>`;
       $("#restore-context-version").disabled = true;
       $("#delete-context-version").disabled = true;
@@ -1266,7 +1266,10 @@
   $("#open-context")?.addEventListener("click", async () => {
     $("#context-error").textContent = "";
     try {
-      const res = await api("/api/project-context");
+      state.contextProjectId = state.activeProjectId;
+      const project = state.projects.find((p) => p.id === state.contextProjectId);
+      $("#context-project-name").textContent = project?.name || "Project";
+      const res = await api(projectContextEndpoint());
       state.contextDocs = res.documents || [];
       const first = state.contextDocs.find((d) => d.id === "project_brief") || state.contextDocs[0];
       contextSelect.innerHTML = state.contextDocs
@@ -1297,7 +1300,7 @@
     $("#context-error").textContent = "";
     const docId = contextSelect.value;
     try {
-      const res = await api(`/api/project-context/${encodeURIComponent(docId)}`, {
+      const res = await api(projectContextEndpoint(`/${encodeURIComponent(docId)}`), {
         method: "PUT",
         body: JSON.stringify({ content: contextTextarea.value }),
       });
@@ -1316,7 +1319,7 @@
       return;
     }
     try {
-      const res = await api(`/api/project-context/${encodeURIComponent(docId)}/restore`, {
+      const res = await api(projectContextEndpoint(`/${encodeURIComponent(docId)}/restore`), {
         method: "POST",
         body: JSON.stringify({ snapshot_id: versionId }),
       });
@@ -1337,7 +1340,7 @@
     }
     try {
       await api(
-        `/api/project-context/${encodeURIComponent(docId)}/history/${encodeURIComponent(versionId)}`,
+        projectContextEndpoint(`/${encodeURIComponent(docId)}/history/${encodeURIComponent(versionId)}`),
         { method: "DELETE" }
       );
       await loadContextHistory(docId);
@@ -2239,7 +2242,7 @@
     try {
       const res = await api("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, project_id: state.activeProjectId }),
       });
       chatMessages = res.messages || chatMessages;
       renderChatMessages(chatMessages);
@@ -2303,7 +2306,7 @@
   let loadedSettingsTabs = new Set();
 
   async function switchSettingsTab(tabName, focusTab = false) {
-    const validTabs = ["projects", "connections", "routing", "logs", "about"];
+    const validTabs = ["projects", "connections", "routing", "prompts", "logs", "about"];
     const tab = validTabs.includes(tabName) ? tabName : "about";
     document.querySelectorAll("[data-settings-tab]").forEach((button) => {
       const selected = button.dataset.settingsTab === tab;
@@ -2339,6 +2342,13 @@
         loadedSettingsTabs.add(tab);
       } catch (err) {
         $("#settings-error").textContent = `Could not load routing settings: ${err.message}`;
+      }
+    } else if (tab === "prompts" && !loadedSettingsTabs.has(tab)) {
+      try {
+        await loadAgentPrompts();
+        loadedSettingsTabs.add(tab);
+      } catch (err) {
+        $("#prompt-error").textContent = `Could not load agent prompts: ${err.message}`;
       }
     } else if (tab === "about") {
       const about = $("#about-content");

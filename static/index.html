@@ -36,6 +36,7 @@
         <div class="board-actions">
           <label class="active-project-label">Project<select id="active-project"></select></label>
           <label class="active-project-label" id="active-subproject-wrap" hidden>Sub-project<select id="active-subproject"><option value="">Whole project</option></select></label>
+          <button class="secondary" id="open-context" type="button">Project context</button>
           <button class="secondary" id="open-documentation" type="button">Documentation</button>
           <button class="secondary" id="open-files" type="button">Files</button>
           <button class="primary" id="new-task" type="button">＋ New task</button>
@@ -58,7 +59,7 @@
     <section class="chat-panel panel">
       <div class="section-heading chat-heading">
         <div><p class="eyebrow">LOCAL OLLAMA</p><h2>Orchestrator chat</h2></div>
-        <div class="chat-tools"><span class="local-badge">Private to your VM</span><button class="secondary" id="open-context" type="button">Project context</button><button class="secondary" id="open-prompts" type="button">Agent prompts</button><button class="secondary clear-chat" id="clear-chat" type="button">Clear conversation</button></div>
+        <div class="chat-tools"><span class="local-badge">Private to your VM</span><button class="secondary clear-chat" id="clear-chat" type="button">Clear conversation</button></div>
       </div>
       <div class="chat-notice">Use Orchestrator chat for discussion, or send a project request to PM/PO. PM/PO returns clarification cards or a draft backlog; no work task starts until you mark it Ready.</div>
       <div class="messages" id="messages" aria-live="polite"></div>
@@ -120,31 +121,9 @@
     </form>
   </dialog>
 
-  <dialog id="prompt-dialog">
-    <form id="prompt-form" class="task-form">
-      <div class="dialog-heading"><div><p class="eyebrow">SAVED ON YOUR VM</p><h2>Agent prompts</h2></div><button class="icon-button" type="button" id="close-prompts" aria-label="Close">×</button></div>
-      <label>
-        <span class="progress-heading">
-          <span>Prompt</span>
-          <span id="prompt-status-badge" class="state state-done">Default prompt active</span>
-        </span>
-        <select name="prompt_id"></select>
-      </label>
-      <label>Instructions<textarea name="content" rows="18" maxlength="20000" required></textarea></label>
-      <p class="draft-note">Only the shared rules and the selected role prompt are included with each agent request. Saved custom prompts are used automatically and kept through app updates; clicking Reset to default restores the built-in prompt for the selected agent.</p>
-      <div class="prompt-feedback" id="prompt-feedback" hidden role="status"></div>
-      <div class="form-error" id="prompt-error" role="alert"></div>
-      <div class="dialog-actions">
-        <button class="secondary prompt-reset-button" type="button" id="reset-prompt">Reset to default</button>
-        <button class="secondary" type="button" id="cancel-prompts">Close</button>
-        <button class="primary" type="submit">Save prompt</button>
-      </div>
-    </form>
-  </dialog>
-
   <dialog id="context-dialog">
     <form id="context-form" class="task-form">
-      <div class="dialog-heading"><div><p class="eyebrow">SAVED ON YOUR VM</p><h2>Project context</h2></div><button class="icon-button" type="button" id="close-context" aria-label="Close">×</button></div>
+      <div class="dialog-heading"><div><p class="eyebrow">SAVED ON YOUR VM · <span id="context-project-name"></span></p><h2>Project context</h2></div><button class="icon-button" type="button" id="close-context" aria-label="Close">×</button></div>
       <label>Document<select name="document_id"></select></label>
       <label>Project information<textarea name="content" rows="18" maxlength="20000" required></textarea></label>
       <div class="history-controls">
@@ -236,6 +215,7 @@
         <button type="button" class="settings-tab" id="settings-tab-projects" role="tab" aria-controls="settings-panel-projects" aria-selected="false" tabindex="-1" data-settings-tab="projects">Projects</button>
         <button type="button" class="settings-tab" id="settings-tab-connections" role="tab" aria-controls="settings-panel-connections" aria-selected="false" tabindex="-1" data-settings-tab="connections">Connections</button>
         <button type="button" class="settings-tab" id="settings-tab-routing" role="tab" aria-controls="settings-panel-routing" aria-selected="false" tabindex="-1" data-settings-tab="routing">Routing</button>
+        <button type="button" class="settings-tab" id="settings-tab-prompts" role="tab" aria-controls="settings-panel-prompts" aria-selected="false" tabindex="-1" data-settings-tab="prompts">Agent prompts</button>
         <button type="button" class="settings-tab" id="settings-tab-logs" role="tab" aria-controls="settings-panel-logs" aria-selected="false" tabindex="-1" data-settings-tab="logs">Logs</button>
         <button type="button" class="settings-tab" id="settings-tab-about" role="tab" aria-controls="settings-panel-about" aria-selected="true" tabindex="0" data-settings-tab="about">About</button>
       </nav>
@@ -268,6 +248,26 @@
           <div id="routing-roles"></div>
           <div class="form-error" id="routing-error" role="alert"></div>
           <div class="dialog-actions"><button class="primary" type="submit">Save routing</button></div>
+        </form>
+      </section>
+      <section class="settings-tab-panel" id="settings-panel-prompts" role="tabpanel" aria-labelledby="settings-tab-prompts" hidden>
+        <form id="prompt-form" class="task-form settings-inner-form">
+          <div class="dialog-heading"><div><p class="eyebrow">SAVED ON YOUR VM</p><h2>Agent prompts</h2></div></div>
+          <label>
+            <span class="progress-heading">
+              <span>Prompt</span>
+              <span id="prompt-status-badge" class="state state-done">Default prompt active</span>
+            </span>
+            <select name="prompt_id"></select>
+          </label>
+          <label>Instructions<textarea name="content" rows="18" maxlength="20000" required></textarea></label>
+          <p class="draft-note">Only the shared rules and the selected role prompt are included with each agent request. Saved custom prompts are used automatically and kept through app updates; clicking Reset to default restores the built-in prompt for the selected agent.</p>
+          <div class="prompt-feedback" id="prompt-feedback" hidden role="status"></div>
+          <div class="form-error" id="prompt-error" role="alert"></div>
+          <div class="dialog-actions">
+            <button class="secondary prompt-reset-button" type="button" id="reset-prompt">Reset to default</button>
+            <button class="primary" type="submit">Save prompt</button>
+          </div>
         </form>
       </section>
       <section class="settings-tab-panel" id="settings-panel-logs" role="tabpanel" aria-labelledby="settings-tab-logs" hidden>

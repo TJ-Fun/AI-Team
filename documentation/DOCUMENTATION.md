@@ -46,7 +46,7 @@ The supplied service runs as the unprivileged `ubuntu` user, uses `ProtectSystem
 
 ### 4.2 Orchestrator and PM/PO
 
-The Orchestrator chat is local to the configured Ollama instance. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a draft backlog. Review the response and task drafts before starting work. Project context documents and agent prompts are editable in their respective dialogs and retained in application data.
+The Orchestrator chat is local to the configured Ollama instance and uses the selected Project Board project's context. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a draft backlog. Review the response and task drafts before starting work. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data.
 
 ### 4.3 Provider connections and routing
 

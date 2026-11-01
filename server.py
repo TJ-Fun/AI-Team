@@ -320,18 +320,6 @@ def ensure_data() -> None:
         dst = DATA / "prompts" / f"{slug}.md"
         if src.is_file() and not dst.exists():
             shutil.copy2(src, dst)
-    for slug in PROJECT_CONTEXT_FILES:
-        src = ROOT / "project_templates" / f"{slug}.md"
-        dst = DATA / "project" / f"{slug}.md"
-        if src.is_file() and not dst.exists():
-            shutil.copy2(src, dst)
-        hist_dir = DATA / "project" / "history" / slug
-        if dst.is_file():
-            hist_dir.mkdir(parents=True, exist_ok=True)
-            if not any(hist_dir.glob("*.md")):
-                shutil.copy2(dst, hist_dir / f"{make_version_id()}.md")
-
-
 def append_event(event: dict[str, Any]) -> None:
     ensure_data()
     with STATE_LOCK:
@@ -508,20 +496,51 @@ def save_routing(value: Any) -> dict[str, list[str]]:
     return cleaned
 
 
+def migrate_legacy_project_context(projects: list[dict[str, Any]]) -> None:
+    with STATE_LOCK:
+        legacy_root = DATA / "project"
+        valid_projects = [project for project in projects if isinstance(project, dict)]
+        if not legacy_root.is_dir() or not valid_projects:
+            return
+        target_project = next((p for p in valid_projects if p.get("id") == "default"), valid_projects[0])
+        project_id = str(target_project.get("id", ""))
+        if not re.fullmatch(r"[a-z0-9-]+", project_id):
+            return
+
+        context_root = DATA / "projects" / project_id / "context"
+        for slug in PROJECT_CONTEXT_FILES:
+            legacy_file = legacy_root / f"{slug}.md"
+            target_file = context_root / f"{slug}.md"
+            if legacy_file.is_file() and not target_file.exists():
+                target_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(legacy_file), str(target_file))
+
+            legacy_history = legacy_root / "history" / slug
+            target_history = context_root / "history" / slug
+            if legacy_history.is_dir():
+                for snapshot in legacy_history.glob("*.md"):
+                    target_snapshot = target_history / snapshot.name
+                    if not target_snapshot.exists():
+                        target_history.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(snapshot), str(target_snapshot))
+
+
 def read_projects() -> list[dict[str, Any]]:
     ensure_data()
     projects_path = DATA / "projects.json"
     if projects_path.is_file():
         try:
             items = json.loads(projects_path.read_text(encoding="utf-8"))
-            if isinstance(items, list) and items:
-                return items
         except Exception:
-            pass
+            items = None
+        if isinstance(items, list) and items:
+            migrate_legacy_project_context(items)
+            return items
     default_project = [
         {"id": "default", "name": "Main project", "repository": "", "context": "", "modules": []}
     ]
     atomic_json(projects_path, default_project)
+    migrate_legacy_project_context(default_project)
     return default_project
 
 
@@ -660,35 +679,58 @@ def project_background_history(project_id: str) -> list[dict[str, str]]:
     return rows
 
 
-def load_project_context(slug: str) -> str:
+def project_context_file(project_id: str, slug: str) -> Path:
+    if slug not in PROJECT_CONTEXT_FILES or not re.fullmatch(r"[a-z0-9-]+", project_id):
+        raise ValueError("Unknown project context.")
+    if not any(p.get("id") == project_id for p in read_projects()):
+        raise ValueError("Project not found.")
+    return DATA / "projects" / project_id / "context" / f"{slug}.md"
+
+
+def ensure_project_context(project_id: str) -> None:
+    for slug in PROJECT_CONTEXT_FILES:
+        path = project_context_file(project_id, slug)
+        if not path.exists():
+            template = ROOT / "project_templates" / f"{slug}.md"
+            if template.is_file():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(template, path)
+        history = path.parent / "history" / slug
+        if path.is_file() and not any(history.glob("*.md")):
+            history.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, history / f"{make_version_id()}.md")
+
+
+def load_project_context(project_id: str, slug: str) -> str:
     if slug not in PROJECT_CONTEXT_FILES:
         return ""
-    ensure_data()
-    p = DATA / "project" / f"{slug}.md"
+    ensure_project_context(project_id)
+    p = project_context_file(project_id, slug)
     return p.read_text(encoding="utf-8").strip() if p.is_file() else ""
 
 
-def save_project_context_document(slug: str, content: str) -> str | None:
+def save_project_context_document(project_id: str, slug: str, content: str) -> str | None:
     if slug not in PROJECT_CONTEXT_FILES:
         raise ValueError("Unknown project context document.")
-    ensure_data()
-    p = DATA / "project" / f"{slug}.md"
+    ensure_project_context(project_id)
+    p = project_context_file(project_id, slug)
     prev = p.read_text(encoding="utf-8") if p.is_file() else ""
     normalized = content.strip() + "\n"
     version_id: str | None = None
     if prev and prev != normalized:
         version_id = make_version_id()
-        snap = DATA / "project" / "history" / slug / f"{version_id}.md"
+        snap = p.parent / "history" / slug / f"{version_id}.md"
         snap.parent.mkdir(parents=True, exist_ok=True)
         snap.write_text(prev, encoding="utf-8")
     atomic_text(p, normalized)
     return version_id
 
 
-def get_project_context_history(slug: str) -> list[dict[str, str]]:
+def get_project_context_history(project_id: str, slug: str) -> list[dict[str, str]]:
     if slug not in PROJECT_CONTEXT_FILES:
         return []
-    folder = DATA / "project" / "history" / slug
+    ensure_project_context(project_id)
+    folder = project_context_file(project_id, slug).parent / "history" / slug
     if not folder.is_dir():
         return []
     rows: list[dict[str, str]] = []
@@ -709,16 +751,21 @@ def get_project_context_history(slug: str) -> list[dict[str, str]]:
 
 
 def project_context_for_role(role: str, task: dict[str, Any] | None = None) -> str:
+    projects = read_projects()
+    requested_project_id = str((task or {}).get("project_id") or "")
+    project = next((p for p in projects if p.get("id") == requested_project_id), None)
+    if not project and not requested_project_id:
+        project = next((p for p in projects if p.get("id") == "default"), projects[0] if projects else None)
+    pid = str(project.get("id") if project else "")
     sections: list[tuple[str, str]] = [
-        ("Project brief", load_project_context("project_brief")),
-        ("Technical overview", load_project_context("technical_overview")),
-        ("Approved decisions", load_project_context("decisions")),
-        ("Confirmed outcomes", load_project_context("outcomes")),
+        ("Project brief", load_project_context(pid, "project_brief") if project else ""),
+        ("Technical overview", load_project_context(pid, "technical_overview") if project else ""),
+        ("Approved decisions", load_project_context(pid, "decisions") if project else ""),
+        ("Confirmed outcomes", load_project_context(pid, "outcomes") if project else ""),
     ]
     if role == "UI designer":
         sections = [sections[0], sections[2], sections[3]]
     elif role == "PM/PO":
-        pid = str((task or {}).get("project_id") or "default")
         current = [
             t
             for t in read_tasks()
@@ -753,9 +800,6 @@ def project_context_for_role(role: str, task: dict[str, Any] | None = None) -> s
             )
         )
 
-    projects = read_projects()
-    pid = str((task or {}).get("project_id") or "default")
-    project = next((p for p in projects if p.get("id") == pid), projects[0] if projects else None)
     if project:
         sections.append(
             (
@@ -3232,8 +3276,11 @@ def check_ollama_config() -> dict[str, Any]:
         return {"available": False, "model_found": False, "model": OLLAMA_MODEL}
 
 
-def call_ollama_chat(context_messages: list[dict[str, Any]]) -> str:
-    board = read_tasks()
+def call_ollama_chat(context_messages: list[dict[str, Any]], project_id: str) -> str:
+    board = [
+        task for task in read_tasks()
+        if str(task.get("project_id") or "default") == project_id
+    ]
     board_text = (
         "\n".join(f"- {t['id']} | {t.get('status')} | {t.get('assigned_role')} | {t.get('title')}" for t in board[:50])
         or "(No tasks have been created.)"
@@ -3243,7 +3290,7 @@ def call_ollama_chat(context_messages: list[dict[str, Any]]) -> str:
         for p in [
             load_prompt("shared_rules"),
             load_prompt("orchestrator"),
-            project_context_for_role("Orchestrator"),
+            project_context_for_role("Orchestrator", {"project_id": project_id}),
             f"Current task board (read-only context):\n{board_text}",
         ]
         if p
@@ -3483,19 +3530,26 @@ class Handler(BaseHTTPRequestHandler):
                 )
             return self.send_json({"prompts": prompts})
 
-        if path == "/api/project-context":
+        m_project_context = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents", path)
+        if m_project_context:
+            project_id = m_project_context.group(1)
+            if not any(p.get("id") == project_id for p in read_projects()):
+                return self.send_json({"error": "Project not found."}, HTTPStatus.NOT_FOUND)
+            ensure_project_context(project_id)
             docs = [
-                {"id": slug, "title": title, "content": load_project_context(slug)}
+                {"id": slug, "title": title, "content": load_project_context(project_id, slug)}
                 for slug, title in PROJECT_CONTEXT_FILES.items()
             ]
             return self.send_json({"documents": docs})
 
-        m_ctx_hist = re.fullmatch(r"/api/project-context/([a-z_]+)/history", path)
+        m_ctx_hist = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/history", path)
         if m_ctx_hist:
-            slug = m_ctx_hist.group(1)
+            project_id, slug = m_ctx_hist.groups()
             if slug not in PROJECT_CONTEXT_FILES:
                 return self.send_json({"error": "Project document not found."}, HTTPStatus.NOT_FOUND)
-            return self.send_json({"history": get_project_context_history(slug)})
+            if not any(p.get("id") == project_id for p in read_projects()):
+                return self.send_json({"error": "Project not found."}, HTTPStatus.NOT_FOUND)
+            return self.send_json({"history": get_project_context_history(project_id, slug)})
 
         if path == "/api/notifications":
             return self.send_json({"notifications": get_notifications()})
@@ -4224,20 +4278,10 @@ class Handler(BaseHTTPRequestHandler):
                 ts = now_iso()
                 snapshots: dict[str, str | None] = {}
                 pid = str(task.get("project_id") or "default")
-                if pid == "default":
-                    for slug, content in documents.items():
-                        snapshots[slug] = save_project_context_document(slug, content)
-                else:
-                    projs = read_projects()
-                    proj = next((p for p in projs if p.get("id") == pid), None)
-                    if not proj:
-                        return self.send_json({"error": "Attached project no longer exists."}, HTTPStatus.CONFLICT)
-                    proj["context"] = "\n\n".join(
-                        f"# {PROJECT_CONTEXT_FILES[slug]}\n\n{content}" for slug, content in documents.items()
-                    )
-                    save_projects(projs)
-                    hist = project_background_history(pid)
-                    snapshots["project_background"] = hist[0]["id"] if hist else None
+                if not any(p.get("id") == pid for p in read_projects()):
+                    return self.send_json({"error": "Attached project no longer exists."}, HTTPStatus.CONFLICT)
+                for slug, content in documents.items():
+                    snapshots[slug] = save_project_context_document(pid, slug, content)
                 task["overview_documents"] = documents
                 task["status"] = "Done"
                 task["updated_at"] = ts
@@ -4256,20 +4300,31 @@ class Handler(BaseHTTPRequestHandler):
                 write_task(task)
             return self.send_json({"task": task, "snapshots": snapshots})
 
-        m_ctx_res = re.fullmatch(r"/api/project-context/([a-z_]+)/restore", path)
+        m_ctx_res = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/restore", path)
         if m_ctx_res:
-            slug = m_ctx_res.group(1)
+            pid, slug = m_ctx_res.groups()
             vid = str(body.get("snapshot_id", ""))
             if slug not in PROJECT_CONTEXT_FILES:
                 return self.send_json({"error": "Project document not found."}, HTTPStatus.NOT_FOUND)
+            if not any(p.get("id") == pid for p in read_projects()):
+                return self.send_json({"error": "Project not found."}, HTTPStatus.NOT_FOUND)
             if not re.fullmatch(r"\d{8}T\d{12}Z", vid):
                 return self.send_json({"error": "Choose a valid saved version."}, HTTPStatus.BAD_REQUEST)
-            snap = DATA / "project" / "history" / slug / f"{vid}.md"
+            snap = project_context_file(pid, slug).parent / "history" / slug / f"{vid}.md"
             if not snap.is_file():
                 return self.send_json({"error": "Saved version not found."}, HTTPStatus.NOT_FOUND)
             txt = snap.read_text(encoding="utf-8")
-            new_snap = save_project_context_document(slug, txt)
-            append_event({"at": now_iso(), "type": "project_context_restored", "document": slug, "restored_snapshot": vid, "snapshot": new_snap})
+            new_snap = save_project_context_document(pid, slug, txt)
+            append_event(
+                {
+                    "at": now_iso(),
+                    "type": "project_context_restored",
+                    "project_id": pid,
+                    "document": slug,
+                    "restored_snapshot": vid,
+                    "snapshot": new_snap,
+                }
+            )
             return self.send_json({"saved": True, "id": slug, "title": PROJECT_CONTEXT_FILES[slug], "content": txt.strip()})
 
         m_proj_res = re.fullmatch(r"/api/projects/([a-z0-9-]+)/restore-context", path)
@@ -4294,6 +4349,15 @@ class Handler(BaseHTTPRequestHandler):
             text = str(body.get("message", "")).strip()
             if not text or len(text) > 12000:
                 return self.send_json({"error": "Write a message up to 12,000 characters."}, HTTPStatus.BAD_REQUEST)
+            requested_project_id = str(body.get("project_id") or "")
+            projects = read_projects()
+            if requested_project_id:
+                project = next((p for p in projects if p.get("id") == requested_project_id), None)
+            else:
+                project = next((p for p in projects if p.get("id") == "default"), projects[0])
+            if not project:
+                return self.send_json({"error": "Choose a valid project."}, HTTPStatus.BAD_REQUEST)
+            project_id = str(project["id"])
             with ACTIVE_CHAT_LOCK:
                 if ACTIVE_CHAT_COUNT > 0:
                     return self.send_json({"error": "Another Orchestrator reply is still in progress."}, HTTPStatus.CONFLICT)
@@ -4305,7 +4369,7 @@ class Handler(BaseHTTPRequestHandler):
                 write_chat_history(hist)
                 append_event({"at": now_iso(), "type": "local_llm_request_started", "provider": "Ollama", "model": OLLAMA_MODEL})
                 try:
-                    reply = call_ollama_chat(hist[-16:])
+                    reply = call_ollama_chat(hist[-16:], project_id)
                     dur = round(time.time() - t0, 2)
                     msg = {"role": "assistant", "content": reply, "at": now_iso(), "provider": "Ollama", "duration_seconds": dur}
                     hist.append(msg)
@@ -4374,17 +4438,23 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
-        m_ctx = re.fullmatch(r"/api/project-context/([a-z_]+)", path)
+        m_ctx = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)", path)
         if m_ctx:
-            slug = m_ctx.group(1)
+            pid, slug = m_ctx.groups()
             if slug not in PROJECT_CONTEXT_FILES:
                 return self.send_json({"error": "Project document not found."}, HTTPStatus.NOT_FOUND)
+            if not any(p.get("id") == pid for p in read_projects()):
+                return self.send_json({"error": "Project not found."}, HTTPStatus.NOT_FOUND)
             content = body.get("content")
             if not isinstance(content, str) or not content.strip() or len(content) > 20000:
                 return self.send_json({"error": "Project document must be non-empty and under 20,000 characters."}, HTTPStatus.BAD_REQUEST)
-            snap = save_project_context_document(slug, content)
-            append_event({"at": now_iso(), "type": "project_context_saved", "document": slug, "snapshot": snap})
-            return self.send_json({"saved": True, "id": slug, "title": PROJECT_CONTEXT_FILES[slug], "content": content.strip(), "snapshot": snap})
+            snap = save_project_context_document(pid, slug, content)
+            append_event(
+                {"at": now_iso(), "type": "project_context_saved", "project_id": pid, "document": slug, "snapshot": snap}
+            )
+            return self.send_json(
+                {"saved": True, "project_id": pid, "id": slug, "title": PROJECT_CONTEXT_FILES[slug], "content": content.strip(), "snapshot": snap}
+            )
 
         m_ov = re.fullmatch(r"/api/tasks/(T-\d{4,})/overview", path)
         if m_ov:
@@ -4510,14 +4580,18 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
-        m_ctx_del = re.fullmatch(r"/api/project-context/([a-z_]+)/history/(\d{8}T\d{12}Z)", path)
+        m_ctx_del = re.fullmatch(
+            r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/history/(\d{8}T\d{12}Z)", path
+        )
         if m_ctx_del:
-            slug, vid = m_ctx_del.group(1), m_ctx_del.group(2)
-            snap = DATA / "project" / "history" / slug / f"{vid}.md"
-            if slug not in PROJECT_CONTEXT_FILES or not snap.is_file():
+            pid, slug, vid = m_ctx_del.groups()
+            if slug not in PROJECT_CONTEXT_FILES or not any(p.get("id") == pid for p in read_projects()):
+                return self.send_json({"error": "Saved version not found."}, HTTPStatus.NOT_FOUND)
+            snap = project_context_file(pid, slug).parent / "history" / slug / f"{vid}.md"
+            if not snap.is_file():
                 return self.send_json({"error": "Saved version not found."}, HTTPStatus.NOT_FOUND)
             snap.unlink()
-            return self.send_json({"deleted": True, "id": slug, "deleted_version": vid})
+            return self.send_json({"deleted": True, "project_id": pid, "id": slug, "deleted_version": vid})
 
         m_proj_del = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-history/(\d{8}T\d{12}Z)", path)
         if m_proj_del:
