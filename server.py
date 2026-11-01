@@ -11,11 +11,13 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -138,6 +140,10 @@ console_handler.setLevel(logging.ERROR)
 console_formatter = logging.Formatter("%(levelname)s: %(message)s")
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
+
+CLONE_JOBS: dict[str, dict[str, Any]] = {}
+CLONE_JOBS_LOCK = threading.Lock()
+CLONE_TARGETS: set[str] = set()
 
 # --- App Configuration ---
 APP_CONFIG_FILE = DATA / "app_config.json"
@@ -944,6 +950,27 @@ def redact_git_output(output: str, token: str) -> str:
     return output.replace(token, "[redacted]") if token else output
 
 
+def update_clone_job(job_id: str, **updates: Any) -> None:
+    with CLONE_JOBS_LOCK:
+        job = CLONE_JOBS.get(job_id)
+        if job:
+            job.update(updates)
+            job["updated_at"] = now_iso()
+
+
+def append_clone_job_output(job_id: str | None, line: str) -> None:
+    if not job_id:
+        return
+    with CLONE_JOBS_LOCK:
+        job = CLONE_JOBS.get(job_id)
+        if job:
+            output = job.setdefault("output", [])
+            output.append(line)
+            del output[:-100]
+            job["progress"] = line
+            job["updated_at"] = now_iso()
+
+
 def git_status(project_id: str) -> dict[str, Any]:
     path = git_project_path(project_id)
     try:
@@ -1039,7 +1066,7 @@ def git_push(project_id: str) -> dict[str, Any]:
         raise ValueError(f"Git push failed: {exc}")
 
 
-def git_clone(project_id: str) -> dict[str, Any]:
+def git_clone(project_id: str, job_id: str | None = None) -> dict[str, Any]:
     logger.info(f"Git clone requested for project: {project_id}")
     project = next((p for p in read_projects() if p.get("id") == project_id), None)
     if not project or not project.get("repository"):
@@ -1065,37 +1092,145 @@ def git_clone(project_id: str) -> dict[str, Any]:
     else:
         logger.warning("GitHub connection is not configured; private repository clone may fail")
 
+    staging_dir: Path | None = None
     try:
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        result = subprocess.run(
-            ["git", "clone", repo_url, str(target_path)],
-            capture_output=True,
+        staging_dir = Path(tempfile.mkdtemp(prefix=f".{target_path.name}.clone-", dir=target_path.parent))
+        staging_path = staging_dir / target_path.name
+        process = subprocess.Popen(
+            ["git", "clone", "--progress", repo_url, str(staging_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=300,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
             env=git_auth_environment(token),
         )
+        logger.info("Git clone process started (project=%s, pid=%s)", project_id, process.pid)
+        output_lines: list[str] = []
+
+        def capture_output() -> None:
+            if process.stdout is None:
+                return
+            for raw_line in process.stdout:
+                line = redact_git_output(raw_line.rstrip(), token)[-1500:]
+                output_lines.append(line)
+                del output_lines[:-100]
+                logger.info("Git clone output (project=%s): %s", project_id, line[:1500])
+                append_clone_job_output(job_id, line)
+
+        output_reader = threading.Thread(target=capture_output, name=f"git-clone-output-{project_id}", daemon=True)
+        output_reader.start()
+        try:
+            return_code = process.wait(timeout=300)
+        except subprocess.TimeoutExpired as exc:
+            process.kill()
+            process.wait()
+            output_reader.join(timeout=5)
+            detail = "\n".join(output_lines[-20:])
+            logger.error("Git clone timed out (project=%s, repo=%s/%s, output=%r)",
+                         project_id, owner, repo, detail[-4000:])
+            raise ValueError(f"Git clone timed out after 300 seconds.{': ' + detail if detail else ''}") from exc
+        output_reader.join(timeout=5)
+        stdout = "\n".join(output_lines)
+        if return_code != 0:
+            detail = stdout.strip() or f"git exited with status {return_code}"
+            logger.error(
+                "Git clone failed (project=%s, repo=%s/%s, exit=%s, output=%r)",
+                project_id, owner, repo, return_code, detail[-4000:],
+            )
+            raise ValueError(f"Git clone failed: {detail}")
+        if target_path.exists():
+            raise ValueError(f"Local path appeared during clone and will not be overwritten: {target_path}")
+        staging_path.replace(target_path)
     except subprocess.TimeoutExpired as exc:
-        logger.exception("Git clone timed out (project=%s, repo=%s/%s)", project_id, owner, repo)
-        raise ValueError("Git clone timed out.") from exc
+        raise ValueError(str(exc)) from exc
     except FileNotFoundError as exc:
         logger.exception("Git executable is unavailable during clone (project=%s)", project_id)
         raise ValueError("Git is not installed on this system.") from exc
+    except ValueError:
+        raise
     except Exception as exc:
         logger.exception("Git clone could not be started (project=%s)", project_id)
         raise ValueError(f"Git clone failed: {exc}") from exc
+    finally:
+        if staging_dir:
+            shutil.rmtree(staging_dir, ignore_errors=True)
 
-    stdout = redact_git_output(result.stdout or "", token)
-    stderr = redact_git_output(result.stderr or "", token)
-    if result.returncode != 0:
-        detail = stderr.strip() or stdout.strip() or f"git exited with status {result.returncode}"
-        logger.error(
-            "Git clone failed (project=%s, repo=%s/%s, exit=%s, stdout=%r, stderr=%r)",
-            project_id, owner, repo, result.returncode, stdout[-4000:], stderr[-4000:],
-        )
-        raise ValueError(f"Git clone failed: {detail}")
     logger.info("Git clone succeeded (project=%s, repo=%s/%s, output_bytes=%s)",
                 project_id, owner, repo, len(stdout.encode("utf-8")))
     return {"success": True, "output": stdout}
+
+
+def start_git_clone(project_id: str) -> dict[str, str]:
+    project = next((p for p in read_projects() if p.get("id") == project_id), None)
+    if not project or not project.get("repository"):
+        raise ValueError("Project repository is not configured.")
+    local_path = str(project.get("local_path", "")).strip()
+    if not local_path:
+        raise ValueError("Local path is not configured for this project.")
+    target_path = Path(local_path).expanduser().resolve()
+    if target_path.exists():
+        raise ValueError(f"Local path already exists: {target_path}")
+    target_key = os.path.normcase(str(target_path))
+    with CLONE_JOBS_LOCK:
+        if target_key in CLONE_TARGETS:
+            raise ValueError("A clone to this local path is already running.")
+        active_jobs = sum(job.get("status") == "running" for job in CLONE_JOBS.values())
+        if active_jobs >= 8:
+            raise ValueError("Too many Git clone operations are running; try again when one finishes.")
+        completed_jobs = sorted(
+            (job for job in CLONE_JOBS.values() if job.get("status") != "running"),
+            key=lambda job: job.get("updated_at", ""),
+        )
+        while len(CLONE_JOBS) >= 100 and completed_jobs:
+            oldest = completed_jobs.pop(0)
+            CLONE_JOBS.pop(str(oldest.get("id")), None)
+        if len(CLONE_JOBS) >= 100:
+            raise ValueError("Git clone job history is full; restart the application before starting another clone.")
+        CLONE_TARGETS.add(target_key)
+        job_id = uuid.uuid4().hex
+        CLONE_JOBS[job_id] = {
+            "id": job_id,
+            "project_id": project_id,
+            "status": "running",
+            "progress": "Starting Git clone…",
+            "output": [],
+            "started_at": now_iso(),
+            "updated_at": now_iso(),
+        }
+
+    def run_clone() -> None:
+        try:
+            result = git_clone(project_id, job_id)
+            update_clone_job(job_id, status="succeeded", result=result, progress="Clone completed.")
+        except ValueError as exc:
+            logger.error("Git clone job failed (project=%s, job=%s): %s", project_id, job_id, exc)
+            update_clone_job(job_id, status="failed", error=str(exc), progress="Clone failed.")
+        except Exception as exc:
+            logger.exception("Git clone job failed (project=%s, job=%s)", project_id, job_id)
+            update_clone_job(job_id, status="failed", error=str(exc), progress="Clone failed.")
+        finally:
+            with CLONE_JOBS_LOCK:
+                CLONE_TARGETS.discard(target_key)
+
+    try:
+        threading.Thread(target=run_clone, name=f"git-clone-{project_id}", daemon=True).start()
+    except Exception:
+        with CLONE_JOBS_LOCK:
+            CLONE_TARGETS.discard(target_key)
+            CLONE_JOBS.pop(job_id, None)
+        raise
+    return {"job_id": job_id, "status": "running"}
+
+
+def get_git_clone_job(project_id: str, job_id: str) -> dict[str, Any]:
+    with CLONE_JOBS_LOCK:
+        job = CLONE_JOBS.get(job_id)
+        if not job or job.get("project_id") != project_id:
+            raise ValueError("Git clone job not found.")
+        return {**job, "output": list(job.get("output") or [])}
 
 
 def resolve_local_view_path(root: Path, relative_path: str) -> Path:
@@ -2984,12 +3119,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_json(self, payload: Any, status: int = HTTPStatus.OK) -> None:
         raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(raw)))
-        self.end_headers()
-        self.wfile.write(raw)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+        except (BrokenPipeError, ConnectionResetError) as exc:
+            logger.warning(
+                "HTTP response delivery failed (client=%s, status=%s): %s",
+                self.client_address[0], status, exc,
+            )
 
     def serve_file(self, file_path: Path, mime_type: str) -> None:
         if not file_path.is_file():
@@ -3076,6 +3217,26 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/projects":
             return self.send_json({"projects": read_projects()})
+
+        m_clone_job = re.fullmatch(r"/api/git/([a-z0-9-]+)/clone/([a-f0-9]{32})", path)
+        if m_clone_job:
+            try:
+                return self.send_json(get_git_clone_job(m_clone_job.group(1), m_clone_job.group(2)))
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+
+        m_git_status = re.fullmatch(r"/api/git/([a-z0-9-]+)/status", path)
+        if m_git_status:
+            project = next((p for p in read_projects() if p.get("id") == m_git_status.group(1)), None)
+            if not project:
+                return self.send_json({"error": "Project not found."}, HTTPStatus.NOT_FOUND)
+            local_path = str(project.get("local_path", "")).strip()
+            if not local_path or not Path(local_path).expanduser().is_dir():
+                return self.send_json({"available": False, "message": "Not cloned yet."})
+            try:
+                return self.send_json({"available": True, "status": git_status(m_git_status.group(1))})
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
         m_gh_files = re.fullmatch(r"/api/projects/([a-z0-9-]+)/github-files", path)
         if m_gh_files:
@@ -3185,7 +3346,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         global ACTIVE_CHAT_COUNT
         path = urllib.parse.urlparse(self.path).path
-        logger.debug(f"POST request: {path}")
+        logger.info("HTTP request started method=POST client=%s path=%s", self.client_address[0], path)
         try:
             body = self.read_json_body()
         except ValueError as exc:
@@ -3422,13 +3583,17 @@ class Handler(BaseHTTPRequestHandler):
         if m_git_clone:
             pid = m_git_clone.group(1)
             try:
-                result = git_clone(pid)
-                append_event({"at": now_iso(), "type": "git_clone", "project_id": pid, "success": True})
-                return self.send_json(result)
+                job = start_git_clone(pid)
+                logger.info("Git clone job accepted (project=%s, job=%s)", pid, job["job_id"])
+                append_event({"at": now_iso(), "type": "git_clone", "project_id": pid, "job_id": job["job_id"]})
+                return self.send_json(job, HTTPStatus.ACCEPTED)
             except ValueError as exc:
-                logger.exception("Git clone request failed (project=%s)", pid)
+                logger.error("Git clone request rejected (project=%s): %s", pid, exc)
                 append_event({"at": now_iso(), "type": "git_clone", "project_id": pid, "success": False, "error": str(exc)[:300]})
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            except Exception as exc:
+                logger.exception("Could not start Git clone job (project=%s)", pid)
+                return self.send_json({"error": f"Could not start Git clone: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         # Settings API endpoints
         if path == "/api/settings/logs":

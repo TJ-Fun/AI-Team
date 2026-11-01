@@ -34,10 +34,18 @@
   };
 
   async function api(url, options = {}) {
-    const response = await fetch(url, {
-      headers: { "Content-Type": "application/json" },
-      ...options,
-    });
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+    } catch (err) {
+      if (err instanceof TypeError && /fetch/i.test(err.message)) {
+        throw new Error(`Could not reach the application server for ${url}; the request may have been interrupted.`);
+      }
+      throw err;
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(data.error || `Request failed (${response.status})`);
@@ -1696,7 +1704,7 @@
               )}" placeholder="https://github.com/owner/repository">
             </label>
           </div>
-          <label>Local file path <span class="muted">Absolute path to local git clone (e.g., C:/Users/you/projects/repo or /home/ubuntu/projects/repo)</span>
+          <label>Local file path <span class="muted">Absolute path to the clone. On the systemd service, use a folder under TEAM_DATA_DIR (default: /var/lib/personal-ai-team/projects).</span>
             <input data-proj-field="local_path" value="${escapeHtml(d.local_path || "")}" placeholder="C:/Users/you/projects/repo">
           </label>
           ${d.repository && d.local_path ? `
@@ -1751,6 +1759,11 @@
           const res = await api(`/api/git/${encodeURIComponent(d.id)}/status`);
           const statusEl = document.querySelector(`[data-proj-status="${idx}"]`);
           if (statusEl) {
+            if (!res.available) {
+              statusEl.textContent = res.message || "Not cloned yet";
+              statusEl.className = "git-status";
+              return;
+            }
             const s = res.status;
             let statusText = s.branch;
             if (s.modified) statusText += ` · ${s.modified} modified`;
@@ -1838,8 +1851,18 @@
       const statusEl = document.querySelector(`[data-proj-status="${cloneBtn.getAttribute('data-proj-clone')}"]`);
       if (statusEl) statusEl.textContent = "Cloning…";
       try {
-        const res = await api(`/api/git/${encodeURIComponent(d.id)}/clone`, { method: "POST" });
-        alert(`Clone successful:\n${res.output}`);
+        const endpoint = `/api/git/${encodeURIComponent(d.id)}/clone`;
+        let job = await api(endpoint, { method: "POST" });
+        while (job.status === "running") {
+          const progress = String(job.progress || "Preparing clone").trim();
+          if (statusEl) statusEl.textContent = `Cloning… ${progress.slice(-100)}`;
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          job = await api(`${endpoint}/${encodeURIComponent(job.job_id)}`);
+        }
+        if (job.status !== "succeeded") {
+          throw new Error(job.error || "Git clone ended without a result. Check the server logs for the clone job.");
+        }
+        alert(`Clone successful:\n${job.result?.output || ""}`);
         renderProjectEditors();
       } catch (err) {
         alert(`Clone failed: ${err.message}`);
