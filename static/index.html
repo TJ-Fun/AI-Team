@@ -235,8 +235,9 @@
       <nav class="settings-tabs" role="tablist" aria-label="Settings sections">
         <button type="button" class="settings-tab" id="settings-tab-projects" role="tab" aria-controls="settings-panel-projects" aria-selected="false" tabindex="-1" data-settings-tab="projects">Projects</button>
         <button type="button" class="settings-tab" id="settings-tab-connections" role="tab" aria-controls="settings-panel-connections" aria-selected="false" tabindex="-1" data-settings-tab="connections">Connections</button>
+        <button type="button" class="settings-tab" id="settings-tab-routing" role="tab" aria-controls="settings-panel-routing" aria-selected="false" tabindex="-1" data-settings-tab="routing">Routing</button>
         <button type="button" class="settings-tab" id="settings-tab-logs" role="tab" aria-controls="settings-panel-logs" aria-selected="false" tabindex="-1" data-settings-tab="logs">Logs</button>
-        <button type="button" class="settings-tab" id="settings-tab-app" role="tab" aria-controls="settings-panel-app" aria-selected="true" tabindex="0" data-settings-tab="app">App management</button>
+        <button type="button" class="settings-tab" id="settings-tab-about" role="tab" aria-controls="settings-panel-about" aria-selected="true" tabindex="0" data-settings-tab="about">About</button>
       </nav>
       <div class="form-error" id="settings-error" role="alert"></div>
       <section class="settings-tab-panel" id="settings-panel-projects" role="tabpanel" aria-labelledby="settings-tab-projects" hidden>
@@ -253,14 +254,21 @@
       <section class="settings-tab-panel" id="settings-panel-connections" role="tabpanel" aria-labelledby="settings-tab-connections" hidden>
         <form id="connections-form" class="task-form settings-inner-form">
           <div class="dialog-heading"><div><p class="eyebrow">ENCRYPTED ON YOUR VM</p><h2>Connections</h2></div></div>
-          <p class="draft-note" id="connections-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. Configure default provider rank order per role below; unavailable connections are skipped automatically.</p>
+          <p class="draft-note" id="connections-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. Test or replace each connection here; configure provider priorities in the Routing tab.</p>
           <div id="connection-list"></div>
           <div class="dialog-actions"><button class="secondary" type="button" id="test-github">Test GitHub connection</button></div>
-          <label>Default provider order for each role <span class="muted">Select provider rank order in each row; swapping ranks keeps every provider listed once.</span></label>
-          <div id="routing-roles"></div>
           <div class="prompt-feedback" id="connections-success" hidden role="status"></div>
           <div class="form-error" id="connections-error" role="alert"></div>
-          <div class="dialog-actions"><button class="secondary" type="button" id="cancel-connections">Close settings</button><button class="primary" type="submit">Save routing</button></div>
+          <div class="dialog-actions"><button class="secondary" type="button" id="cancel-connections">Close settings</button></div>
+        </form>
+      </section>
+      <section class="settings-tab-panel" id="settings-panel-routing" role="tabpanel" aria-labelledby="settings-tab-routing" hidden>
+        <form id="routing-form" class="task-form settings-inner-form">
+          <div class="dialog-heading"><div><p class="eyebrow">PROVIDER PRIORITY</p><h2>Routing</h2></div></div>
+          <p class="draft-note">Set the provider rank order for each role. Unavailable connections are skipped automatically; changing a rank swaps the providers so each one appears once.</p>
+          <div id="routing-roles"></div>
+          <div class="form-error" id="routing-error" role="alert"></div>
+          <div class="dialog-actions"><button class="secondary" type="button" id="cancel-routing">Close settings</button><button class="primary" type="submit">Save routing</button></div>
         </form>
       </section>
       <section class="settings-tab-panel" id="settings-panel-logs" role="tabpanel" aria-labelledby="settings-tab-logs" hidden>
@@ -294,7 +302,16 @@
           <pre id="log-output" class="log-output"><span class="muted">Load logs to view them.</span></pre>
         </div>
       </section>
-      <section class="settings-tab-panel" id="settings-panel-app" role="tabpanel" aria-labelledby="settings-tab-app">
+      <section class="settings-tab-panel" id="settings-panel-about" role="tabpanel" aria-labelledby="settings-tab-about">
+        <div class="settings-section about-section">
+          <h3>About Personal AI Team</h3>
+          <div id="about-content" class="about-content" aria-live="polite">Loading app information…</div>
+          <a class="about-project-link" href="https://github.com/TJ-Fun/AI-Team" target="_blank" rel="noopener noreferrer">Open the project on GitHub</a>
+          <div class="about-actions">
+            <button type="button" class="secondary" id="open-version-log">Version log</button>
+            <button type="button" class="secondary" id="open-app-documentation">Documentation</button>
+          </div>
+        </div>
         <div class="settings-section">
           <h3>App Update</h3>
           <p class="draft-note">Fetch the repository into a local checkout, copy files newer than the deployed versions, then restart the service. Files that are newer in the app working directory are kept; files not present in the repository are not deleted.</p>
@@ -309,12 +326,8 @@
           </label>
           <button type="button" class="secondary" id="save-app-config">Save configuration</button>
           <button type="button" class="primary" id="update-app">Update App</button>
-          <div id="update-status" class="update-status"></div>
-        </div>
-        <div class="settings-section settings-restart-section">
-          <h3>Restart App</h3>
-          <p class="draft-note">Restart the application service without changing files. This briefly interrupts the service.</p>
           <button type="button" class="danger" id="restart-app">Restart App</button>
+          <div id="update-status" class="update-status"></div>
           <div id="restart-status" class="restart-status"></div>
         </div>
       </section>

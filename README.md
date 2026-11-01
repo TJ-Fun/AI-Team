@@ -1,6 +1,10 @@
 # AI-Team
 
+Current application version: **0.23**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
+
 The web client is served from `static/` (`index.html`, `app.js`, and `style.css`). The server keeps application data and logs under `TEAM_DATA_DIR` (default: `data/`).
+
+Settings are organized into Projects, Connections, Routing, Logs, and About tabs. Statistics remain available from the main header.
 
 In **Settings → Logs**, **Store from** sets the minimum level written to the rotating log files and persists across restarts. **Show** filters the most recent matching entries in the log viewer. The **Documentation** button browses the local `documentation/` folder; **Files** browses the active project's configured local clone.
 

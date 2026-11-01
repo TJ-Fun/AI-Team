@@ -1425,6 +1425,25 @@
     await loadRepositoryFolder("");
   }
 
+  async function openDocumentationFile(filePath, title) {
+    state.repoMode = "documentation";
+    $("#repository-view-eyebrow").textContent = "LOCAL APP DOCUMENTATION";
+    $("#repository-view-title").textContent = title;
+    $("#repository-view-meta").textContent = filePath;
+    $("#repository-file-list").innerHTML = "";
+    $("#repository-file-content").textContent = "Loading…";
+    $("#repository-view-error").textContent = "";
+    if (!repoDialog.open) repoDialog.showModal();
+    try {
+      const res = await api(`/api/documentation-files?file=${encodeURIComponent(filePath)}`);
+      $("#repository-view-meta").textContent = `Local documentation · ${res.path}`;
+      $("#repository-file-content").textContent = res.content;
+    } catch (err) {
+      $("#repository-file-content").textContent = "";
+      $("#repository-view-error").textContent = err.message;
+    }
+  }
+
   $("#open-documentation")?.addEventListener("click", () => void openRepositoryView("documentation"));
   $("#open-files")?.addEventListener("click", () => void openRepositoryView("files"));
   $("#close-repository-view")?.addEventListener("click", () => repoDialog.close());
@@ -1455,6 +1474,7 @@
 
   // --- Connections Dialog ---
   const connectionsForm = $("#connections-form");
+  const routingForm = $("#routing-form");
 
   function isProviderConnected(providerName) {
     return state.connections.some((c) => {
@@ -1661,9 +1681,11 @@
 
   $("#cancel-connections")?.addEventListener("click", () => $("#settings-dialog").close());
 
-  connectionsForm?.addEventListener("submit", async (e) => {
+  connectionsForm?.addEventListener("submit", (e) => e.preventDefault());
+
+  routingForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("#connections-error").textContent = "";
+    $("#routing-error").textContent = "";
     try {
       await api("/api/routing", {
         method: "POST",
@@ -1672,9 +1694,10 @@
       $("#settings-dialog").close();
       await refreshBoard();
     } catch (err) {
-      $("#connections-error").textContent = err.message;
+      $("#routing-error").textContent = err.message;
     }
   });
+  $("#cancel-routing")?.addEventListener("click", () => $("#settings-dialog").close());
 
   // --- Projects & Sub-projects Dialog ---
   const projectsForm = $("#projects-form");
@@ -2283,8 +2306,8 @@
   let loadedSettingsTabs = new Set();
 
   async function switchSettingsTab(tabName, focusTab = false) {
-    const validTabs = ["projects", "connections", "logs", "app"];
-    const tab = validTabs.includes(tabName) ? tabName : "app";
+    const validTabs = ["projects", "connections", "routing", "logs", "about"];
+    const tab = validTabs.includes(tabName) ? tabName : "about";
     document.querySelectorAll("[data-settings-tab]").forEach((button) => {
       const selected = button.dataset.settingsTab === tab;
       button.setAttribute("aria-selected", String(selected));
@@ -2311,6 +2334,22 @@
         loadedSettingsTabs.add(tab);
       } catch (err) {
         $("#settings-error").textContent = `Could not load connections: ${err.message}`;
+      }
+    } else if (tab === "routing" && !loadedSettingsTabs.has(tab)) {
+      $("#routing-error").textContent = "";
+      try {
+        await reloadSettingsData();
+        loadedSettingsTabs.add(tab);
+      } catch (err) {
+        $("#settings-error").textContent = `Could not load routing settings: ${err.message}`;
+      }
+    } else if (tab === "about") {
+      const about = $("#about-content");
+      try {
+        const res = await api("/api/documentation-files?file=ABOUT.md");
+        about.textContent = res.content;
+      } catch (err) {
+        about.textContent = `Could not load app information: ${err.message}`;
       }
     }
   }
@@ -2350,6 +2389,12 @@
 
   $("#close-settings")?.addEventListener("click", () => settingsDialog.close());
   $("#cancel-settings")?.addEventListener("click", () => settingsDialog.close());
+  $("#open-version-log")?.addEventListener("click", () => {
+    void openDocumentationFile("VERSIONS.md", "Version log");
+  });
+  $("#open-app-documentation")?.addEventListener("click", () => {
+    void openDocumentationFile("DOCUMENTATION.md", "Documentation");
+  });
 
   $("#log-capture-level")?.addEventListener("change", async (e) => {
     const level = e.target.value;

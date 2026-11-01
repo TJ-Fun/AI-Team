@@ -116,10 +116,11 @@
 .restart-status.error,.update-status.error{background:#fde3df;color:#9b382c}
 .restart-status.info,.update-status.info{background:#f3f6ed;color:#777344}
 
-.settings-dialog{width:min(920px,calc(100vw - 32px));max-width:920px;max-height:92vh;overflow:hidden}
-.settings-shell{display:flex;flex-direction:column;max-height:92vh;padding:24px}
-.settings-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin:16px 0 12px;padding-bottom:1px}
-.settings-tab{flex:none;padding:10px 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:#727a70;font:600 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.settings-dialog{width:min(920px,calc(100vw - 32px));max-width:920px;height:min(88vh,780px);max-height:92vh;overflow:hidden}
+.settings-shell{display:flex;flex-direction:column;height:100%;min-height:0;padding:24px}
+.settings-shell>.dialog-heading,.settings-footer{flex:0 0 auto}
+.settings-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;flex:0 0 auto;border-bottom:1px solid var(--line);margin:16px 0 12px;padding-bottom:1px}
+.settings-tab{min-width:0;padding:10px 7px;border:0;border-bottom:2px solid transparent;background:transparent;color:#727a70;font:600 12px system-ui,sans-serif;cursor:pointer;white-space:normal;overflow-wrap:anywhere}
 .settings-tab:hover{color:var(--green);background:#f7f8f5}
 .settings-tab[aria-selected="true"]{border-bottom-color:var(--green);color:var(--green);background:#f4f8f3}
 .settings-tab:focus-visible{outline:2px solid #94b395;outline-offset:-2px}
@@ -129,7 +130,15 @@
 .settings-inner-form>.dialog-heading{margin:8px 0 12px}
 .settings-inner-form .dialog-actions{margin-top:16px}
 .settings-footer{margin-top:12px}
-.settings-restart-section .danger{margin-left:0}
+.settings-section label:not(.log-control-label){display:flex;flex-direction:column;gap:7px;margin:14px 0;color:#596157;font-size:12px;font-weight:600}
+.settings-section input:not([type="checkbox"]),.settings-section select,.settings-section textarea{width:100%;border:1px solid #dfe4dc;border-radius:8px;padding:10px 11px;background:#fff;color:var(--ink);font:13px/1.5 system-ui,sans-serif;outline:0}
+.settings-section input:not([type="checkbox"]):focus,.settings-section select:focus,.settings-section textarea:focus{border-color:#94b395;box-shadow:0 0 0 3px #edf4ec}
+.settings-section input[readonly]{background:#f4f5f2;color:#697168}
+.settings-section #restart-app{margin:10px 0 0 8px;vertical-align:middle}
+.settings-section #update-app{margin-right:4px}
+.about-content{max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #e9ece6;border-radius:8px;padding:12px;background:#fff;color:#596157;font:11px/1.6 ui-monospace,monospace}
+.about-project-link{display:inline-block;margin-top:10px;color:var(--green);font-size:11px;font-weight:650}
+.about-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .statistics-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
 .statistics-card{display:flex;flex-direction:column;gap:4px;border:1px solid #e6ebe3;border-radius:9px;padding:12px;background:#fafbf9}
 .statistics-card span{font-size:10px;font-weight:650;color:#778174}
@@ -141,9 +150,9 @@
 .header-tools>#open-settings,.header-tools>#open-statistics{white-space:nowrap}
 @media(max-width:720px){
   .settings-shell{padding:16px}
-  .settings-dialog{width:calc(100vw - 20px);max-height:94vh}
-  .settings-shell{max-height:94vh}
+  .settings-dialog{width:calc(100vw - 20px);height:90vh;max-height:94vh}
   .settings-tabs{margin-top:12px}
+  .settings-tab{padding:9px 4px;font-size:10px}
   .statistics-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
   .statistics-card{padding:9px}
   .statistics-card strong{font-size:17px}
@@ -152,7 +161,8 @@
   .statistics-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
   .statistics-card{display:flex;align-items:flex-start}
   .statistics-card small{grid-column:1/-1}
-  .settings-tab{padding:9px 11px;font-size:11px}
+  .settings-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .settings-tab{padding:9px 3px;font-size:10px}
   .header-tools{justify-content:flex-start}
   .header-tools>#open-settings,.header-tools>#open-statistics{padding:8px 10px}
 }
