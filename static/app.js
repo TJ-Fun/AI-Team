@@ -1454,7 +1454,6 @@
   });
 
   // --- Connections Dialog ---
-  const connectionsDialog = $("#connections-dialog");
   const connectionsForm = $("#connections-form");
 
   function isProviderConnected(providerName) {
@@ -1558,17 +1557,6 @@
     renderConnectionsAndRouting();
   }
 
-  $("#open-connections")?.addEventListener("click", async () => {
-    $("#connections-error").textContent = "";
-    setConnectionsSuccess("");
-    try {
-      await reloadSettingsData();
-      if (!connectionsDialog.open) connectionsDialog.showModal();
-    } catch (err) {
-      alert(`Could not load connections: ${err.message}`);
-    }
-  });
-
   $("#connection-list")?.addEventListener("click", async (e) => {
     const saveBtn = e.target.closest("[data-save-conn]");
     if (saveBtn) {
@@ -1671,8 +1659,7 @@
     }
   });
 
-  $("#close-connections")?.addEventListener("click", () => connectionsDialog.close());
-  $("#cancel-connections")?.addEventListener("click", () => connectionsDialog.close());
+  $("#cancel-connections")?.addEventListener("click", () => $("#settings-dialog").close());
 
   connectionsForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1682,7 +1669,7 @@
         method: "POST",
         body: JSON.stringify({ routing: state.routing }),
       });
-      connectionsDialog.close();
+      $("#settings-dialog").close();
       await refreshBoard();
     } catch (err) {
       $("#connections-error").textContent = err.message;
@@ -1690,7 +1677,6 @@
   });
 
   // --- Projects & Sub-projects Dialog ---
-  const projectsDialog = $("#projects-dialog");
   const projectsForm = $("#projects-form");
   let projectDrafts = [];
 
@@ -1925,47 +1911,42 @@
     }
   });
 
-  $("#open-projects")?.addEventListener("click", async () => {
+  async function loadProjectsIntoSettings() {
     $("#projects-error").textContent = "";
-    try {
-      const res = await api("/api/projects");
-      const list = res.projects || [];
-      api("/api/connections/github/repositories", { method: "POST", body: "{}" })
-        .then((r) => {
-          $("#github-repo-options").innerHTML = (r.repositories || [])
-            .map(
-              (repo) =>
-                `<option value="${escapeHtml(repo.clone_url)}">${escapeHtml(repo.full_name)}${
-                  repo.private ? " · private" : ""
-                }</option>`
-            )
-            .join("");
-        })
-        .catch(() => {});
+    const res = await api("/api/projects");
+    const list = res.projects || [];
+    api("/api/connections/github/repositories", { method: "POST", body: "{}" })
+      .then((r) => {
+        $("#github-repo-options").innerHTML = (r.repositories || [])
+          .map(
+            (repo) =>
+              `<option value="${escapeHtml(repo.clone_url)}">${escapeHtml(repo.full_name)}${
+                repo.private ? " · private" : ""
+              }</option>`
+          )
+          .join("");
+      })
+      .catch(() => {});
 
-      projectDrafts = await Promise.all(
-        list.map(async (p) => {
-          const hist = await fetchProjectHistory(p.id);
-          return {
-            id: p.id || "",
-            name: p.name || "",
-            repository: p.repository || "",
-            local_path: p.local_path || "",
-            context: p.context || "",
-            modulesText: (p.modules || [])
-              .map((m) => `${m.name} | ${m.path || ""} | ${m.context || ""}`)
-              .join("\n"),
-            history: hist,
-            selectedVersion: hist[0]?.id || "",
-          };
-        })
-      );
-      renderProjectEditors();
-      if (!projectsDialog.open) projectsDialog.showModal();
-    } catch (err) {
-      alert(`Could not load projects: ${err.message}`);
-    }
-  });
+    projectDrafts = await Promise.all(
+      list.map(async (p) => {
+        const hist = await fetchProjectHistory(p.id);
+        return {
+          id: p.id || "",
+          name: p.name || "",
+          repository: p.repository || "",
+          local_path: p.local_path || "",
+          context: p.context || "",
+          modulesText: (p.modules || [])
+            .map((m) => `${m.name} | ${m.path || ""} | ${m.context || ""}`)
+            .join("\n"),
+          history: hist,
+          selectedVersion: hist[0]?.id || "",
+        };
+      })
+    );
+    renderProjectEditors();
+  }
 
   $("#add-project")?.addEventListener("click", () => {
     projectDrafts.push({
@@ -1980,8 +1961,7 @@
     renderProjectEditors();
   });
 
-  $("#close-projects")?.addEventListener("click", () => projectsDialog.close());
-  $("#cancel-projects")?.addEventListener("click", () => projectsDialog.close());
+  $("#cancel-projects")?.addEventListener("click", () => $("#settings-dialog").close());
 
   projectsForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -2015,7 +1995,7 @@
         method: "PUT",
         body: JSON.stringify({ projects: payload }),
       });
-      projectsDialog.close();
+      $("#settings-dialog").close();
       await refreshBoard();
     } catch (err) {
       $("#projects-error").textContent = err.message;
@@ -2085,6 +2065,35 @@
       }),
       { requests: 0, replies: 0, seconds: 0, timedReplies: 0 }
     );
+    $("#stats-total-requests").textContent = String(total.requests);
+    $("#stats-success-rate").textContent = total.requests
+      ? `${Math.round((total.replies / total.requests) * 100)}%`
+      : "—";
+    $("#stats-success-detail").textContent = total.requests
+      ? `${total.replies} successful ${total.replies === 1 ? "reply" : "replies"} of ${total.requests} requests`
+      : "No requests in this period";
+    $("#stats-average-time").textContent = formatDuration(
+      total.timedReplies ? total.seconds / total.timedReplies : null
+    );
+    const qRows = state.qualityRows || [];
+    const scoredOutcomes = qRows.reduce(
+      (acc, row) => {
+        const measured = Number(row.measured) || 0;
+        const rate = Number(row.qa_pass_rate);
+        if (measured > 0 && Number.isFinite(rate)) {
+          acc.measured += measured;
+          acc.passed += (rate / 100) * measured;
+        }
+        return acc;
+      },
+      { measured: 0, passed: 0 }
+    );
+    $("#stats-qa-pass-rate").textContent = scoredOutcomes.measured
+      ? `${Math.round((scoredOutcomes.passed / scoredOutcomes.measured) * 100)}%`
+      : "—";
+    $("#stats-qa-detail").textContent = scoredOutcomes.measured
+      ? `${scoredOutcomes.measured} scored deliverable checks · all time`
+      : "No scored deliverable checks yet";
 
     const cells = (m) => `
       <span>${m.requests} ${m.requests === 1 ? "request" : "requests"}</span>
@@ -2109,7 +2118,6 @@
         )
         .join("");
 
-    const qRows = state.qualityRows || [];
     $("#provider-quality-rows").innerHTML = qRows.length
       ? `<div class="quality-head"><span>Role / provider</span><span>Requests / replies</span><span>QA pass</span><span>Errors</span><span>Avg time</span></div>` +
         qRows
@@ -2272,10 +2280,60 @@
 
   // --- Settings Dialog ---
   const settingsDialog = $("#settings-dialog");
-  const settingsForm = $("#settings-form");
+  let loadedSettingsTabs = new Set();
+
+  async function switchSettingsTab(tabName, focusTab = false) {
+    const validTabs = ["projects", "connections", "logs", "app"];
+    const tab = validTabs.includes(tabName) ? tabName : "app";
+    document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+      const selected = button.dataset.settingsTab === tab;
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+      if (selected && focusTab) button.focus();
+    });
+    document.querySelectorAll(".settings-tab-panel").forEach((panel) => {
+      panel.hidden = panel.id !== `settings-panel-${tab}`;
+    });
+    localStorage.setItem("ai_team_settings_tab", tab);
+    $("#settings-error").textContent = "";
+    if (tab === "projects" && !loadedSettingsTabs.has(tab)) {
+      try {
+        await loadProjectsIntoSettings();
+        loadedSettingsTabs.add(tab);
+      } catch (err) {
+        $("#settings-error").textContent = `Could not load projects: ${err.message}`;
+      }
+    } else if (tab === "connections" && !loadedSettingsTabs.has(tab)) {
+      $("#connections-error").textContent = "";
+      setConnectionsSuccess("");
+      try {
+        await reloadSettingsData();
+        loadedSettingsTabs.add(tab);
+      } catch (err) {
+        $("#settings-error").textContent = `Could not load connections: ${err.message}`;
+      }
+    }
+  }
+
+  document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+    button.addEventListener("click", () => void switchSettingsTab(button.dataset.settingsTab));
+    button.addEventListener("keydown", (event) => {
+      const tabs = [...document.querySelectorAll("[data-settings-tab]")];
+      const index = tabs.indexOf(button);
+      let nextIndex = index;
+      if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+      else if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = tabs.length - 1;
+      else return;
+      event.preventDefault();
+      void switchSettingsTab(tabs[nextIndex].dataset.settingsTab, true);
+    });
+  });
 
   $("#open-settings")?.addEventListener("click", async () => {
     $("#settings-error").textContent = "";
+    loadedSettingsTabs = new Set();
     try {
       const res = await api("/api/settings/config");
       const config = res.config || {};
@@ -2284,9 +2342,10 @@
       $("#app-working-dir").value = config.app_working_dir || "";
       $("#log-capture-level").value = config.log_level || "INFO";
     } catch (err) {
-      console.error("Failed to load app config:", err);
+      $("#settings-error").textContent = `Could not load app configuration: ${err.message}`;
     }
     if (!settingsDialog.open) settingsDialog.showModal();
+    await switchSettingsTab(localStorage.getItem("ai_team_settings_tab") || "app");
   });
 
   $("#close-settings")?.addEventListener("click", () => settingsDialog.close());

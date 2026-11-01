@@ -115,3 +115,44 @@
 .restart-status.success,.update-status.success{background:#e3f3e6;color:#286b39}
 .restart-status.error,.update-status.error{background:#fde3df;color:#9b382c}
 .restart-status.info,.update-status.info{background:#f3f6ed;color:#777344}
+
+.settings-dialog{width:min(920px,calc(100vw - 32px));max-width:920px;max-height:92vh;overflow:hidden}
+.settings-shell{display:flex;flex-direction:column;max-height:92vh;padding:24px}
+.settings-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin:16px 0 12px;padding-bottom:1px}
+.settings-tab{flex:none;padding:10px 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:#727a70;font:600 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.settings-tab:hover{color:var(--green);background:#f7f8f5}
+.settings-tab[aria-selected="true"]{border-bottom-color:var(--green);color:var(--green);background:#f4f8f3}
+.settings-tab:focus-visible{outline:2px solid #94b395;outline-offset:-2px}
+.settings-tab-panel{flex:1 1 auto;min-height:0;overflow-y:auto;padding:0 3px 4px 0}
+.settings-tab-panel[hidden]{display:none}
+.settings-inner-form{width:auto;max-height:none;overflow:visible;padding:0}
+.settings-inner-form>.dialog-heading{margin:8px 0 12px}
+.settings-inner-form .dialog-actions{margin-top:16px}
+.settings-footer{margin-top:12px}
+.settings-restart-section .danger{margin-left:0}
+.statistics-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.statistics-card{display:flex;flex-direction:column;gap:4px;border:1px solid #e6ebe3;border-radius:9px;padding:12px;background:#fafbf9}
+.statistics-card span{font-size:10px;font-weight:650;color:#778174}
+.statistics-card strong{font-size:21px;line-height:1.2;color:#3e6548}
+.statistics-card small{font-size:9px;line-height:1.4;color:#929990}
+.statistics-content>.stat-period-label{margin:12px 0 0}
+.statistics-content .provider-statistics{margin-top:10px}
+.header-tools{min-width:0}
+.header-tools>#open-settings,.header-tools>#open-statistics{white-space:nowrap}
+@media(max-width:720px){
+  .settings-shell{padding:16px}
+  .settings-dialog{width:calc(100vw - 20px);max-height:94vh}
+  .settings-shell{max-height:94vh}
+  .settings-tabs{margin-top:12px}
+  .statistics-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .statistics-card{padding:9px}
+  .statistics-card strong{font-size:17px}
+}
+@media(max-width:520px){
+  .statistics-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .statistics-card{display:flex;align-items:flex-start}
+  .statistics-card small{grid-column:1/-1}
+  .settings-tab{padding:9px 11px;font-size:11px}
+  .header-tools{justify-content:flex-start}
+  .header-tools>#open-settings,.header-tools>#open-statistics{padding:8px 10px}
+}
