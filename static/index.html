@@ -58,17 +58,17 @@
 
     <section class="chat-panel panel">
       <div class="section-heading chat-heading">
-        <div><p class="eyebrow">AI CHAT</p><h2>Orchestrator chat</h2></div>
-        <div class="chat-tools"><span class="local-badge" id="chat-provider-label">Hosted AI</span><button class="secondary clear-chat" id="clear-chat" type="button">Clear conversation</button></div>
+        <div><p class="eyebrow">AI CHAT</p><h2>PM/PO chat</h2></div>
+        <div class="chat-tools"><select class="chat-provider-menu" id="chat-provider-menu" aria-label="Chat AI provider"></select><button class="secondary clear-chat" id="clear-chat" type="button">Clear conversation</button></div>
       </div>
-      <div class="chat-notice">Use Orchestrator chat for discussion, or send a project request to PM/PO. PM/PO returns clarification cards or a draft backlog; no work task starts until you mark it Ready.</div>
+      <div class="chat-notice">Chat with the PM/PO agent about this project. Each project has its own conversation and context; ask it to clarify requirements or propose work, then create tasks from the board.</div>
       <div class="messages" id="messages" aria-live="polite"></div>
       <form id="chat-form" class="chat-form">
-        <label class="sr-only" for="chat-input">Message the Orchestrator</label>
-        <textarea id="chat-input" rows="2" placeholder="Ask the Orchestrator…" maxlength="12000" required></textarea>
-        <div class="chat-actions"><button class="secondary plan-button" id="pm-button" type="button">Send to PM/PO</button><button class="primary send-button" id="send-button" type="submit" aria-label="Send message">↑</button></div>
+        <label class="sr-only" for="chat-input">Message the PM/PO agent</label>
+        <textarea id="chat-input" rows="2" placeholder="Ask the PM/PO…" maxlength="12000" required></textarea>
+        <div class="chat-actions"><button class="primary send-button" id="send-button" type="submit" aria-label="Send message">↑</button></div>
       </form>
-      <p class="hint">Enter sends to Orchestrator · Shift+Enter for a new line · use Send to PM/PO for a project request</p>
+      <p class="hint">Enter sends · Shift+Enter for a new line</p>
     </section>
   </main>
 

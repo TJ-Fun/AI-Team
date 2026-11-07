@@ -1,12 +1,12 @@
 # Personal AI Team — Project Documentation
 
-Version 0.27 · Updated 2026-11-01
+Version 0.28 · Updated 2026-11-07
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
 ## 1. Overview
 
-Personal AI Team is a self-hosted web application for managing a project task board and coordinating AI-assisted work. It has a Python standard-library HTTP server, a browser interface written in HTML/CSS/JavaScript, a provider-backed Orchestrator chat, configurable external AI providers, and optional GitHub repository operations.
+Personal AI Team is a self-hosted web application for managing a project task board and coordinating AI-assisted work. It has a Python standard-library HTTP server, a browser interface written in HTML/CSS/JavaScript, a provider-backed PM/PO chat, configurable external AI providers, and optional GitHub repository operations.
 
 The application is intended for a trusted, single-user environment. The default listener is `127.0.0.1:8765`; it does not provide user accounts or an authentication layer. Keep it bound to loopback or put it behind an appropriately authenticated reverse proxy. Do not expose the port directly to the public internet.
 
@@ -45,14 +45,14 @@ The supplied service runs as the unprivileged `ubuntu` user, uses `ProtectSystem
 4. User-created tasks remain drafts until reviewed and marked Ready. PM/PO-proposed work tasks enter the Ready queue automatically; their project-overview documents still require user approval. Deliverable work requires acceptance checks before it can enter the agent queue.
 5. Follow status, attempts, agent replies, validation results, and activity from the board/task details. Browser polling refreshes board and runtime status.
 
-### 4.2 Orchestrator and PM/PO
+### 4.2 PM/PO chat
 
-The Orchestrator chat runs on a hosted AI provider selected in **Settings → Routing → Chat window** (Gemini, GroqCloud, or OpenRouter). Each project has its own chat history, and every message includes the active project's context documents and task board, so conversations stay scoped to the selected project. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a backlog. Valid proposed work tasks enter the queue automatically; project-overview documents remain pending user approval. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data. PM/PO plans must follow the JSON schema supplied with the request; unknown sub-project IDs are safely assigned to the whole project rather than rejecting the entire plan.
+The chat panel is a direct conversation with the PM/PO agent, running on a hosted provider selected in the chat header dropdown (also configurable in **Settings → Routing → Chat window**; Gemini, GroqCloud, or OpenRouter). Each project has its own chat history, and every message includes the active project's context documents and task board, so conversations stay scoped to the selected project. PM/PO may ask clarification questions or propose a backlog; proposed work tasks are created from the board and remain Draft until marked Ready. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data. PM/PO plans must follow the JSON schema supplied with planning requests; unknown sub-project IDs are safely assigned to the whole project rather than rejecting the entire plan.
 
 ### 4.3 Provider connections and routing
 
 1. Open **Settings → Connections** to add, replace, test, or clear provider credentials. Supported connection families are Gemini, GroqCloud, OpenRouter, and the GitHub repository connector.
-2. Open **Settings → Routing** to set provider rank order per work role and to choose the provider used by the Orchestrator chat. Unavailable providers are skipped by the dispatcher. The QA role uses its own routing order.
+2. Open **Settings → Routing** to set provider rank order per work role and to choose the provider used by the PM/PO chat. Unavailable providers are skipped by the dispatcher. The QA role uses its own routing order.
 3. A task can request automatic selection or a specific provider. Provider attempts and quality outcomes feed the Statistics view. Tasks entering **Needs validation** are sent to QA automatically. QA reviews the acceptance checks, original agent reply, and available repository evidence without modifying files or claiming to run tests. A failed review returns the task to its original work role automatically. After three failed QA reviews the task becomes **Blocked** for user intervention; manually returning it to Ready resets the QA-failure count. Task creation and status transitions are always written to `TEAM_DATA_DIR/logs/activity.jsonl` and to `app.log` when the configured capture level includes INFO. Agent reply text is saved under `TEAM_DATA_DIR/replies/<task_id>/<provider>/` and shown in task details; `app.log` records when that reply file is saved, not the full reply body.
 
 ### 4.4 GitHub repository work

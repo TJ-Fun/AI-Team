@@ -126,15 +126,32 @@
   }
 
   // --- Header & Status ---
+  function chatProviderOptions(selected) {
+    const providers = state.routingProviders.length ? state.routingProviders : ["Gemini", "GroqCloud", "OpenRouter"];
+    const known = state.connections.length > 0;
+    return providers
+      .map(
+        (opt) =>
+          `<option value="${escapeHtml(opt)}"${opt === selected ? " selected" : ""}>${escapeHtml(opt)}${
+            known && !isProviderConnected(opt) ? " · not connected" : ""
+          }</option>`
+      )
+      .join("");
+  }
+
   async function loadConfig() {
     const dot = $("#model-dot") || $(".model-chip .status-dot");
     const nameEl = $("#model-name");
-    const labelEl = $("#chat-provider-label");
+    const menu = $("#chat-provider-menu");
     try {
       const cfg = await api("/api/config");
       const provider = cfg.chat_provider || "Gemini";
+      state.chatProvider = provider;
+      if (Array.isArray(cfg.providers) && cfg.providers.length) {
+        state.routingProviders = cfg.providers;
+      }
       nameEl.textContent = `Chat · ${provider}`;
-      if (labelEl) labelEl.textContent = `${provider} · ${cfg.chat_model || ""}`.trim();
+      if (menu) menu.innerHTML = chatProviderOptions(provider);
       dot?.classList.toggle("offline", cfg.chat_configured === false);
     } catch {
       nameEl.textContent = "AI chat";
@@ -1596,20 +1613,32 @@
   }
 
   function renderChatProviderSelect() {
+    const options = chatProviderOptions(state.chatProvider);
     const sel = $("#chat-provider-select");
-    if (!sel) return;
-    sel.innerHTML = state.routingProviders
-      .map(
-        (opt) =>
-          `<option value="${escapeHtml(opt)}"${opt === state.chatProvider ? " selected" : ""}>${escapeHtml(opt)}${
-            !isProviderConnected(opt) ? " · not connected" : ""
-          }</option>`
-      )
-      .join("");
+    if (sel) sel.innerHTML = options;
+    const menu = $("#chat-provider-menu");
+    if (menu) menu.innerHTML = options;
   }
 
   $("#chat-provider-select")?.addEventListener("change", (e) => {
     state.chatProvider = e.target.value;
+    const menu = $("#chat-provider-menu");
+    if (menu) menu.innerHTML = chatProviderOptions(state.chatProvider);
+  });
+
+  $("#chat-provider-menu")?.addEventListener("change", async (e) => {
+    const provider = e.target.value;
+    state.chatProvider = provider;
+    const sel = $("#chat-provider-select");
+    if (sel) sel.innerHTML = chatProviderOptions(provider);
+    try {
+      await api("/api/routing", {
+        method: "POST",
+        body: JSON.stringify({ chat_provider: provider }),
+      });
+    } catch (err) {
+      alert(`Could not save chat provider: ${err.message}`);
+    }
   });
 
   async function reloadSettingsData() {
@@ -2244,7 +2273,7 @@
       .map(
         (m) => `
         <div class="message ${m.role === "user" ? "user-message" : "assistant-message"}">
-          <div class="message-role">${m.role === "user" ? "You" : `Orchestrator${m.provider ? ` · ${escapeHtml(m.provider)}` : ""}`}</div>
+          <div class="message-role">${m.role === "user" ? "You" : `PM/PO${m.provider ? ` · ${escapeHtml(m.provider)}` : ""}`}</div>
           <div class="message-content">${escapeHtml(m.content)}</div>
         </div>`
       )
@@ -2273,9 +2302,8 @@
     if (!text) return;
     chatInput.value = "";
     $("#send-button").disabled = true;
-    $("#pm-button").disabled = true;
     chatMessages = [...chatMessages, { role: "user", content: text }];
-    renderChatMessages(chatMessages, "Orchestrator is thinking…");
+    renderChatMessages(chatMessages, "PM/PO is thinking…");
     try {
       const res = await api("/api/chat", {
         method: "POST",
@@ -2288,7 +2316,6 @@
       renderChatMessages(chatMessages);
     } finally {
       $("#send-button").disabled = false;
-      $("#pm-button").disabled = false;
       chatInput.focus();
     }
   });
@@ -2300,34 +2327,8 @@
     }
   });
 
-  $("#pm-button")?.addEventListener("click", async () => {
-    const text = chatInput.value.trim();
-    if (!text) {
-      alert("Describe the project request first.");
-      return;
-    }
-    $("#send-button").disabled = true;
-    $("#pm-button").disabled = true;
-    renderChatMessages(chatMessages, "Sending the project request to PM/PO…");
-    try {
-      await api("/api/pm-requests", {
-        method: "POST",
-        body: JSON.stringify({ request: text, project_id: state.activeProjectId }),
-      });
-      chatInput.value = "";
-      await Promise.all([loadChat(), refreshBoard()]);
-    } catch (err) {
-      renderChatMessages(chatMessages);
-      alert(`Could not send the request to PM/PO: ${err.message}`);
-    } finally {
-      $("#send-button").disabled = false;
-      $("#pm-button").disabled = false;
-      chatInput.focus();
-    }
-  });
-
   $("#clear-chat")?.addEventListener("click", async () => {
-    if (!confirm("Clear the saved Orchestrator conversation? This keeps all tasks and agent reply files.")) {
+    if (!confirm("Clear the saved PM/PO conversation? This keeps all tasks and agent reply files.")) {
       return;
     }
     try {

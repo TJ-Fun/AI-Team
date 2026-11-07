@@ -1,5 +1,12 @@
 # Version log
 
+## 0.28 — 2026-11-07
+
+- Turned the chat panel into a direct PM/PO agent conversation with a provider dropdown in the chat header.
+- Removed the Send to PM/PO button; planning requests are now handled conversationally and tasks are created from the board.
+- Fit all six Settings tabs on one row with smaller tab styling.
+- Updated the documentation for the PM/PO chat.
+
 ## 0.27 — 2026-11-01
 
 - Removed the local Ollama runtime; the Orchestrator chat now runs on a hosted provider (Gemini, GroqCloud, or OpenRouter) selected in Settings → Routing → Chat window.

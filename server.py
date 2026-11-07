@@ -3515,9 +3515,11 @@ def chat_system_prompt(project_id: str) -> str:
     return "\n\n".join(
         p
         for p in [
-            load_prompt("shared_rules"),
-            load_prompt("orchestrator"),
-            project_context_for_role("Orchestrator", {"project_id": project_id}),
+            combined_agent_prompt("PM/PO"),
+            "Chat mode: you are talking directly with the user in a chat window, not processing a formal planning request. "
+            "Answer conversationally in clear markdown. Do not return the planning JSON schema unless the user explicitly asks you to produce a plan; "
+            "when they do, remind them that plans become tasks when created from the board.",
+            project_context_for_role("PM/PO", {"project_id": project_id}),
             f"Current task board (read-only context):\n{board_text}",
         ]
         if p
@@ -4026,7 +4028,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/routing":
             try:
-                routing = save_routing(body.get("routing"))
+                routing = None
+                if "routing" in body:
+                    routing = save_routing(body.get("routing"))
                 chat_provider = body.get("chat_provider")
                 if chat_provider is not None:
                     chat_provider = str(chat_provider).strip()
@@ -4035,7 +4039,9 @@ class Handler(BaseHTTPRequestHandler):
                     save_app_config({"chat_provider": chat_provider})
                 append_event({"at": now_iso(), "type": "routing_updated"})
                 DISPATCH_EVENT.set()
-                return self.send_json({"routing": routing, "chat_provider": get_chat_provider()})
+                return self.send_json(
+                    {"routing": routing if routing is not None else get_routing(), "chat_provider": get_chat_provider()}
+                )
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
