@@ -40,17 +40,9 @@ DOCUMENTATION_DIR = ROOT / "documentation"
 HOST = os.environ.get("TEAM_HOST", "127.0.0.1")
 PORT = int(os.environ.get("TEAM_PORT", "8765"))
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "orchestrator").strip() or "orchestrator"
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openrouter/free").strip() or "openrouter/free"
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b").strip() or "openai/gpt-oss-20b"
-_RAW_ANTIGRAVITY_AGENT = os.environ.get("ANTIGRAVITY_AGENT", "").strip()
-ANTIGRAVITY_AGENT = (
-    "antigravity-preview-09-2026"
-    if not _RAW_ANTIGRAVITY_AGENT or _RAW_ANTIGRAVITY_AGENT == "antigravity"
-    else _RAW_ANTIGRAVITY_AGENT
-)
 HTTP_USER_AGENT = os.environ.get("TEAM_USER_AGENT", "Personal-AI-Team/1.0").strip() or "Personal-AI-Team/1.0"
 LOG_LEVELS = {
     "DEBUG": logging.DEBUG,
@@ -73,16 +65,16 @@ WORK_ROLES = [
     "Documentation",
 ]
 
-PROVIDERS = ["Gemini", "Antigravity", "GroqCloud", "OpenRouter"]
+PROVIDERS = ["Gemini", "GroqCloud", "OpenRouter"]
 TASK_PROVIDERS = ["Automatic", *PROVIDERS]
 
 ROUTING_DEFAULTS: dict[str, list[str]] = {
-    "PM/PO": ["Gemini", "GroqCloud", "Antigravity", "OpenRouter"],
-    "Frontend developer": ["Antigravity", "Gemini", "GroqCloud", "OpenRouter"],
-    "Backend developer": ["Antigravity", "Gemini", "GroqCloud", "OpenRouter"],
-    "QA": ["GroqCloud", "Gemini", "Antigravity", "OpenRouter"],
-    "UI designer": ["Gemini", "Antigravity", "GroqCloud", "OpenRouter"],
-    "Documentation": ["Gemini", "Antigravity", "GroqCloud", "OpenRouter"],
+    "PM/PO": ["Gemini", "GroqCloud", "OpenRouter"],
+    "Frontend developer": ["Gemini", "GroqCloud", "OpenRouter"],
+    "Backend developer": ["Gemini", "GroqCloud", "OpenRouter"],
+    "QA": ["GroqCloud", "Gemini", "OpenRouter"],
+    "UI designer": ["Gemini", "GroqCloud", "OpenRouter"],
+    "Documentation": ["Gemini", "GroqCloud", "OpenRouter"],
 }
 
 PROMPT_FILES: dict[str, str] = {
@@ -104,7 +96,7 @@ PROJECT_CONTEXT_FILES: dict[str, str] = {
 }
 
 CONNECTION_SPECS: dict[str, tuple[str, str]] = {
-    "gemini": ("Gemini / Antigravity", "GEMINI_API_KEY"),
+    "gemini": ("Gemini", "GEMINI_API_KEY"),
     "groq": ("GroqCloud", "GROQ_API_KEY"),
     "openrouter": ("OpenRouter", "OPENROUTER_API_KEY"),
     "github": ("GitHub repository connector", "GITHUB_TOKEN"),
@@ -397,7 +389,7 @@ def get_provider_key(conn_id: str) -> str:
 def configured_providers() -> list[str]:
     result: list[str] = []
     if get_provider_key("gemini"):
-        result.extend(["Gemini", "Antigravity"])
+        result.append("Gemini")
     if get_provider_key("groq"):
         result.append("GroqCloud")
     if get_provider_key("openrouter"):
@@ -871,9 +863,14 @@ def project_context_for_role(role: str, task: dict[str, Any] | None = None) -> s
     return "\n\n".join(f"## {title}\n{body[:6000]}" for title, body in sections if body and body.strip())
 
 
-def read_chat_history() -> list[dict[str, Any]]:
+def chat_history_path(project_id: str) -> Path:
+    safe_id = re.sub(r"[^a-z0-9-]+", "-", str(project_id or "default").lower()).strip("-") or "default"
+    return DATA / "chat" / f"{safe_id}.json"
+
+
+def read_chat_history(project_id: str = "default") -> list[dict[str, Any]]:
     ensure_data()
-    p = DATA / "chat" / "orchestrator.json"
+    p = chat_history_path(project_id)
     if not p.is_file():
         return []
     try:
@@ -883,17 +880,17 @@ def read_chat_history() -> list[dict[str, Any]]:
         return []
 
 
-def write_chat_history(messages: list[dict[str, Any]]) -> None:
+def write_chat_history(messages: list[dict[str, Any]], project_id: str = "default") -> None:
     ensure_data()
     with STATE_LOCK:
-        atomic_json(DATA / "chat" / "orchestrator.json", messages)
+        atomic_json(chat_history_path(project_id), messages)
 
 
-def append_chat_notice(content: str, timestamp: str, task_id: str) -> None:
+def append_chat_notice(content: str, timestamp: str, task_id: str, project_id: str = "default") -> None:
     with STATE_LOCK:
-        hist = read_chat_history()
+        hist = read_chat_history(project_id)
         hist.append({"role": "assistant", "content": content, "at": timestamp, "task_id": task_id})
-        write_chat_history(hist)
+        write_chat_history(hist, project_id)
 
 
 def read_task_replies(task_id: str) -> list[dict[str, Any]]:
@@ -925,6 +922,8 @@ def task_provider(task: dict[str, Any]) -> str:
     if task.get("workflow_phase") == "qa":
         return provider_for_role(task, "QA", "qa_routing_cycle_start")
     val = str(task.get("provider", ""))
+    if val == "Antigravity":
+        val = "Automatic"
     configured = configured_providers()
     if val in PROVIDERS:
         return val if val in configured else ""
@@ -1977,61 +1976,10 @@ def sync_local_checkout_after_merge(task_id: str) -> bool:
             shutil.rmtree(staging_dir, ignore_errors=True)
 
 
-def github_postprocess_task(task_id: str, create_pr: bool = False) -> None:
+def github_postprocess_task(task_id: str) -> None:
     task = read_task(task_id)
     if not task:
         return
-    if (
-        create_pr
-        and task.get("task_type") != "pm_planning"
-        and task.get("assigned_role") in ("Frontend developer", "Backend developer", "Documentation")
-    ):
-        try:
-            project = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
-            if project and project.get("repository"):
-                owner, repo = repository_parts(project["repository"])
-                branch = f"ai-team/{task_id.lower()}"
-                existing_pulls = github_api(
-                    f"/repos/{owner}/{repo}/pulls?head={urllib.parse.quote(f'{owner}:{branch}', safe='')}&state=open"
-                )
-                if isinstance(existing_pulls, list) and existing_pulls:
-                    created = existing_pulls[0]
-                else:
-                    meta = github_api(f"/repos/{owner}/{repo}")
-                    created = github_api(
-                        f"/repos/{owner}/{repo}/pulls",
-                        "POST",
-                        {
-                            "title": f"{task_id}: {task.get('title', '')}"[:240],
-                            "head": branch,
-                            "base": meta.get("default_branch") or "main",
-                            "body": f"Automated change for {task_id}.\n\n{str(task.get('request', ''))[:4000]}",
-                            "draft": False,
-                        },
-                    )
-                latest = read_task(task_id)
-                if latest:
-                    latest["pull_request"] = {
-                        "number": int(created["number"]),
-                        "url": str(created.get("html_url", "")),
-                        "branch": branch,
-                        "state": str(created.get("state", "open")),
-                        "created_at": now_iso(),
-                    }
-                    latest.setdefault("activity", []).append(
-                        {"at": now_iso(), "type": "pull_request_created", "message": f"GitHub pull request #{created['number']} created."}
-                    )
-                    write_task(latest)
-                    append_event({"at": now_iso(), "task_id": task_id, "type": "pull_request_created", "pull_request": created["number"]})
-        except Exception as exc:
-            latest = read_task(task_id)
-            if latest:
-                msg = str(exc)[:500]
-                latest["github_error"] = msg
-                latest.setdefault("activity", []).append(
-                    {"at": now_iso(), "type": "github_error", "message": f"Could not create the pull request: {msg[:350]}"}
-                )
-                write_task(latest)
 
     refreshed = read_task(task_id)
     if not refreshed:
@@ -2325,40 +2273,6 @@ def get_provider_quality() -> list[dict[str, Any]]:
         )
     out.sort(key=lambda x: (x["role"], x["provider"]))
     return out
-
-
-def get_local_llm_usage() -> list[dict[str, Any]]:
-    log_path = DATA / "logs" / "activity.jsonl"
-    if not log_path.is_file():
-        return []
-    calls: list[dict[str, Any]] = []
-    pending: dict[str, Any] | None = None
-    for line in log_path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if not line.strip():
-            continue
-        try:
-            ev = json.loads(line)
-        except Exception:
-            continue
-        etype = ev.get("type")
-        if etype == "local_llm_request_started":
-            if pending:
-                calls.append(pending)
-            pending = {
-                "provider": ev.get("provider") or "Ollama",
-                "model": ev.get("model") or OLLAMA_MODEL,
-                "started_at": ev.get("at"),
-                "state": "in_progress",
-            }
-        elif etype in ("local_llm_reply", "local_llm_error") and pending:
-            pending["finished_at"] = ev.get("at")
-            pending["state"] = "succeeded" if etype == "local_llm_reply" else "failed"
-            pending["duration_seconds"] = ev.get("duration_seconds")
-            calls.append(pending)
-            pending = None
-    if pending:
-        calls.append(pending)
-    return calls
 
 
 def read_ai_stat_resets() -> list[dict[str, Any]]:
@@ -2789,8 +2703,7 @@ def build_repo_agent_instructions(task: dict[str, Any], provider: str) -> str:
     if task.get("qa_attempt_active"):
         return build_qa_review_instructions(task)
     if (
-        provider == "Antigravity"
-        or task.get("task_type") == "pm_planning"
+        task.get("task_type") == "pm_planning"
         or task.get("assigned_role") not in ("Frontend developer", "Backend developer", "Documentation")
     ):
         return ""
@@ -2869,316 +2782,6 @@ def normalize_github_repo_url(raw_repo: str) -> str:
     if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", cleaned):
         return f"https://github.com/{cleaned}"
     return cleaned
-
-
-def upsert_antigravity_credential(
-    api_key: str,
-    cred_id: str,
-    token: str,
-    header_name: str | None = None,
-    prefix: str | None = None,
-) -> bool:
-    if not api_key or not token:
-        return False
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": HTTP_USER_AGENT,
-        "x-goog-api-key": api_key,
-    }
-    payload: dict[str, Any] = {"type": "bearer_token", "token": token}
-    if header_name:
-        payload["header_name"] = header_name
-    if prefix is not None:
-        payload["prefix"] = prefix
-
-    patch_req = urllib.request.Request(
-        f"https://generativelanguage.googleapis.com/v1beta/credentials/{urllib.parse.quote(cred_id, safe='')}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="PATCH",
-    )
-    try:
-        with urllib.request.urlopen(patch_req, timeout=15) as resp:
-            resp.read()
-        return True
-    except urllib.error.HTTPError as exc:
-        if exc.code != 404:
-            return False
-    except Exception:
-        return False
-
-    post_req = urllib.request.Request(
-        "https://generativelanguage.googleapis.com/v1beta/credentials",
-        data=json.dumps({"id": cred_id, **payload}).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(post_req, timeout=15) as resp:
-            resp.read()
-        return True
-    except Exception:
-        return False
-
-
-def sync_antigravity_github_credentials(api_key: str, github_token: str) -> tuple[bool, bool]:
-    """Create or update Git Smart-HTTP Basic and GitHub REST API Bearer credentials for Antigravity."""
-    if not api_key or not github_token:
-        return False, False
-    basic_token = base64.b64encode(f"x-access-token:{github_token}".encode("utf-8")).decode("ascii")
-    git_basic_ok = upsert_antigravity_credential(
-        api_key,
-        "github-git-basic",
-        basic_token,
-        header_name="Authorization",
-        prefix="Basic",
-    )
-    api_bearer_ok = upsert_antigravity_credential(api_key, "github-api-bearer", github_token)
-    return git_basic_ok, api_bearer_ok
-
-
-def format_antigravity_error(status: int, raw_detail: str) -> str:
-    cleaned = str(raw_detail or "").strip()[:1300]
-    if status >= 500 and "internal error" in cleaned.lower():
-        return (
-            f"{cleaned} (Note: Antigravity managed agent requires a paid-tier Gemini API key with Cloud Billing enabled, "
-            "or the remote preview sandbox service encountered a transient internal error.)"
-        )
-    return cleaned
-
-
-def call_antigravity_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-    api_key = get_provider_key("gemini")
-    if not api_key:
-        raise ProviderFailure("Antigravity", 401, "Gemini / Antigravity API key is not configured.")
-    role = str(task.get("assigned_role") or "PM/PO")
-    proj = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
-    repository = normalize_github_repo_url(str((proj or {}).get("repository", "")))
-    is_repo_write_task = (
-        bool(repository)
-        and task.get("task_type") != "pm_planning"
-        and role in ("Frontend developer", "Backend developer", "Documentation")
-    )
-
-    sys_inst = combined_agent_prompt(role) + ("\n\n" + PM_PLANNING_CONTRACT if task.get("task_type") == "pm_planning" else "")
-    checks = task.get("acceptance_checks") or []
-
-    def build_input(with_mounted_repo: bool, fallback_snapshot: str = "") -> str:
-        text = (
-            f"Role & operating rules:\n{sys_inst}\n\n---\n\n"
-            + f"Task ID: {task['id']}\nRole: {role}\nTask request:\n{task.get('request', '')}\n\n"
-            + "Acceptance checks:\n"
-            + ("\n".join(f"- {c}" for c in checks) if checks else "- None specified")
-            + f"\n\nProject context:\n{project_context_for_role(role, task)}"
-        )
-        if task.get("task_type") == "pm_planning":
-            text += "\n\n" + PM_PLANNING_CONTRACT
-        if task.get("qa_attempt_active"):
-            text += build_qa_review_instructions(task)
-        if repository and with_mounted_repo:
-            if is_repo_write_task:
-                mod = next((m for m in (proj or {}).get("modules", []) if m.get("id") == task.get("module_id")), None)
-                branch = f"ai-team/{task['id'].lower()}"
-                folder = str((mod or {}).get("path", ""))
-                text += (
-                    f"\n\nRepository task instructions: Your repository is mounted at /workspace/project. "
-                    f"Work only in {folder or 'the repository root'} as relevant. Configure local git user.name and user.email if needed, "
-                    f"create and switch to branch {branch} (git checkout -B {branch}; never modify the default branch), "
-                    f"implement the requested changes, run available checks, commit finished changes, "
-                    f"and push {branch} to origin (git push -u origin {branch} --force-with-lease). Do not merge. "
-                    f"In your final response, state the branch name ({branch}), files changed, checks run and results, and any blockers."
-                )
-            else:
-                text += (
-                    f"\n\nRepository context note: The project repository is mounted read-only for reference at /workspace/project. "
-                    f"Inspect files if helpful, but do not create branches, commit, or push changes for this {role} task."
-                )
-        elif fallback_snapshot:
-            text += f"\n\nRepository snapshot (read-only context):\n{fallback_snapshot}"
-        return text
-
-    repo_env_spec: str | dict[str, Any] = "remote"
-    if repository:
-        env_obj: dict[str, Any] = {
-            "type": "remote",
-            "sources": [{"type": "inline", "target": ".agents/AGENTS.md", "content": sys_inst}],
-        }
-        if not task.get("qa_attempt_active"):
-            env_obj["sources"].append({"type": "repository", "source": repository, "target": "/workspace/project"})
-        github_token = get_provider_key("github")
-        if github_token:
-            git_basic_ok, api_bearer_ok = sync_antigravity_github_credentials(api_key, github_token)
-            basic_auth = base64.b64encode(f"x-access-token:{github_token}".encode("utf-8")).decode("ascii")
-            env_obj["network"] = {
-                "allowlist": [
-                    (
-                        {"domain": "github.com", "credential": "github-git-basic"}
-                        if git_basic_ok
-                        else {"domain": "github.com", "transform": {"Authorization": f"Basic {basic_auth}"}}
-                    ),
-                    (
-                        {"domain": "api.github.com", "credential": "github-api-bearer"}
-                        if api_bearer_ok
-                        else {"domain": "api.github.com", "transform": {"Authorization": f"Bearer {github_token}"}}
-                    ),
-                    {"domain": "*"},
-                ]
-            }
-        repo_env_spec = env_obj
-
-    create_url = "https://generativelanguage.googleapis.com/v1beta/interactions"
-    req_headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": HTTP_USER_AGENT,
-        "x-goog-api-key": api_key,
-    }
-
-    interaction: dict[str, Any] | None = None
-    last_failure: ProviderFailure | None = None
-    for attempt in range(1, 4):
-        use_mounted_repo = bool(repository) and not task.get("qa_attempt_active")
-        env_to_send: str | dict[str, Any] = repo_env_spec
-        fallback_snap = ""
-        if attempt == 3 and repository and not is_repo_write_task and not task.get("qa_attempt_active"):
-            use_mounted_repo = False
-            env_to_send = "remote"
-            try:
-                fallback_snap = github_task_context(task)
-            except Exception:
-                fallback_snap = ""
-        elif attempt == 3 and repository and is_repo_write_task and isinstance(repo_env_spec, dict):
-            env_to_send = {
-                **repo_env_spec,
-                "sources": [{"type": "repository", "source": repository, "target": "/workspace/project"}],
-            }
-
-        body: dict[str, Any] = {
-            "agent": ANTIGRAVITY_AGENT,
-            "input": build_input(use_mounted_repo, fallback_snap),
-            "environment": env_to_send,
-            "background": True,
-        }
-        req = urllib.request.Request(
-            create_url,
-            data=json.dumps(body).encode("utf-8"),
-            headers=req_headers,
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                interaction = json.loads(resp.read().decode("utf-8", errors="replace"))
-            last_failure = None
-            break
-        except urllib.error.HTTPError as exc:
-            raw_err = exc.read().decode("utf-8", errors="replace")
-            try:
-                err_detail = json.loads(raw_err).get("error", {}).get("message") or raw_err
-            except Exception:
-                err_detail = raw_err
-            last_failure = ProviderFailure(
-                "Antigravity",
-                exc.code,
-                format_antigravity_error(exc.code, str(err_detail)),
-                exc.headers.get("Retry-After"),
-            )
-            if exc.code >= 500 and attempt < 3:
-                time.sleep(attempt * 2.5)
-                continue
-            raise last_failure from exc
-        except Exception as exc:
-            last_failure = ProviderFailure("Antigravity", 503, str(exc)[:1000])
-            if attempt < 3:
-                time.sleep(attempt * 2.5)
-                continue
-            raise last_failure from exc
-
-    if interaction is None:
-        if last_failure is not None:
-            raise last_failure
-        raise ProviderFailure("Antigravity", 502, "Antigravity interaction could not be started.")
-
-    iid = interaction.get("id")
-    deadline = time.time() + 1800
-    while iid and interaction.get("status") in ("in_progress", "queued") and time.time() < deadline:
-        time.sleep(5)
-        poll_url = f"https://generativelanguage.googleapis.com/v1beta/interactions/{urllib.parse.quote(str(iid), safe='')}?stream=false"
-        poll_req = urllib.request.Request(
-            poll_url,
-            headers={
-                "Accept": "application/json",
-                "User-Agent": HTTP_USER_AGENT,
-                "x-goog-api-key": api_key,
-            },
-            method="GET",
-        )
-        try:
-            with urllib.request.urlopen(poll_req, timeout=30) as resp:
-                interaction = json.loads(resp.read().decode("utf-8", errors="replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403, 404):
-                raw_err = exc.read().decode("utf-8", errors="replace")[:1000]
-                raise ProviderFailure("Antigravity", exc.code, raw_err) from exc
-            continue
-        except Exception:
-            continue
-
-    status_val = str(interaction.get("status") or "")
-    if status_val in ("in_progress", "queued"):
-        raise ProviderFailure("Antigravity", 408, "Antigravity interaction timed out while still in progress.")
-    if status_val in ("failed", "cancelled", "budget_exceeded"):
-        errs = interaction.get("errors") or []
-        diag = "; ".join(
-            f"{e.get('code', '')}: {e.get('message', '')}".strip(": ")
-            for e in errs
-            if isinstance(e, dict) and (e.get("code") or e.get("message"))
-        )
-        raise ProviderFailure(
-            "Antigravity",
-            502,
-            f"Antigravity interaction {status_val}" + (f": {diag}" if diag else "."),
-        )
-
-    output = str(interaction.get("output_text") or "")
-    if not output.strip():
-        steps = interaction.get("steps") or []
-        trailing_parts: list[str] = []
-        collecting = False
-        for step in reversed(steps):
-            if not isinstance(step, dict):
-                continue
-            stype = step.get("type")
-            if stype == "user_input":
-                break
-            if stype == "thought":
-                continue
-            if stype != "model_output":
-                if collecting:
-                    break
-                continue
-            stop_outer = False
-            for c in reversed(step.get("content") or []):
-                if not isinstance(c, dict):
-                    continue
-                if c.get("type") == "text":
-                    collecting = True
-                    trailing_parts.append(str(c.get("text") or ""))
-                elif collecting:
-                    stop_outer = True
-                    break
-            if stop_outer:
-                break
-        output = "".join(reversed(trailing_parts))
-        if not output.strip():
-            for step in steps:
-                if isinstance(step, dict) and step.get("type") == "model_output":
-                    for c in step.get("content") or []:
-                        if isinstance(c, dict) and c.get("type") == "text":
-                            output += str(c.get("text") or "")
-    if not output.strip():
-        raise ProviderFailure("Antigravity", 400, "Antigravity returned no text output.")
-    return output.strip(), {"usage": interaction.get("usage"), "environment_id": interaction.get("environment_id")}
 
 
 def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[str, str, dict[str, Any]]:
@@ -3281,48 +2884,6 @@ def test_provider_connection(conn_id: str) -> dict[str, Any]:
             "provider": "GitHub",
             "login": login,
             "message": f"GitHub connected as {login}.",
-        }
-
-    if conn_id == "antigravity":
-        api_key = get_provider_key("gemini")
-        if not api_key:
-            raise ValueError("Gemini / Antigravity API key is not configured.")
-        req = urllib.request.Request(
-            "https://generativelanguage.googleapis.com/v1beta/interactions",
-            data=json.dumps(
-                {
-                    "agent": ANTIGRAVITY_AGENT,
-                    "input": "Reply with OK.",
-                    "environment": "remote",
-                    "background": True,
-                }
-            ).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": HTTP_USER_AGENT,
-                "x-goog-api-key": api_key,
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                created = json.loads(resp.read().decode("utf-8", errors="replace"))
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", errors="replace")
-            try:
-                detail = json.loads(raw).get("error", {}).get("message") or raw
-            except Exception:
-                detail = raw
-            raise ValueError(f"Antigravity HTTP {exc.code}: {format_antigravity_error(exc.code, str(detail))}") from exc
-        except Exception as exc:
-            raise ValueError(f"Antigravity request failed: {exc}") from exc
-        sid = str(created.get("id") or "")[:18]
-        return {
-            "connected": True,
-            "provider": "Antigravity",
-            "model": ANTIGRAVITY_AGENT,
-            "message": f"Antigravity connected (agent: {ANTIGRAVITY_AGENT}" + (f", session {sid}… started)." if sid else ")."),
         }
 
     if conn_id not in CONNECTION_SPECS:
@@ -3431,7 +2992,6 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         return None
     model_map = {
         "Gemini": GEMINI_MODEL,
-        "Antigravity": ANTIGRAVITY_AGENT,
         "GroqCloud": GROQ_MODEL,
         "OpenRouter": OPENROUTER_MODEL,
     }
@@ -3528,7 +3088,7 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         )
         task["status"] = "In progress"
         task["updated_at"] = ts
-        task["attempt_timeout_seconds"] = 3600 if provider == "Antigravity" else 900
+        task["attempt_timeout_seconds"] = DEFAULT_ATTEMPT_TIMEOUT_SECONDS
         task["dispatch_note"] = f"{provider} is working on this task."
         task.setdefault("activity", []).append(
             {
@@ -3576,9 +3136,6 @@ def dispatch_one_for_provider(provider: str) -> bool:
         if provider == "Gemini":
             reply, meta = call_gemini_task(task)
             actual_model = GEMINI_MODEL
-        elif provider == "Antigravity":
-            reply, meta = call_antigravity_task(task)
-            actual_model = ANTIGRAVITY_AGENT
         else:
             reply, actual_model, meta = call_openai_compatible_task(task, provider)
 
@@ -3631,8 +3188,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
 
         proj = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
         if (
-            provider != "Antigravity"
-            and proj
+            proj
             and proj.get("repository")
             and not qa_active
             and task.get("assigned_role") in ("Frontend developer", "Backend developer", "Documentation")
@@ -3766,11 +3322,8 @@ def dispatch_one_for_provider(provider: str) -> bool:
                     DISPATCH_EVENT.set()
 
         fresh_after = read_task(tid)
-        if fresh_after and (
-            (provider == "Antigravity" and proj and proj.get("repository") and not qa_active)
-            or fresh_after.get("pull_request")
-        ):
-            github_postprocess_task(tid, create_pr=(provider == "Antigravity" and not qa_active))
+        if fresh_after and fresh_after.get("pull_request"):
+            github_postprocess_task(tid)
 
     except Exception as exc:
         failure = exc if isinstance(exc, ProviderFailure) else ProviderFailure(provider, 503, str(exc)[:1000])
@@ -3938,24 +3491,19 @@ def watchdog_worker_loop() -> None:
         time.sleep(WATCHDOG_INTERVAL_SECONDS)
 
 
-# --- Local Ollama Chat ---
-def check_ollama_config() -> dict[str, Any]:
-    try:
-        req = urllib.request.Request(
-            f"{OLLAMA_URL}/api/tags",
-            headers={"Accept": "application/json", "User-Agent": HTTP_USER_AGENT},
-            method="GET",
-        )
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            data = json.loads(resp.read().decode("utf-8", errors="replace"))
-        names = [str(m.get("name", "")) for m in (data.get("models") or []) if isinstance(m, dict)]
-        found = any(n == OLLAMA_MODEL or n.startswith(f"{OLLAMA_MODEL}:") for n in names)
-        return {"available": True, "model_found": found, "model": OLLAMA_MODEL}
-    except Exception:
-        return {"available": False, "model_found": False, "model": OLLAMA_MODEL}
+# --- Orchestrator Chat (hosted providers) ---
+def get_chat_provider() -> str:
+    configured = str(read_app_config().get("chat_provider") or "").strip()
+    if configured in PROVIDERS:
+        return configured
+    return "Gemini"
 
 
-def call_ollama_chat(context_messages: list[dict[str, Any]], project_id: str) -> str:
+def chat_provider_model(provider: str) -> str:
+    return {"Gemini": GEMINI_MODEL, "GroqCloud": GROQ_MODEL, "OpenRouter": OPENROUTER_MODEL}.get(provider, GEMINI_MODEL)
+
+
+def chat_system_prompt(project_id: str) -> str:
     board = [
         task for task in read_tasks()
         if str(task.get("project_id") or "default") == project_id
@@ -3964,7 +3512,7 @@ def call_ollama_chat(context_messages: list[dict[str, Any]], project_id: str) ->
         "\n".join(f"- {t['id']} | {t.get('status')} | {t.get('assigned_role')} | {t.get('title')}" for t in board[:50])
         or "(No tasks have been created.)"
     )
-    sys_prompt = "\n\n".join(
+    return "\n\n".join(
         p
         for p in [
             load_prompt("shared_rules"),
@@ -3974,32 +3522,122 @@ def call_ollama_chat(context_messages: list[dict[str, Any]], project_id: str) ->
         ]
         if p
     )
+
+
+def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) -> tuple[str, str, str]:
+    """Send the chat history to the configured chat provider. Returns (reply, provider, model)."""
+    configured = configured_providers()
+    if not configured:
+        raise ProviderFailure("Chat", 401, "No AI provider is connected. Add a key in Settings → Connections.")
+    preferred = get_chat_provider()
+    provider = preferred if preferred in configured else configured[0]
+    model = chat_provider_model(provider)
+    sys_prompt = chat_system_prompt(project_id)
+    history = [
+        {"role": m["role"], "content": str(m.get("content", ""))}
+        for m in context_messages[-16:]
+        if m.get("role") in ("user", "assistant") and str(m.get("content", "")).strip()
+    ]
+
+    if provider == "Gemini":
+        api_key = get_provider_key("gemini")
+        while history and history[0]["role"] != "user":
+            history.pop(0)
+        merged: list[dict[str, str]] = []
+        for m in history:
+            if merged and merged[-1]["role"] == m["role"]:
+                merged[-1]["content"] += "\n\n" + m["content"]
+            else:
+                merged.append(dict(m))
+        contents = [
+            {
+                "role": "model" if m["role"] == "assistant" else "user",
+                "parts": [{"text": m["content"]}],
+            }
+            for m in merged
+        ]
+        payload = {
+            "systemInstruction": {"parts": [{"text": sys_prompt}]},
+            "contents": contents,
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
+        }
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(GEMINI_MODEL, safe='')}:generateContent?key={urllib.parse.quote(api_key, safe='')}"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": HTTP_USER_AGENT,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read().decode("utf-8", errors="replace"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")[:1500]
+            raise ProviderFailure("Gemini", exc.code, body, exc.headers.get("Retry-After")) from exc
+        except Exception as exc:
+            raise ProviderFailure("Gemini", 503, str(exc)[:1000]) from exc
+        candidates = result.get("candidates") or []
+        parts = (((candidates[0] if candidates else {}).get("content") or {}).get("parts")) or []
+        text = "".join(str(p.get("text", "")) for p in parts if isinstance(p, dict)).strip()
+        if not text:
+            raise ProviderFailure("Gemini", 400, "Gemini returned no text.")
+        return text, provider, model
+
+    conn_id = "groq" if provider == "GroqCloud" else "openrouter"
+    api_key = get_provider_key(conn_id)
+    endpoint = (
+        "https://api.groq.com/openai/v1/chat/completions"
+        if provider == "GroqCloud"
+        else "https://openrouter.ai/api/v1/chat/completions"
+    )
+    messages: list[dict[str, str]] = [{"role": "system", "content": sys_prompt}]
+    messages.extend(history)
     payload = {
-        "model": OLLAMA_MODEL,
-        "think": False,
-        "stream": False,
-        "messages": [
-            {"role": "system", "content": sys_prompt},
-            *[{"role": m["role"], "content": m["content"]} for m in context_messages],
-        ],
-        "options": {"temperature": 0.2, "num_predict": 512},
+        "model": model,
+        "messages": messages,
+        "temperature": 0.4,
+        "max_tokens": 2048,
     }
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": HTTP_USER_AGENT,
+    }
+    if provider == "OpenRouter":
+        headers["X-Title"] = "Personal AI Team"
     req = urllib.request.Request(
-        f"{OLLAMA_URL}/api/chat",
+        endpoint,
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": HTTP_USER_AGENT,
-        },
+        headers=headers,
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        data = json.loads(resp.read().decode("utf-8", errors="replace"))
-    reply = str((data.get("message") or {}).get("content", "")).strip()
-    if not reply:
-        raise ValueError("Ollama returned an empty response.")
-    return reply
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        try:
+            detail = json.loads(raw).get("error", {}).get("message") or raw
+        except Exception:
+            detail = raw
+        raise ProviderFailure(provider, exc.code, str(detail)[:1500], exc.headers.get("Retry-After")) from exc
+    except Exception as exc:
+        raise ProviderFailure(provider, 503, str(exc)[:1000]) from exc
+    choices = result.get("choices") or []
+    choice = choices[0] if choices and isinstance(choices[0], dict) else {}
+    msg = choice.get("message") or {}
+    content = msg.get("content")
+    if isinstance(content, list):
+        content = "".join(str(p.get("text", "")) for p in content if isinstance(p, dict))
+    text = str(content or "").strip()
+    if not text:
+        raise ProviderFailure(provider, 400, f"{provider} returned no text.")
+    return text, provider, model
 
 
 def clean_overview_documents(body: dict[str, Any]) -> dict[str, str]:
@@ -4075,10 +3713,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.serve_file(resolve_web_asset("style.css"), "text/css; charset=utf-8")
 
         if path == "/api/config":
-            cfg = check_ollama_config()
+            chat_provider = get_chat_provider()
             return self.send_json(
                 {
-                    **cfg,
+                    "chat_provider": chat_provider,
+                    "chat_model": chat_provider_model(chat_provider),
+                    "chat_configured": chat_provider in configured_providers(),
+                    "providers": PROVIDERS,
                     "gemini_model": GEMINI_MODEL,
                     "gemini_configured": bool(get_provider_key("gemini")),
                     "openrouter_model": OPENROUTER_MODEL,
@@ -4091,7 +3732,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(
                 {
                     "cpu_percent": get_cpu_percent(),
-                    "llm_working": ACTIVE_CHAT_COUNT > 0,
+                    "chat_working": ACTIVE_CHAT_COUNT > 0,
                     "gemini_working": ACTIVE_GEMINI_COUNT > 0,
                     "gemini_configured": bool(get_provider_key("gemini")),
                     "gemini_model": GEMINI_MODEL,
@@ -4099,7 +3740,6 @@ class Handler(BaseHTTPRequestHandler):
                     "openrouter_configured": bool(get_provider_key("openrouter")),
                     "openrouter_model": OPENROUTER_MODEL,
                     "groq_configured": bool(get_provider_key("groq")),
-                    "antigravity_configured": bool(get_provider_key("gemini")),
                     "github_configured": bool(get_provider_key("github")),
                     "watchdog": WATCHDOG_STATUS,
                 }
@@ -4119,6 +3759,7 @@ class Handler(BaseHTTPRequestHandler):
                     "providers": PROVIDERS,
                     "configured": configured_providers(),
                     "routing": get_routing(),
+                    "chat_provider": get_chat_provider(),
                 }
             )
 
@@ -4237,13 +3878,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"quality": get_provider_quality()})
 
         if path == "/api/llm-usage":
-            return self.send_json(
-                {
-                    "local_model": OLLAMA_MODEL,
-                    "local_calls": get_local_llm_usage(),
-                    "resets": read_ai_stat_resets(),
-                }
-            )
+            return self.send_json({"resets": read_ai_stat_resets()})
 
         if path == "/api/settings/logs":
             return self.send_json({"logs": [], "info": "Use POST to load logs with filters"})
@@ -4253,7 +3888,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"config": config})
 
         if path == "/api/chat":
-            return self.send_json({"messages": read_chat_history()})
+            chat_pid = str((query.get("project_id") or ["default"])[0] or "default")
+            return self.send_json({"messages": read_chat_history(chat_pid), "project_id": chat_pid})
 
         self.send_json({"error": "Not found."}, HTTPStatus.NOT_FOUND)
 
@@ -4351,7 +3987,7 @@ class Handler(BaseHTTPRequestHandler):
                 "activity": [{"at": ts, "type": "created", "message": "Project request sent to PM/PO from Orchestrator chat."}],
             }
             write_task(task)
-            hist = read_chat_history()
+            hist = read_chat_history(pid)
             hist.extend(
                 [
                     {"role": "user", "content": req_text, "at": ts},
@@ -4363,7 +3999,7 @@ class Handler(BaseHTTPRequestHandler):
                     },
                 ]
             )
-            write_chat_history(hist)
+            write_chat_history(hist, pid)
             DISPATCH_EVENT.set()
             return self.send_json({"task": task}, HTTPStatus.CREATED)
 
@@ -4391,16 +4027,22 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/routing":
             try:
                 routing = save_routing(body.get("routing"))
+                chat_provider = body.get("chat_provider")
+                if chat_provider is not None:
+                    chat_provider = str(chat_provider).strip()
+                    if chat_provider not in PROVIDERS:
+                        raise ValueError("Choose a valid chat provider.")
+                    save_app_config({"chat_provider": chat_provider})
                 append_event({"at": now_iso(), "type": "routing_updated"})
                 DISPATCH_EVENT.set()
-                return self.send_json({"routing": routing})
+                return self.send_json({"routing": routing, "chat_provider": get_chat_provider()})
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
         m_conn_test = re.fullmatch(r"/api/connections/([a-z_]+)/test", path)
         if m_conn_test:
             cid = m_conn_test.group(1)
-            if cid != "antigravity" and cid not in CONNECTION_SPECS:
+            if cid not in CONNECTION_SPECS:
                 return self.send_json({"connected": False, "error": "Unknown connection."}, HTTPStatus.NOT_FOUND)
             try:
                 result = test_provider_connection(cid)
@@ -4448,7 +4090,7 @@ class Handler(BaseHTTPRequestHandler):
             period = str(body.get("period", "")).strip()
             bucket = str(body.get("bucket", "")).strip()
             patterns = {"today": r"^\d{4}-\d{2}-\d{2}$", "month": r"^\d{4}-\d{2}$", "year": r"^\d{4}$", "all": r"^all$"}
-            if provider not in ["Ollama", *PROVIDERS] or not model or len(model) > 160:
+            if provider not in PROVIDERS or not model or len(model) > 160:
                 return self.send_json({"error": "Choose a valid provider and model."}, HTTPStatus.BAD_REQUEST)
             if period not in patterns or not re.fullmatch(patterns[period], bucket):
                 return self.send_json({"error": "Choose a valid statistic period."}, HTTPStatus.BAD_REQUEST)
@@ -4930,7 +4572,10 @@ class Handler(BaseHTTPRequestHandler):
                         }
                         write_task(followup)
                         append_chat_notice(
-                            f"All clarification answers are in. I sent them back to PM/PO as {fid}.", ts, fid
+                            f"All clarification answers are in. I sent them back to PM/PO as {fid}.",
+                            ts,
+                            fid,
+                            str(parent.get("project_id") or "default"),
                         )
                         DISPATCH_EVENT.set()
             return self.send_json({"task": question, "followup_task": followup})
@@ -5037,24 +4682,31 @@ class Handler(BaseHTTPRequestHandler):
                 ACTIVE_CHAT_COUNT += 1
             t0 = time.time()
             try:
-                hist = read_chat_history()
+                hist = read_chat_history(project_id)
                 hist.append({"role": "user", "content": text, "at": now_iso()})
-                write_chat_history(hist)
-                append_event({"at": now_iso(), "type": "local_llm_request_started", "provider": "Ollama", "model": OLLAMA_MODEL})
+                write_chat_history(hist, project_id)
+                append_event({"at": now_iso(), "type": "chat_request_started", "provider": get_chat_provider()})
                 try:
-                    reply = call_ollama_chat(hist[-16:], project_id)
+                    reply, used_provider, used_model = call_chat_provider(hist, project_id)
                     dur = round(time.time() - t0, 2)
-                    msg = {"role": "assistant", "content": reply, "at": now_iso(), "provider": "Ollama", "duration_seconds": dur}
+                    msg = {
+                        "role": "assistant",
+                        "content": reply,
+                        "at": now_iso(),
+                        "provider": used_provider,
+                        "model": used_model,
+                        "duration_seconds": dur,
+                    }
                     hist.append(msg)
-                    write_chat_history(hist)
-                    append_event({"at": now_iso(), "type": "local_llm_reply", "provider": "Ollama", "model": OLLAMA_MODEL, "duration_seconds": dur})
+                    write_chat_history(hist, project_id)
+                    append_event({"at": now_iso(), "type": "chat_reply", "provider": used_provider, "model": used_model, "duration_seconds": dur})
                     return self.send_json({"reply": msg, "messages": hist})
                 except Exception as exc:
                     dur = round(time.time() - t0, 2)
-                    append_event({"at": now_iso(), "type": "local_llm_error", "provider": "Ollama", "model": OLLAMA_MODEL, "duration_seconds": dur})
-                    err_msg = f"I couldn’t reach Ollama ({OLLAMA_MODEL}): {exc}"
+                    append_event({"at": now_iso(), "type": "chat_error", "provider": get_chat_provider(), "duration_seconds": dur})
+                    err_msg = f"The chat provider could not answer ({exc})."
                     hist.append({"role": "assistant", "content": err_msg, "at": now_iso(), "error": True})
-                    write_chat_history(hist)
+                    write_chat_history(hist, project_id)
                     return self.send_json({"error": err_msg}, HTTPStatus.BAD_GATEWAY)
             finally:
                 with ACTIVE_CHAT_LOCK:
@@ -5283,9 +4935,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"dismissed": True, "id": nid})
 
         if path == "/api/chat":
-            write_chat_history([])
-            append_event({"at": now_iso(), "type": "chat_cleared"})
-            return self.send_json({"cleared": True, "messages": []})
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            chat_pid = str((query.get("project_id") or ["default"])[0] or "default")
+            write_chat_history([], chat_pid)
+            append_event({"at": now_iso(), "type": "chat_cleared", "project_id": chat_pid})
+            return self.send_json({"cleared": True, "project_id": chat_pid, "messages": []})
 
         self.send_json({"error": "Not found."}, HTTPStatus.NOT_FOUND)
 

@@ -1,12 +1,12 @@
 # Personal AI Team — Project Documentation
 
-Version 0.26 · Updated 2026-11-01
+Version 0.27 · Updated 2026-11-01
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
 ## 1. Overview
 
-Personal AI Team is a self-hosted web application for managing a project task board and coordinating AI-assisted work. It has a Python standard-library HTTP server, a browser interface written in HTML/CSS/JavaScript, a local Ollama chat, configurable external AI providers, and optional GitHub repository operations.
+Personal AI Team is a self-hosted web application for managing a project task board and coordinating AI-assisted work. It has a Python standard-library HTTP server, a browser interface written in HTML/CSS/JavaScript, a provider-backed Orchestrator chat, configurable external AI providers, and optional GitHub repository operations.
 
 The application is intended for a trusted, single-user environment. The default listener is `127.0.0.1:8765`; it does not provide user accounts or an authentication layer. Keep it bound to loopback or put it behind an appropriately authenticated reverse proxy. Do not expose the port directly to the public internet.
 
@@ -47,19 +47,19 @@ The supplied service runs as the unprivileged `ubuntu` user, uses `ProtectSystem
 
 ### 4.2 Orchestrator and PM/PO
 
-The Orchestrator chat is local to the configured Ollama instance and uses the selected Project Board project's context. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a backlog. Valid proposed work tasks enter the queue automatically; project-overview documents remain pending user approval. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data. PM/PO plans must follow the JSON schema supplied with the request; unknown sub-project IDs are safely assigned to the whole project rather than rejecting the entire plan.
+The Orchestrator chat runs on a hosted AI provider selected in **Settings → Routing → Chat window** (Gemini, GroqCloud, or OpenRouter). Each project has its own chat history, and every message includes the active project's context documents and task board, so conversations stay scoped to the selected project. Use it for discussion and planning. **Send to PM/PO** creates a project request; PM/PO may ask clarification questions or propose a backlog. Valid proposed work tasks enter the queue automatically; project-overview documents remain pending user approval. Edit a project's durable context documents from **Project context** on the Project Board. Agent prompts are available in **Settings → Agent prompts** and are retained in application data. PM/PO plans must follow the JSON schema supplied with the request; unknown sub-project IDs are safely assigned to the whole project rather than rejecting the entire plan.
 
 ### 4.3 Provider connections and routing
 
-1. Open **Settings → Connections** to add, replace, test, or clear provider credentials. Supported connection families are Gemini/Antigravity, GroqCloud, OpenRouter, and the GitHub repository connector.
-2. Open **Settings → Routing** to set provider rank order per work role. Unavailable providers are skipped by the dispatcher. The QA role uses its own routing order.
+1. Open **Settings → Connections** to add, replace, test, or clear provider credentials. Supported connection families are Gemini, GroqCloud, OpenRouter, and the GitHub repository connector.
+2. Open **Settings → Routing** to set provider rank order per work role and to choose the provider used by the Orchestrator chat. Unavailable providers are skipped by the dispatcher. The QA role uses its own routing order.
 3. A task can request automatic selection or a specific provider. Provider attempts and quality outcomes feed the Statistics view. Tasks entering **Needs validation** are sent to QA automatically. QA reviews the acceptance checks, original agent reply, and available repository evidence without modifying files or claiming to run tests. A failed review returns the task to its original work role automatically. After three failed QA reviews the task becomes **Blocked** for user intervention; manually returning it to Ready resets the QA-failure count. Task creation and status transitions are always written to `TEAM_DATA_DIR/logs/activity.jsonl` and to `app.log` when the configured capture level includes INFO. Agent reply text is saved under `TEAM_DATA_DIR/replies/<task_id>/<provider>/` and shown in task details; `app.log` records when that reply file is saved, not the full reply body.
 
 ### 4.4 GitHub repository work
 
 Projects can point to GitHub repositories and local checkout folders. The GitHub connection configured in Connections is shared by repository listing, clone, pull, push, repository reads, and app updates. Clone operations expose progress and actionable Git errors in the UI/logs. Local Files and Documentation browsing is read-only.
 
-For code and documentation tasks, the app creates a task/attempt branch from the repository's configured default branch, commits provider-supplied file manifests where supported, and opens a PR targeting that default branch. Gemini, GroqCloud, and OpenRouter receive a limited source snapshot fetched from GitHub; the app applies their returned file manifest. Antigravity works in a remote repository environment and pushes its task branch. Neither flow edits the configured local checkout. PM/PO planning receives saved project context and board information; Antigravity additionally receives a read-only remote repository mount when the project has a repository configured. No agent reads from or edits the configured local checkout. Repository-changing work and QA are serialized per repository, and eligible work is selected oldest-first within that repository; unrelated repositories may run concurrently. QA reviews the current PR head using a bounded GitHub source snapshot (up to 32 files and 48 KB) plus the original agent response. The app verifies that the reviewed PR head has not changed before merging. A changed PR is queued for another QA pass. The app merges only after QA passes.
+For code and documentation tasks, the app creates a task/attempt branch from the repository's configured default branch, commits provider-supplied file manifests where supported, and opens a PR targeting that default branch. Gemini, GroqCloud, and OpenRouter receive a limited source snapshot fetched from GitHub; the app applies their returned file manifest. PM/PO planning receives saved project context and board information. No agent reads from or edits the configured local checkout. Repository-changing work and QA are serialized per repository, and eligible work is selected oldest-first within that repository; unrelated repositories may run concurrently. QA reviews the current PR head using a bounded GitHub source snapshot (up to 32 files and 48 KB) plus the original agent response. The app verifies that the reviewed PR head has not changed before merging. A changed PR is queued for another QA pass. The app merges only after QA passes.
 
 After a validated PR is merged, the app synchronizes the configured local checkout to the default branch. If the checkout does not exist, the app clones it to a staging directory and installs it only after a successful clone. Existing checkouts are updated only when the GitHub origin matches, the checked-out branch is the repository default branch, the worktree is clean, and a fast-forward is possible. Dirty, divergent, branch-mismatched, or wrong-origin checkouts are left untouched; the task receives a local-sync error notification for user resolution. After resolving the issue, use **Retry local checkout sync** in that task's details to retry the same guarded operation. A failed local sync does not undo a successful GitHub merge. No local sync occurs before QA approves and the PR merges.
 
@@ -138,7 +138,7 @@ sudoedit /etc/personal-ai-team.env
 
 Recognized provider key names include `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, and `GITHUB_TOKEN`. Alternatively, credentials can be entered in **Settings → Connections** and stored encrypted in the app data directory. Do not put real keys in Git, documentation, shell history, or support logs.
 
-The service defaults `OLLAMA_URL` to `http://127.0.0.1:11434`, model to `orchestrator`, and port to `8765`. Ensure Ollama is installed/running locally and that the configured model is available. The server defaults to listening on loopback; configure any reverse proxy separately and require authentication before allowing remote access.
+The service defaults the HTTP port to `8765`. The Orchestrator chat uses one of the configured hosted providers; no local model runtime is required. The server defaults to listening on loopback; configure any reverse proxy separately and require authentication before allowing remote access.
 
 ### 5.4 Install and start systemd service
 
@@ -218,9 +218,7 @@ The app's rotating file log and the systemd journal contain different informatio
 | `TEAM_HOST` | `127.0.0.1` | HTTP listen address. |
 | `TEAM_PORT` | `8765` | HTTP listen port. |
 | `TEAM_DATA_DIR` | `data/` beside the server | Persistent data, encrypted secrets, and logs. |
-| `OLLAMA_URL` | `http://127.0.0.1:11434` | Local Ollama endpoint. |
-| `OLLAMA_MODEL` | `orchestrator` | Local chat model name. |
-| `GEMINI_API_KEY` | optional | Gemini/Antigravity provider credential. |
+| `GEMINI_API_KEY` | optional | Gemini provider credential. |
 | `GROQ_API_KEY` | optional | GroqCloud credential. |
 | `OPENROUTER_API_KEY` | optional | OpenRouter credential. |
 | `GITHUB_TOKEN` | optional | GitHub repository connector credential. |
@@ -235,7 +233,7 @@ Additional model identifiers and user-agent values can be configured through the
 - Protect `/etc/personal-ai-team.env`, the generated Fernet key, and backups containing application data.
 - Use an adequately scoped GitHub token. The app uses the configured credential for GitHub operations and avoids embedding tokens in remote URLs.
 - App updates copy files; they are not a transactional deployment or rollback system. Back up application source and data before major changes.
-- Confirm actual deployment paths, service user, Python executable, Ollama model, and proxy settings before applying commands to a production Oracle host.
+- Confirm actual deployment paths, service user, Python executable, chat provider selection, and proxy settings before applying commands to a production Oracle host.
 
 ## 8. Development and verification
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=Personal AI Team task board and Ollama chat
+Description=Personal AI Team task board and AI chat
 After=network.target
 
 [Service]
@@ -8,8 +8,6 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/personal-ai-team
 EnvironmentFile=-/etc/personal-ai-team.env
-Environment=OLLAMA_URL=http://127.0.0.1:11434
-Environment=OLLAMA_MODEL=orchestrator
 Environment=TEAM_PORT=8765
 Environment=TEAM_DATA_DIR=/var/lib/personal-ai-team
 Environment=TEAM_SECRET_KEY_FILE=/etc/personal-ai-team/credential.key

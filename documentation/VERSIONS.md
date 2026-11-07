@@ -1,5 +1,13 @@
 # Version log
 
+## 0.27 — 2026-11-01
+
+- Removed the local Ollama runtime; the Orchestrator chat now runs on a hosted provider (Gemini, GroqCloud, or OpenRouter) selected in Settings → Routing → Chat window.
+- Chat history is stored per project, and every chat request includes the active project's context documents and task board so conversations stay scoped to the selected project.
+- Removed the Antigravity provider entirely; Gemini, GroqCloud, and OpenRouter remain for agent tasks, with legacy Antigravity task selections treated as Automatic.
+- Added project-scope isolation instructions to the shared agent rules and Orchestrator prompt.
+- Updated the documentation for the hosted chat provider and Antigravity removal.
+
 ## 0.26 — 2026-11-01
 
 - Automatically queued valid PM/PO work tasks while keeping proposed project overviews behind user approval.

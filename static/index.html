@@ -13,8 +13,8 @@
       <h1>AI Team</h1>
     </div>
     <div class="header-tools">
-      <div class="model-chip"><span class="status-dot" id="model-dot"></span><span id="model-name">Connecting to Ollama…</span></div>
-      <div class="cpu-meter" title="Overall CPU utilization across the VM, not just Ollama">
+      <div class="model-chip"><span class="status-dot" id="model-dot"></span><span id="model-name">AI chat</span></div>
+      <div class="cpu-meter" title="Overall CPU utilization across the VM">
         <span class="cpu-label">VM CPU</span>
         <div class="cpu-track" role="progressbar" aria-label="VM CPU utilization" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="cpu-bar"></span></div>
         <strong id="cpu-value">—</strong>
@@ -58,8 +58,8 @@
 
     <section class="chat-panel panel">
       <div class="section-heading chat-heading">
-        <div><p class="eyebrow">LOCAL OLLAMA</p><h2>Orchestrator chat</h2></div>
-        <div class="chat-tools"><span class="local-badge">Private to your VM</span><button class="secondary clear-chat" id="clear-chat" type="button">Clear conversation</button></div>
+        <div><p class="eyebrow">AI CHAT</p><h2>Orchestrator chat</h2></div>
+        <div class="chat-tools"><span class="local-badge" id="chat-provider-label">Hosted AI</span><button class="secondary clear-chat" id="clear-chat" type="button">Clear conversation</button></div>
       </div>
       <div class="chat-notice">Use Orchestrator chat for discussion, or send a project request to PM/PO. PM/PO returns clarification cards or a draft backlog; no work task starts until you mark it Ready.</div>
       <div class="messages" id="messages" aria-live="polite"></div>
@@ -110,7 +110,7 @@
       <label>Request<textarea name="request" rows="4" maxlength="12000" placeholder="Describe what needs to be done" required></textarea></label>
       <div class="two-columns">
         <label>Work role<select name="role"><option>PM/PO</option><option>Frontend developer</option><option>Backend developer</option><option>QA</option><option>UI designer</option><option>Documentation</option></select></label>
-        <label>AI provider<select name="provider"><option>Automatic</option><option>Gemini</option><option>Antigravity</option><option>GroqCloud</option><option>OpenRouter</option></select></label>
+        <label>AI provider<select name="provider"><option>Automatic</option><option>Gemini</option><option>GroqCloud</option><option>OpenRouter</option></select></label>
       </div>
       <div class="two-columns"><label>Project<select name="project_id"></select></label><label>Sub-project<select name="module_id"><option value="">Whole project</option></select></label></div>
       <label>Acceptance checks<textarea name="checks" rows="3" placeholder="One check per line. For automatic checks use exact:text, contains:text, or not_contains:text"></textarea></label>
@@ -150,7 +150,6 @@
         <select id="detail-provider-select">
           <option value="Automatic">Automatic</option>
           <option value="Gemini">Gemini</option>
-          <option value="Antigravity">Antigravity</option>
           <option value="GroqCloud">GroqCloud</option>
           <option value="OpenRouter">OpenRouter</option>
         </select>
@@ -246,6 +245,9 @@
           <div class="dialog-heading"><div><p class="eyebrow">PROVIDER PRIORITY</p><h2>Routing</h2></div></div>
           <p class="draft-note">Set the provider rank order for each role. Unavailable connections are skipped automatically; changing a rank swaps the providers so each one appears once.</p>
           <div id="routing-roles"></div>
+          <section class="route-role"><strong>Chat window</strong><div class="route-order"><label>Provider
+            <select id="chat-provider-select"></select>
+          </label></div><p class="draft-note">The Orchestrator chat uses this provider and always receives the active project's context and task board.</p></section>
           <div class="form-error" id="routing-error" role="alert"></div>
           <div class="dialog-actions"><button class="primary" type="submit">Save routing</button></div>
         </form>

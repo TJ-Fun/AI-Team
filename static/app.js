@@ -13,8 +13,7 @@
     projects: [{ id: "default", name: "Main project", repository: "", context: "", modules: [] }],
     activeProjectId: localStorage.getItem("ai_team_active_project") || "default",
     activeModuleId: localStorage.getItem("ai_team_active_subproject") || "",
-    localModel: "orchestrator",
-    localCalls: [],
+    chatProvider: "Gemini",
     statResets: [],
     qualityRows: [],
     notifications: [],
@@ -28,7 +27,7 @@
     encryptionAvailable: true,
     routing: {},
     routingRoles: [],
-    routingProviders: ["Gemini", "Antigravity", "GroqCloud", "OpenRouter"],
+    routingProviders: ["Gemini", "GroqCloud", "OpenRouter"],
     repoMode: "files",
     repoCurrentPath: "",
     pollBusy: false,
@@ -130,20 +129,15 @@
   async function loadConfig() {
     const dot = $("#model-dot") || $(".model-chip .status-dot");
     const nameEl = $("#model-name");
+    const labelEl = $("#chat-provider-label");
     try {
       const cfg = await api("/api/config");
-      if (!cfg.available) {
-        nameEl.textContent = "Ollama unavailable";
-        dot?.classList.add("offline");
-      } else if (!cfg.model_found) {
-        nameEl.textContent = `Model missing · ${cfg.model}`;
-        dot?.classList.add("offline");
-      } else {
-        nameEl.textContent = `Ollama · ${cfg.model}`;
-        dot?.classList.remove("offline");
-      }
+      const provider = cfg.chat_provider || "Gemini";
+      nameEl.textContent = `Chat · ${provider}`;
+      if (labelEl) labelEl.textContent = `${provider} · ${cfg.chat_model || ""}`.trim();
+      dot?.classList.toggle("offline", cfg.chat_configured === false);
     } catch {
-      nameEl.textContent = "Ollama unavailable";
+      nameEl.textContent = "AI chat";
       dot?.classList.add("offline");
     }
   }
@@ -158,21 +152,21 @@
       const track = $(".cpu-track");
       if (track) track.setAttribute("aria-valuenow", String(cpu ?? 0));
 
-      const working = Boolean(data.llm_working || data.gemini_working || data.openrouter_working);
-      state.llmBusy = Boolean(data.llm_working);
+      const working = Boolean(data.chat_working || data.gemini_working || data.openrouter_working);
+      state.llmBusy = Boolean(data.chat_working);
       const llmState = $("#llm-state");
       llmState.textContent = data.openrouter_working
         ? "Hosted AI working"
         : data.gemini_working
           ? "Gemini working"
-          : data.llm_working
-            ? "Ollama working"
+          : data.chat_working
+            ? "Chat working"
             : "Idle";
       llmState.classList.toggle("working", working);
       $("#clear-chat").disabled = state.llmBusy;
 
       $("#agent-status").textContent =
-        `Gemini / Antigravity ${data.gemini_configured ? "connected" : "not connected"} · ` +
+        `Gemini ${data.gemini_configured ? "connected" : "not connected"} · ` +
         `GroqCloud ${data.groq_configured ? "connected" : "not connected"} · ` +
         `OpenRouter ${data.openrouter_configured ? "connected" : "not connected"} · ` +
         `GitHub ${data.github_configured ? "connected" : "not connected"}`;
@@ -310,6 +304,7 @@
     localStorage.setItem("ai_team_active_subproject", "");
     renderActiveSubprojectSelect();
     renderTasks();
+    void loadChat();
     if ($("#repository-view-dialog")?.open) {
       void openRepositoryView(state.repoMode);
     }
@@ -522,8 +517,6 @@
       ]);
       state.projects = projectsRes.projects || [];
       state.tasks = tasksRes.tasks || [];
-      state.localModel = usageRes.local_model || "orchestrator";
-      state.localCalls = usageRes.local_calls || [];
       state.statResets = usageRes.resets || [];
       state.notifications = noticesRes.notifications || [];
       state.qualityRows = qualityRes.quality || [];
@@ -1517,7 +1510,7 @@
   function isProviderConnected(providerName) {
     return state.connections.some((c) => {
       if (!c.configured) return false;
-      if ((providerName === "Gemini" || providerName === "Antigravity") && c.id === "gemini") return true;
+      if ((providerName === "Gemini") && c.id === "gemini") return true;
       if (providerName === "GroqCloud" && c.id === "groq") return true;
       if (providerName === "OpenRouter" && c.id === "openrouter") return true;
       return false;
@@ -1560,10 +1553,7 @@
               c.id === "gemini"
                 ? `<button type="button" class="secondary" data-test-conn="gemini" ${
                     c.configured ? "" : "disabled"
-                  }>Test Gemini</button>
-                  <button type="button" class="secondary" data-test-conn="antigravity" ${
-                    c.configured ? "" : "disabled"
-                  }>Test Antigravity</button>`
+                  }>Test</button>`
                 : `<button type="button" class="secondary" data-test-conn="${escapeHtml(c.id)}" ${
                     c.configured ? "" : "disabled"
                   }>Test</button>`
@@ -1605,13 +1595,32 @@
       .join("");
   }
 
+  function renderChatProviderSelect() {
+    const sel = $("#chat-provider-select");
+    if (!sel) return;
+    sel.innerHTML = state.routingProviders
+      .map(
+        (opt) =>
+          `<option value="${escapeHtml(opt)}"${opt === state.chatProvider ? " selected" : ""}>${escapeHtml(opt)}${
+            !isProviderConnected(opt) ? " · not connected" : ""
+          }</option>`
+      )
+      .join("");
+  }
+
+  $("#chat-provider-select")?.addEventListener("change", (e) => {
+    state.chatProvider = e.target.value;
+  });
+
   async function reloadSettingsData() {
     const [connRes, routeRes] = await Promise.all([api("/api/connections"), api("/api/routing")]);
     state.connections = connRes.connections || [];
     state.encryptionAvailable = connRes.encryption_available !== false;
     state.routingRoles = routeRes.roles || [];
-    state.routingProviders = routeRes.providers || ["Gemini", "Antigravity", "GroqCloud", "OpenRouter"];
+    state.routingProviders = routeRes.providers || ["Gemini", "GroqCloud", "OpenRouter"];
     state.routing = routeRes.routing || {};
+    state.chatProvider = routeRes.chat_provider || "Gemini";
+    renderChatProviderSelect();
     renderConnectionsAndRouting();
   }
 
@@ -1725,7 +1734,7 @@
     try {
       await api("/api/routing", {
         method: "POST",
-        body: JSON.stringify({ routing: state.routing }),
+        body: JSON.stringify({ routing: state.routing, chat_provider: state.chatProvider }),
       });
       $("#settings-dialog").close();
       await refreshBoard();
@@ -2072,10 +2081,6 @@
         }
       }
     }
-    for (const call of state.localCalls || []) {
-      records.push({ ...call, provider: "Ollama", requested_at: call.started_at });
-    }
-
     const bucket = periodBucket(period);
     const applicableResets = (state.statResets || []).filter((r) => r.period === period && r.bucket === bucket);
     const cutoff = new Map(applicableResets.map((r) => [`${r.provider}\0${r.model}`, r.reset_at]));
@@ -2090,7 +2095,6 @@
 
     for (const r of records) if (r.provider) ensure(r.provider, r.model || "Model not recorded");
     for (const r of applicableResets) ensure(r.provider, r.model);
-    ensure("Ollama", state.localModel || "orchestrator");
 
     for (const r of records) {
       if (!r.provider || !matchesPeriod(r.requested_at, period)) continue;
@@ -2240,7 +2244,7 @@
       .map(
         (m) => `
         <div class="message ${m.role === "user" ? "user-message" : "assistant-message"}">
-          <div class="message-role">${m.role === "user" ? "You" : "Orchestrator"}</div>
+          <div class="message-role">${m.role === "user" ? "You" : `Orchestrator${m.provider ? ` · ${escapeHtml(m.provider)}` : ""}`}</div>
           <div class="message-content">${escapeHtml(m.content)}</div>
         </div>`
       )
@@ -2255,7 +2259,7 @@
   let chatMessages = [];
   async function loadChat() {
     try {
-      const res = await api("/api/chat");
+      const res = await api(`/api/chat?project_id=${encodeURIComponent(state.activeProjectId)}`);
       chatMessages = res.messages || [];
       renderChatMessages(chatMessages);
     } catch (err) {
@@ -2327,7 +2331,7 @@
       return;
     }
     try {
-      await api("/api/chat", { method: "DELETE" });
+      await api(`/api/chat?project_id=${encodeURIComponent(state.activeProjectId)}`, { method: "DELETE" });
       await loadChat();
     } catch (err) {
       alert(err.message);
