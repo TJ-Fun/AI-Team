@@ -242,6 +242,36 @@ def save_app_config(config: dict[str, Any]) -> None:
         raise ValueError(f"Failed to save app config: {exc}")
 
 
+AUTONOMY_DEFAULTS: dict[str, bool] = {
+    "plan_requires_approval": False,
+    "escalation_runs_provisional": True,
+    "merge_requires_approval": False,
+}
+
+
+def get_autonomy() -> dict[str, bool]:
+    saved = read_app_config().get("autonomy")
+    result = dict(AUTONOMY_DEFAULTS)
+    if isinstance(saved, dict):
+        for key in result:
+            if isinstance(saved.get(key), bool):
+                result[key] = saved[key]
+    return result
+
+
+def save_autonomy(value: Any) -> dict[str, bool]:
+    if not isinstance(value, dict):
+        raise ValueError("Autonomy settings must be an object.")
+    cleaned: dict[str, bool] = {}
+    for key, default in AUTONOMY_DEFAULTS.items():
+        raw = value.get(key, default)
+        if not isinstance(raw, bool):
+            raise ValueError(f"Autonomy setting {key} must be true or false.")
+        cleaned[key] = raw
+    save_app_config({"autonomy": cleaned})
+    return cleaned
+
+
 configure_file_log_level(read_app_config().get("log_level", "INFO"))
 
 # Log startup after applying the persisted file log level.
@@ -284,11 +314,28 @@ PM_PLANNING_CONTRACT = (
     '{"type":"plan","summary":"brief plan summary","project_overview":{"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log"},'
     '"tasks":[{"title":"task title","request":"bounded implementation request",'
-    '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true}]}. '
+    '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1}]}. '
     "Use only these work roles: PM/PO, Frontend developer, Backend developer, QA, UI designer, Documentation. "
     "Use only sub-project IDs listed in the project context; use an empty module_id for the whole project. "
-    "Propose 1 to 12 small tasks. When writing the overview, preserve confirmed existing context, separate facts from assumptions, "
+    "Propose 1 to 12 small tasks. Assign each task a phase number (1 = first milestone, 2 = next, and so on); "
+    "later phases only start after earlier phases complete. Every plan that produces deliverables must include "
+    "at least one Documentation task per phase covering user-facing or technical documentation. "
+    "When writing the overview, preserve confirmed existing context, separate facts from assumptions, "
     "and provide concise complete content for all three documents. Do not claim the tasks have already been created."
+)
+
+ESCALATION_CONTRACT = (
+    "For a PM/PO escalation request, return ONLY one valid JSON object, with no markdown: "
+    '{"type":"escalation","summary":"brief summary","design_change":{"description":"what changes and why","reason":"root cause"},'
+    '"team_tasks":[{"title":"task title","request":"bounded implementation request",'
+    '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1}],'
+    '"alternatives":[{"title":"option name","description":"trade-offs and impact"}],'
+    '"recommendation":"which option you recommend and why"}. '
+    "team_tasks are executed immediately while the user reviews the design change; keep them small and reversible. "
+    "Set phase when the work belongs to a planned phase; if omitted, the blocked task's phase is inherited. "
+    "alternatives must list 1 to 4 other viable solutions with honest trade-offs. "
+    "You may not edit existing confirmed tasks; express every requirement change through this response. "
+    "If the failure needs no design change, return design_change as null and team_tasks as an empty list."
 )
 
 WORK_REPLY_CONTRACT = (
@@ -739,6 +786,15 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
             snap = DATA / "projects" / pid / "history" / f"{make_version_id()}.md"
             snap.parent.mkdir(parents=True, exist_ok=True)
             snap.write_text(old_ctx, encoding="utf-8")
+        old_proj = existing_map.get(pid, {})
+        try:
+            version = max(1, int(raw.get("version") or old_proj.get("version") or 1))
+        except (TypeError, ValueError):
+            version = 1
+        raw_phases = raw.get("completed_phases") if isinstance(raw.get("completed_phases"), list) else old_proj.get("completed_phases")
+        completed_phases = sorted({int(p) for p in (raw_phases or []) if str(p).isdigit()})
+        raw_milestones = raw.get("milestones") if isinstance(raw.get("milestones"), list) else old_proj.get("milestones")
+        milestones = [m for m in (raw_milestones or []) if isinstance(m, dict)][:100]
         cleaned.append(
             {
                 "id": pid,
@@ -747,6 +803,9 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
                 "local_path": local_path,
                 "context": context,
                 "modules": clean_modules,
+                "version": version,
+                "completed_phases": completed_phases,
+                "milestones": milestones,
             }
         )
 
@@ -1039,7 +1098,7 @@ def has_untried_alternate(task: dict[str, Any], failed_provider: str) -> bool:
 
 
 def task_repository_key(task: dict[str, Any]) -> str:
-    if task.get("task_type") in ("pm_planning", "project_overview", "clarification_question"):
+    if task.get("task_type") in ("pm_planning", "pm_escalation", "project_overview", "clarification_question", "design_review"):
         return ""
     role = str(task.get("assigned_role") or "")
     if role == "QA":
@@ -2125,6 +2184,23 @@ def github_postprocess_task(task_id: str) -> None:
             return
         refreshed["ci_status"] = str(checks.get("state") or "unknown")
         refreshed.pop("ci_error", None)
+        if get_autonomy().get("merge_requires_approval") and not refreshed.get("merge_approved"):
+            ts = now_iso()
+            refreshed["status"] = "Needs approval"
+            refreshed["merge_approval_required"] = True
+            refreshed["updated_at"] = ts
+            refreshed.setdefault("activity", []).append(
+                {
+                    "at": ts,
+                    "type": "merge_approval_required",
+                    "from": "Done",
+                    "to": "Needs approval",
+                    "message": "QA passed; approve the pull request merge in task details before it is merged.",
+                }
+            )
+            write_task(refreshed)
+            append_event({"at": ts, "task_id": task_id, "type": "merge_approval_required"})
+            return
         merged = github_api(
             f"/repos/{owner}/{repo}/pulls/{pull['number']}/merge",
             "PUT",
@@ -2276,6 +2352,55 @@ def get_notifications() -> list[dict[str, Any]]:
                     "task_id": tid,
                 }
             )
+        if t.get("status") == "Needs approval" and t.get("merge_approval_required"):
+            items.append(
+                {
+                    "id": f"task:{tid}:merge-approval:{upd}",
+                    "kind": "decision",
+                    "severity": "high",
+                    "title": f"Merge approval needed for {tid}",
+                    "message": "QA passed; approve the pull request merge in task details.",
+                    "task_id": tid,
+                }
+            )
+        task_type = t.get("task_type")
+        if t.get("status") == "Needs answer" and task_type == "clarification_question":
+            question = str((t.get("question_data") or {}).get("question") or t.get("request") or "")
+            items.append(
+                {
+                    "id": f"task:{tid}:decision:{upd}",
+                    "kind": "decision",
+                    "severity": "high",
+                    "title": f"PM/PO needs an answer: {t.get('title') or tid}",
+                    "message": question[:500] or "PM/PO is waiting for your answer before planning can continue.",
+                    "task_id": tid,
+                }
+            )
+        if t.get("status") == "Needs approval" and task_type in ("project_overview", "design_review"):
+            if task_type == "project_overview":
+                decision_title = "Project overview needs approval"
+                decision_message = "PM/PO proposed project brief, technical overview, and decisions for your review."
+            else:
+                review = t.get("review_data") or {}
+                design_change = review.get("design_change") or {}
+                decision_title = "Design review needs approval"
+                decision_message = str(
+                    design_change.get("description")
+                    or review.get("summary")
+                    or t.get("request")
+                    or "PM/PO proposed a design change for your review."
+                )
+            items.append(
+                {
+                    "id": f"task:{tid}:decision:{upd}",
+                    "kind": "decision",
+                    "severity": "medium",
+                    "title": decision_title,
+                    "message": decision_message[:500],
+                    "task_id": tid,
+                }
+            )
+
         if t.get("status") == "Needs validation" and not task_provider({**t, "workflow_phase": "qa"}):
             items.append(
                 {
@@ -2335,6 +2460,23 @@ def get_notifications() -> list[dict[str, Any]]:
                 "action": "update",
             }
         )
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for proj in read_projects():
+        for m in proj.get("milestones") or []:
+            if not isinstance(m, dict):
+                continue
+            completed_at = str(m.get("completed_at") or "")
+            if completed_at >= cutoff:
+                items.append(
+                    {
+                        "id": f"milestone:{proj.get('id')}:{m.get('phase')}:{m.get('version')}",
+                        "kind": "milestone",
+                        "severity": "low",
+                        "title": f"{proj.get('name', 'Project')} reached v{m.get('version')}",
+                        "message": f"Phase {m.get('phase')} milestone completed.",
+                    }
+                )
 
     dismissed_path = DATA / "settings" / "notifications_dismissed.json"
     dismissed: set[str] = set()
@@ -2556,6 +2698,11 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
             produces = t["produces_deliverable"] if isinstance(t.get("produces_deliverable"), bool) else (role != "PM/PO")
             if produces and not clean_checks:
                 clean_checks.append("Manually review the resulting deliverable against the task request.")
+            try:
+                phase = int(t.get("phase") or 1)
+            except (TypeError, ValueError):
+                phase = 1
+            phase = min(max(phase, 1), 9)
             norm_t.append(
                 {
                     "title": title,
@@ -2564,6 +2711,7 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
                     "module_id": mid,
                     "acceptance_checks": clean_checks,
                     "produces_deliverable": produces,
+                    "phase": phase,
                 }
             )
         ov = data.get("project_overview")
@@ -2653,6 +2801,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                 "activity": [{"at": ts, "type": "created", "message": "PM/PO prepared a project overview; waiting for your approval."}],
             }
         )
+        plan_status = "Draft" if get_autonomy().get("plan_requires_approval") else "Ready"
         work_ids: list[str] = []
         for item in res["tasks"]:
             wid = next_task_id()
@@ -2668,7 +2817,8 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                     "provider": "Automatic",
                     "acceptance_checks": item["acceptance_checks"],
                     "produces_deliverable": item["produces_deliverable"],
-                    "status": "Ready",
+                    "phase": item.get("phase") or 1,
+                    "status": plan_status,
                     "planning_root_id": task.get("planning_root_id"),
                     "source_plan_task_id": task["id"],
                     "project_id": task.get("project_id") or "default",
@@ -2677,7 +2827,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                     "updated_at": ts,
                     "attempts": [],
                     "validation": None,
-                    "activity": [{"at": ts, "type": "created", "message": f"Proposed by PM/PO in {task['id']}; automatically queued for execution."}],
+                    "activity": [{"at": ts, "type": "created", "message": f"Proposed by PM/PO in {task['id']}; {'created as draft for manual release' if plan_status == 'Draft' else 'automatically queued for execution'}."}],
                 }
             )
         task["project_overview_task_id"] = ov_id
@@ -2692,7 +2842,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
             "validated_at": ts,
         }
         DISPATCH_EVENT.set()
-        message = f"PM/PO created project overview {ov_id} and queued {len(work_ids)} work task(s): {', '.join(work_ids)}."
+        message = f"PM/PO created project overview {ov_id} and {'queued' if plan_status == 'Ready' else 'created draft'} {len(work_ids)} work task(s): {', '.join(work_ids)}."
         if res["warnings"]:
             message += " " + " ".join(res["warnings"])
         return "Done", message
@@ -2715,6 +2865,352 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
         }
         task["planning_error"] = msg
         return "Rework needed", f"{provider} replied, but the PM/PO result could not be logged: {msg}"
+
+
+def parse_escalation_response(reply: str, project_id: str) -> dict[str, Any]:
+    clean = reply.strip()
+    if clean.startswith("```"):
+        clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", clean, flags=re.IGNORECASE).strip()
+    try:
+        data = json.loads(clean)
+    except Exception as exc:
+        raise ValueError("PM/PO escalation reply must be a valid JSON object.") from exc
+    if not isinstance(data, dict) or data.get("type") != "escalation":
+        raise ValueError("PM/PO escalation reply must have type 'escalation'.")
+    summary = str(data.get("summary") or "").strip()[:500]
+
+    dc = data.get("design_change")
+    design_change = None
+    if isinstance(dc, dict):
+        desc = str(dc.get("description") or "").strip()[:4000]
+        reason = str(dc.get("reason") or "").strip()[:2000]
+        if desc:
+            design_change = {"description": desc, "reason": reason}
+
+    proj = next((p for p in read_projects() if p.get("id") == project_id), None)
+    valid_mods = {m["id"] for m in (proj or {}).get("modules", [])}
+    team_tasks: list[dict[str, Any]] = []
+    raw_tasks = data.get("team_tasks") or []
+    if not isinstance(raw_tasks, list) or len(raw_tasks) > 8:
+        raise ValueError("escalation team_tasks must be a list of at most 8 tasks.")
+    for t in raw_tasks:
+        if not isinstance(t, dict):
+            raise ValueError("Each escalation team task must be an object.")
+        title = str(t.get("title", "")).strip()[:160]
+        req = str(t.get("request", "")).strip()[:12000]
+        role = str(t.get("role", "")).strip()
+        mid = str(t.get("module_id", "")).strip()
+        checks = t.get("acceptance_checks") or []
+        if not title or not req:
+            raise ValueError("Each escalation team task needs a title and request.")
+        if role not in WORK_ROLES:
+            raise ValueError(f"Escalation team task '{title}' has an invalid work role.")
+        if not isinstance(checks, list):
+            raise ValueError(f"Escalation team task '{title}' acceptance_checks must be a list.")
+        if mid and mid not in valid_mods:
+            mid = ""
+        clean_checks = [str(c).strip()[:500] for c in checks if str(c).strip()][:20]
+        produces = t["produces_deliverable"] if isinstance(t.get("produces_deliverable"), bool) else (role != "PM/PO")
+        if produces and not clean_checks:
+            clean_checks.append("Manually review the resulting deliverable against the task request.")
+        phase = None
+        if t.get("phase") is not None:
+            try:
+                phase = int(t.get("phase"))
+            except (TypeError, ValueError):
+                phase = None
+        if phase is not None:
+            phase = min(max(phase, 1), 9)
+        team_tasks.append(
+            {
+                "title": title,
+                "request": req,
+                "role": role,
+                "module_id": mid,
+                "acceptance_checks": clean_checks,
+                "produces_deliverable": produces,
+                "phase": phase,
+            }
+        )
+
+    alternatives: list[dict[str, str]] = []
+    raw_alts = data.get("alternatives") or []
+    if isinstance(raw_alts, list):
+        for a in raw_alts[:4]:
+            if isinstance(a, dict):
+                at = str(a.get("title", "")).strip()[:160]
+                ad = str(a.get("description", "")).strip()[:2000]
+                if at:
+                    alternatives.append({"title": at, "description": ad})
+            elif isinstance(a, str) and a.strip():
+                alternatives.append({"title": a.strip()[:160], "description": ""})
+
+    return {
+        "type": "escalation",
+        "summary": summary,
+        "design_change": design_change,
+        "team_tasks": team_tasks,
+        "alternatives": alternatives,
+        "recommendation": str(data.get("recommendation") or "").strip()[:2000],
+    }
+
+
+def finish_pm_escalation_task(task: dict[str, Any], reply: str, provider: str) -> tuple[str, str]:
+    try:
+        res = parse_escalation_response(reply, str(task.get("project_id") or "default"))
+        ts = now_iso()
+        pid = str(task.get("project_id") or "default")
+        blocked_id = str(task.get("escalation_for_task_id") or "")
+        blocked = read_task(blocked_id) if blocked_id else None
+        autonomy = get_autonomy()
+        provisional_status = "Ready" if autonomy.get("escalation_runs_provisional", True) else "Draft"
+        try:
+            blocked_phase = min(max(int((blocked or {}).get("phase") or 1), 1), 9)
+        except (TypeError, ValueError):
+            blocked_phase = 1
+
+        review_id = ""
+        team_ids: list[str] = []
+        if res["design_change"] or res["team_tasks"]:
+            review_id = next_task_id()
+            for item in res["team_tasks"]:
+                wid = next_task_id()
+                team_ids.append(wid)
+                write_task(
+                    {
+                        "id": wid,
+                        "task_type": "work",
+                        "title": item["title"],
+                        "request": item["request"],
+                        "assigned_role": item["role"],
+                        "provider": "Automatic",
+                        "acceptance_checks": item["acceptance_checks"],
+                        "produces_deliverable": item["produces_deliverable"],
+                        "phase": item.get("phase") or blocked_phase,
+                        "status": provisional_status,
+                        "pending_design_review": True,
+                        "design_review_task_id": review_id,
+                        "escalation_task_id": task["id"],
+                        "escalation_for_task_id": blocked_id,
+                        "project_id": pid,
+                        "module_id": item["module_id"] or str((blocked or {}).get("module_id") or ""),
+                        "planning_root_id": (blocked or {}).get("planning_root_id") or task.get("planning_root_id"),
+                        "source_plan_task_id": (blocked or {}).get("source_plan_task_id") or task.get("source_plan_task_id"),
+                        "created_at": ts,
+                        "updated_at": ts,
+                        "attempts": [],
+                        "validation": None,
+                        "activity": [
+                            {
+                                "at": ts,
+                                "type": "created",
+                                "message": f"Provisional task from PM/PO escalation {task['id']}; {'runs' if provisional_status == 'Ready' else 'is drafted'} while design review {review_id} awaits approval.",
+                            }
+                        ],
+                    }
+                )
+            write_task(
+                {
+                    "id": review_id,
+                    "task_type": "design_review",
+                    "title": f"Design review: {res['summary'] or 'PM/PO proposed change'}",
+                    "request": res["design_change"]["description"] if res["design_change"] else res["summary"],
+                    "review_data": {
+                        "summary": res["summary"],
+                        "design_change": res["design_change"],
+                        "alternatives": res["alternatives"],
+                        "recommendation": res["recommendation"],
+                        "team_task_ids": team_ids,
+                        "source_task_id": blocked_id,
+                        "escalation_task_id": task["id"],
+                    },
+                    "assigned_role": "PM/PO",
+                    "provider": "Automatic",
+                    "status": "Needs approval",
+                    "project_id": pid,
+                    "module_id": "",
+                    "produces_deliverable": False,
+                    "acceptance_checks": [],
+                    "created_at": ts,
+                    "updated_at": ts,
+                    "attempts": [],
+                    "validation": None,
+                    "activity": [
+                        {
+                            "at": ts,
+                            "type": "created",
+                            "message": f"PM/PO proposed a design change; provisional team tasks are {'running' if provisional_status == 'Ready' else 'drafted'} pending your review.",
+                        }
+                    ],
+                }
+            )
+            if blocked and blocked.get("status") == "Blocked":
+                blocked.setdefault("activity", []).append(
+                    {
+                        "at": ts,
+                        "type": "design_review_created",
+                        "message": f"PM/PO escalation {task['id']} created design review {review_id}; provisional tasks {'running' if provisional_status == 'Ready' else 'drafted'}.",
+                    }
+                )
+                blocked["updated_at"] = ts
+                write_task(blocked)
+            DISPATCH_EVENT.set()
+
+        task["validation"] = {
+            "status": "passed",
+            "checks": [{"check": "PM/PO escalation structure", "kind": "schema", "passed": True, "message": "Response parsed and saved."}],
+            "validated_at": ts,
+        }
+        if review_id:
+            msg = (
+                f"PM/PO proposed a design change. Queued {len(team_ids)} provisional task(s) "
+                f"({', '.join(team_ids)}) and created design review {review_id} for your approval."
+            )
+        else:
+            if blocked and blocked.get("status") == "Blocked":
+                blocked.setdefault("activity", []).append(
+                    {
+                        "at": ts,
+                        "type": "escalation_reviewed",
+                        "message": f"PM/PO escalation {task['id']} found no design change needed: {res['summary']}",
+                    }
+                )
+                blocked["updated_at"] = ts
+                write_task(blocked)
+            msg = f"PM/PO reviewed the escalation and decided no design change is needed: {res['summary']}"
+        return "Done", msg
+    except Exception as exc:
+        msg = str(exc)
+        logger.warning("PM/PO escalation rejected task_id=%s provider=%s: %s", task.get("id"), provider, msg)
+        task["validation"] = {
+            "status": "failed",
+            "checks": [{"check": "PM/PO escalation structure", "kind": "schema", "passed": False, "message": msg}],
+            "validated_at": now_iso(),
+        }
+        task["planning_error"] = msg
+        return "Rework needed", f"{provider} replied, but the PM/PO escalation could not be logged: {msg}"
+
+
+def maybe_create_escalation(blocked_task: dict[str, Any], reason: str) -> str:
+    """Create a PM/PO escalation task for a system-blocked work task. Returns new task id or ''."""
+    tid = str(blocked_task.get("id") or "")
+    if not tid or blocked_task.get("task_type") not in ("work", None):
+        return ""
+    pid = str(blocked_task.get("project_id") or "default")
+    for t in read_tasks():
+        if (
+            t.get("task_type") == "pm_escalation"
+            and t.get("escalation_for_task_id") == tid
+            and t.get("status") not in ("Done", "Canceled", "Blocked")
+        ):
+            return ""
+    ts = now_iso()
+    esc_id = next_task_id()
+    attempts = blocked_task.get("attempts") or []
+    last_errors = [
+        str(a.get("error") or "")[:300]
+        for a in attempts[-3:]
+        if a.get("error")
+    ]
+    request = (
+        f"Task {tid} ('{blocked_task.get('title', '')}') became Blocked.\n"
+        f"Role: {blocked_task.get('assigned_role', '')}\n"
+        f"Module: {blocked_task.get('module_id') or 'whole project'}\n"
+        f"Phase: {blocked_task.get('phase') or 1}\n"
+        f"Reason: {reason}\n"
+        f"Request:\n{str(blocked_task.get('request', ''))[:4000]}\n\n"
+        f"Acceptance checks:\n" + ("\n".join(f"- {c}" for c in (blocked_task.get("acceptance_checks") or [])) or "- None")
+        + (f"\n\nRecent attempt errors:\n" + "\n".join(f"- {e}" for e in last_errors) if last_errors else "")
+        + "\n\nDecide whether a design change is needed. If yes, propose small reversible team tasks plus alternatives for user review. "
+        "If the block is purely technical (provider outage, bad instructions), propose corrected team tasks or explain why no change is needed."
+    )
+    write_task(
+        {
+            "id": esc_id,
+            "task_type": "pm_escalation",
+            "title": f"PM/PO escalation: {tid} blocked",
+            "request": request,
+            "escalation_for_task_id": tid,
+            "escalation_round": int(blocked_task.get("escalation_round") or 0) + 1,
+            "assigned_role": "PM/PO",
+            "provider": "Automatic",
+            "status": "Ready",
+            "project_id": pid,
+            "module_id": "",
+            "produces_deliverable": False,
+            "acceptance_checks": [],
+            "created_at": ts,
+            "updated_at": ts,
+            "attempts": [],
+            "validation": None,
+            "dispatch_note": "Escalation queued for the PM/PO agent.",
+            "activity": [{"at": ts, "type": "created", "message": f"Auto-escalation for blocked task {tid}."}],
+        }
+    )
+    append_event({"at": ts, "task_id": esc_id, "type": "escalation_created", "for_task": tid})
+    DISPATCH_EVENT.set()
+    return esc_id
+
+
+def project_min_open_phase(tasks: list[dict[str, Any]], project_id: str) -> int | None:
+    phases = [
+        int(t["phase"])
+        for t in tasks
+        if t.get("project_id", "default") == project_id
+        and "phase" in t
+        and t.get("status") not in ("Done", "Canceled", "Draft")
+    ]
+    return min(phases) if phases else None
+
+
+def task_phase_gated(task: dict[str, Any], all_tasks: list[dict[str, Any]]) -> bool:
+    if "phase" not in task:
+        return False
+    pid = str(task.get("project_id") or "default")
+    min_phase = project_min_open_phase(all_tasks, pid)
+    return min_phase is not None and int(task["phase"]) > min_phase
+
+
+def check_project_milestones() -> list[str]:
+    """Detect completed phases per project, bump version, log decision, notify."""
+    completed: list[str] = []
+    projects = read_projects()
+    tasks = read_tasks()
+    for proj in projects:
+        pid = str(proj.get("id") or "default")
+        done_phases = set(proj.get("completed_phases") or [])
+        phased = [t for t in tasks if t.get("project_id", "default") == pid and "phase" in t]
+        by_phase: dict[int, list[dict[str, Any]]] = {}
+        for t in phased:
+            by_phase.setdefault(int(t["phase"]), []).append(t)
+        newly: list[int] = []
+        for phase, items in sorted(by_phase.items()):
+            if phase in done_phases:
+                continue
+            if items and all(t.get("status") in ("Done", "Canceled") for t in items) and any(
+                t.get("status") == "Done" for t in items
+            ):
+                newly.append(phase)
+        if not newly:
+            continue
+        ts = now_iso()
+        proj["completed_phases"] = sorted(done_phases | set(newly))
+        version = int(proj.get("version") or 1) + len(newly)
+        proj["version"] = version
+        proj.setdefault("milestones", []).extend(
+            {"phase": p, "version": version - len(newly) + i + 1, "completed_at": ts} for i, p in enumerate(newly)
+        )
+        save_projects([dict(proj) if p.get("id") == pid else p for p in projects])
+        for p in newly:
+            note = f"- {ts[:10]}: Milestone reached — phase {p} completed; project version {version - len(newly) + newly.index(p) + 1}."
+            try:
+                prev = load_project_context(pid, "decisions")
+                save_project_context_document(pid, "decisions", (prev.rstrip() + "\n" + note + "\n").strip() + "\n")
+            except Exception:
+                pass
+            completed.append(f"{proj.get('name', pid)} v{version}: phase {p} milestone completed.")
+            append_event({"at": ts, "type": "milestone", "project_id": pid, "phase": p, "version": version})
+    return completed
 
 
 def deterministic_validation(checks: list[str], reply: str) -> dict[str, Any]:
@@ -2847,8 +3343,17 @@ def parse_qa_result(reply: str) -> dict[str, Any]:
     }
 
 
+def planning_contract_for_task(task: dict[str, Any]) -> str:
+    tt = task.get("task_type")
+    if tt == "pm_planning":
+        return PM_PLANNING_CONTRACT
+    if tt == "pm_escalation":
+        return ESCALATION_CONTRACT
+    return ""
+
+
 def needs_work_reply_envelope(task: dict[str, Any]) -> bool:
-    if task.get("task_type") == "pm_planning" or task.get("qa_attempt_active"):
+    if task.get("task_type") in ("pm_planning", "pm_escalation") or task.get("qa_attempt_active"):
         return False
     role = str(task.get("assigned_role") or "")
     if role in ("Frontend developer", "Backend developer", "Documentation"):
@@ -2914,12 +3419,13 @@ def call_gemini_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     prompt += build_repo_agent_instructions(task, "Gemini")
     if needs_work_reply_envelope(task):
         prompt += "\n\n" + WORK_REPLY_CONTRACT
-    if task.get("task_type") == "pm_planning":
-        prompt += "\n\n" + PM_PLANNING_CONTRACT
+    contract = planning_contract_for_task(task)
+    if contract:
+        prompt += "\n\n" + contract
     if (task.get("validation") or {}).get("status") == "failed":
         prompt += "\n\nPrevious attempt failed validation checks:\n" + json.dumps(task["validation"].get("checks", []), indent=2)
 
-    sys_inst = combined_agent_prompt(role) + ("\n\n" + PM_PLANNING_CONTRACT if task.get("task_type") == "pm_planning" else "")
+    sys_inst = combined_agent_prompt(role) + (("\n\n" + contract) if contract else "")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(GEMINI_MODEL, safe='')}:generateContent?key={urllib.parse.quote(api_key, safe='')}"
     payload = {
         "systemInstruction": {"parts": [{"text": sys_inst}]},
@@ -2987,6 +3493,9 @@ def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[st
     prompt += build_repo_agent_instructions(task, provider)
     if needs_work_reply_envelope(task):
         prompt += "\n\n" + WORK_REPLY_CONTRACT
+    contract = planning_contract_for_task(task)
+    if contract:
+        prompt += "\n\n" + contract
     if (task.get("validation") or {}).get("status") == "failed":
         prompt += "\n\nPrevious attempt failed validation checks:\n" + json.dumps(task["validation"].get("checks", []), indent=2)
 
@@ -2995,8 +3504,7 @@ def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[st
         "messages": [
             {
                 "role": "system",
-                "content": combined_agent_prompt(role)
-                + ("\n\n" + PM_PLANNING_CONTRACT if task.get("task_type") == "pm_planning" else ""),
+                "content": combined_agent_prompt(role) + (("\n\n" + contract) if contract else ""),
             },
             {"role": "user", "content": prompt},
         ],
@@ -3225,6 +3733,8 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
                 if candidate.get("workflow_phase") == "qa":
                     continue
                 if task_provider(candidate) != provider:
+                    continue
+                if task_phase_gated(candidate, all_tasks):
                     continue
                 repo_key = task_repository_key(candidate)
                 if repo_key and repo_key in ACTIVE_REPOSITORY_TASKS:
@@ -3456,6 +3966,8 @@ def dispatch_one_for_provider(provider: str) -> bool:
                     fresh.pop("qa_attempt_active", None)
                 elif fresh.get("task_type") == "pm_planning":
                     next_status, msg = finish_pm_planning_task(fresh, reply, provider)
+                elif fresh.get("task_type") == "pm_escalation":
+                    next_status, msg = finish_pm_escalation_task(fresh, reply, provider)
                 elif fresh.get("produces_deliverable"):
                     val = deterministic_validation(fresh.get("acceptance_checks") or [], reply)
                     fresh["validation"] = val
@@ -3506,6 +4018,13 @@ def dispatch_one_for_provider(provider: str) -> bool:
                         "to": next_status,
                     }
                 )
+                if next_status == "Blocked":
+                    esc_id = maybe_create_escalation(fresh, msg)
+                    if esc_id:
+                        fresh.setdefault("activity", []).append(
+                            {"at": now_iso(), "type": "escalation", "message": f"Auto-escalated to PM/PO as {esc_id}."}
+                        )
+                        write_task(fresh)
                 if next_status in ("Needs validation", "Ready"):
                     DISPATCH_EVENT.set()
 
@@ -3567,6 +4086,13 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 )
                 write_task(fresh)
                 append_event({"at": ts, "task_id": tid, "type": "agent_error", "provider": provider, "to": next_status})
+                if next_status == "Blocked":
+                    esc_id = maybe_create_escalation(fresh, msg)
+                    if esc_id:
+                        fresh.setdefault("activity", []).append(
+                            {"at": now_iso(), "type": "escalation", "message": f"Auto-escalated to PM/PO as {esc_id}."}
+                        )
+                        write_task(fresh)
         if fallback:
             DISPATCH_EVENT.set()
     finally:
@@ -3634,6 +4160,13 @@ def run_watchdog_pass() -> int:
                     {"at": ts, "type": "watchdog_recovery", "from": "In progress", "to": task["status"], "message": reason}
                 )
                 write_task(task)
+                if task["status"] == "Blocked":
+                    esc_id = maybe_create_escalation(task, reason)
+                    if esc_id:
+                        task.setdefault("activity", []).append(
+                            {"at": now_iso(), "type": "escalation", "message": f"Auto-escalated to PM/PO as {esc_id}."}
+                        )
+                        write_task(task)
                 changed += 1
             elif status == "Waiting for capacity" and task.get("retry_after"):
                 retry_ts = parse_iso_epoch(task.get("retry_after"))
@@ -3641,10 +4174,20 @@ def run_watchdog_pass() -> int:
                     continue
                 ts = now_iso()
                 task["automatic_retries"] = int(task.get("automatic_retries") or 0) + 1
-                if task.get("provider") == "Automatic":
-                    task["routing_cycle_start"] = len(task.get("attempts") or [])
-                if task.get("workflow_phase") == "qa":
-                    task["qa_routing_cycle_start"] = len(task.get("attempts") or [])
+                if task.get("provider") == "Automatic" or task.get("workflow_phase") == "qa":
+                    role = str(task.get("assigned_role") or "PM/PO")
+                    qa_active = task.get("workflow_phase") == "qa"
+                    cycle_key = "qa_routing_cycle_start" if qa_active else "routing_cycle_start"
+                    start = max(0, int(task.get(cycle_key) or 0))
+                    tried = {
+                        str(a.get("provider", ""))
+                        for a in (task.get("attempts") or [])[start:]
+                        if str(a.get("role") or role) == role
+                    }
+                    order = get_routing().get("QA" if qa_active else role, PROVIDERS)
+                    configured = configured_providers()
+                    if not any(p in configured and p not in tried for p in order):
+                        task[cycle_key] = len(task.get("attempts") or [])
                 task["status"] = "Ready"
                 task.pop("retry_after", None)
                 task.pop("waiting_reason", None)
@@ -3683,6 +4226,11 @@ CI_POLL_INTERVAL_SECONDS = 90
 
 
 def run_ci_poll_pass() -> None:
+    try:
+        for msg in check_project_milestones():
+            logger.info("Milestone: %s", msg)
+    except Exception as exc:
+        logger.warning("Milestone check failed: %s", str(exc)[:300])
     for task in read_tasks():
         pull = task.get("pull_request")
         if (
@@ -3978,6 +4526,7 @@ class Handler(BaseHTTPRequestHandler):
                     "configured": configured_providers(),
                     "routing": get_routing(),
                     "chat_provider": get_chat_provider(),
+                    "autonomy": get_autonomy(),
                 }
             )
 
@@ -4251,6 +4800,9 @@ class Handler(BaseHTTPRequestHandler):
                 routing = None
                 if "routing" in body:
                     routing = save_routing(body.get("routing"))
+                autonomy = None
+                if "autonomy" in body:
+                    autonomy = save_autonomy(body.get("autonomy"))
                 chat_provider = body.get("chat_provider")
                 if chat_provider is not None:
                     chat_provider = str(chat_provider).strip()
@@ -4260,7 +4812,11 @@ class Handler(BaseHTTPRequestHandler):
                 append_event({"at": now_iso(), "type": "routing_updated"})
                 DISPATCH_EVENT.set()
                 return self.send_json(
-                    {"routing": routing if routing is not None else get_routing(), "chat_provider": get_chat_provider()}
+                    {
+                        "routing": routing if routing is not None else get_routing(),
+                        "chat_provider": get_chat_provider(),
+                        "autonomy": autonomy if autonomy is not None else get_autonomy(),
+                    }
                 )
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
@@ -4844,6 +5400,184 @@ class Handler(BaseHTTPRequestHandler):
                 write_task(task)
             return self.send_json({"task": task, "snapshots": snapshots})
 
+        m_design = re.fullmatch(r"/api/tasks/(T-\d{4,})/design-review", path)
+        if m_design:
+            tid = m_design.group(1)
+            decision = str(body.get("decision", "")).strip().lower()
+            free_text = str(body.get("free_text", "")).strip()[:5000]
+            alt_index = body.get("alternative_index")
+            if decision not in ("approve", "reject", "alternative"):
+                return self.send_json({"error": "Decision must be approve, reject, or alternative."}, HTTPStatus.BAD_REQUEST)
+            with STATE_LOCK:
+                task = read_task(tid)
+                if not task:
+                    return self.send_json({"error": "Design review task not found."}, HTTPStatus.NOT_FOUND)
+                if task.get("task_type") != "design_review" or task.get("status") != "Needs approval":
+                    return self.send_json({"error": "This design review is no longer awaiting a decision."}, HTTPStatus.CONFLICT)
+                review = task.get("review_data") or {}
+                team_ids = [str(x) for x in (review.get("team_task_ids") or [])]
+                pid = str(task.get("project_id") or "default")
+                ts = now_iso()
+                chosen_alt = ""
+                chosen_alt_detail = ""
+                if decision == "alternative":
+                    try:
+                        idx = int(alt_index)
+                    except (TypeError, ValueError):
+                        idx = -1
+                    alts = review.get("alternatives") or []
+                    if not (0 <= idx < len(alts)):
+                        return self.send_json({"error": "Choose a listed alternative."}, HTTPStatus.BAD_REQUEST)
+                    chosen_alt = str(alts[idx].get("title") or "")
+                    chosen_alt_detail = str(alts[idx].get("description") or "")
+                elif decision == "reject" and not free_text:
+                    return self.send_json({"error": "Explain why the design change is rejected, or pick an alternative."}, HTTPStatus.BAD_REQUEST)
+
+                task["status"] = "Done"
+                task["updated_at"] = ts
+                task["design_decision"] = decision
+                task["design_free_text"] = free_text
+                task["design_alternative"] = chosen_alt or None
+                task["design_alternative_detail"] = chosen_alt_detail or None
+                task.setdefault("activity", []).append(
+                    {
+                        "at": ts,
+                        "type": "design_review_decision",
+                        "from": "Needs approval",
+                        "to": "Done",
+                        "message": f"User decision: {decision}" + (f" ({chosen_alt})" if chosen_alt else "") + ".",
+                    }
+                )
+                write_task(task)
+
+                if decision == "approve":
+                    for wid in team_ids:
+                        wt = read_task(wid)
+                        if wt and wt.get("pending_design_review"):
+                            was_draft = wt.get("status") == "Draft"
+                            wt.pop("pending_design_review", None)
+                            if was_draft:
+                                wt["status"] = "Ready"
+                                wt["dispatch_note"] = "Design review approved; provisional task queued."
+                            wt["updated_at"] = ts
+                            wt.setdefault("activity", []).append(
+                                {"at": ts, "type": "design_approved", "message": f"Design review {tid} approved; provisional task {'queued' if was_draft else 'confirmed'}."}
+                            )
+                            write_task(wt)
+                    desc = str((review.get("design_change") or {}).get("description") or review.get("summary") or "")
+                    try:
+                        prev = load_project_context(pid, "decisions")
+                        note = f"- {ts[:10]}: Design change approved (review {tid}): {desc[:500]}"
+                        save_project_context_document(pid, "decisions", (prev.rstrip() + "\n" + note + "\n").strip() + "\n")
+                    except Exception:
+                        pass
+                    src = read_task(str(review.get("source_task_id") or ""))
+                    if src and src.get("status") == "Blocked":
+                        src.setdefault("activity", []).append(
+                            {
+                                "at": ts,
+                                "type": "design_review_approved",
+                                "message": f"Design review {tid} approved; provisional tasks confirmed. This task remains blocked—retry, edit, or cancel it.",
+                            }
+                        )
+                        src["updated_at"] = ts
+                        write_task(src)
+                else:
+                    reason_bits = [f"User {decision} design review {tid}."]
+                    if chosen_alt:
+                        reason_bits.append(f"Chosen alternative: {chosen_alt}.")
+                        if chosen_alt_detail:
+                            reason_bits.append(f"Alternative details: {chosen_alt_detail}")
+                    if free_text:
+                        reason_bits.append(f"User feedback: {free_text}")
+                    for wid in team_ids:
+                        wt = read_task(wid)
+                        if not wt:
+                            continue
+                        if wt.get("status") in ("Done", "Canceled"):
+                            continue
+                        wt["status"] = "Canceled"
+                        wt["updated_at"] = ts
+                        wt.pop("pending_design_review", None)
+                        wt.setdefault("activity", []).append(
+                            {"at": ts, "type": "design_rejected", "message": "Provisional task canceled after design review rejection."}
+                        )
+                        write_task(wt)
+                    esc_id = next_task_id()
+                    orig = read_task(str(review.get("escalation_task_id") or ""))
+                    blocked = read_task(str(review.get("source_task_id") or ""))
+                    write_task(
+                        {
+                            "id": esc_id,
+                            "task_type": "pm_escalation",
+                            "title": f"PM/PO escalation round 2: design review {tid} {decision}",
+                            "request": (
+                                f"The user {decision} your design change proposal (review {tid}).\n\n"
+                                f"Original proposal:\n{str(review.get('summary') or '')}\n"
+                                f"{str((review.get('design_change') or {}).get('description') or '')}\n\n"
+                                + "\n".join(reason_bits)
+                                + (f"\n\nBlocked source task {blocked.get('id') if blocked else '?'}: {blocked.get('block_reason', '')}" if blocked else "")
+                                + "\n\nPropose a revised plan: new team_tasks and alternatives addressing the user's decision. "
+                                "The previously proposed provisional tasks were canceled."
+                            ),
+                            "escalation_for_task_id": str(review.get("source_task_id") or ""),
+                            "escalation_round": int((orig or {}).get("escalation_round") or 1) + 1,
+                            "assigned_role": "PM/PO",
+                            "provider": "Automatic",
+                            "status": "Ready",
+                            "project_id": pid,
+                            "module_id": "",
+                            "produces_deliverable": False,
+                            "acceptance_checks": [],
+                            "created_at": ts,
+                            "updated_at": ts,
+                            "attempts": [],
+                            "validation": None,
+                            "dispatch_note": "Design review rejected; revised escalation queued for PM/PO.",
+                            "activity": [{"at": ts, "type": "created", "message": f"Follow-up escalation after user {decision} on {tid}."}],
+                        }
+                    )
+                    if blocked and blocked.get("status") == "Blocked":
+                        blocked.setdefault("activity", []).append(
+                            {
+                                "at": ts,
+                                "type": "design_review_rejected",
+                                "message": f"Design review {tid} was {decision}; follow-up escalation {esc_id} queued for PM/PO.",
+                            }
+                        )
+                        blocked["updated_at"] = ts
+                        write_task(blocked)
+                    DISPATCH_EVENT.set()
+            return self.send_json({"task": task})
+
+        m_merge = re.fullmatch(r"/api/tasks/(T-\d{4,})/approve-merge", path)
+        if m_merge:
+            tid = m_merge.group(1)
+            with STATE_LOCK:
+                task = read_task(tid)
+                if not task:
+                    return self.send_json({"error": "Task not found."}, HTTPStatus.NOT_FOUND)
+                if task.get("status") != "Needs approval" or not task.get("merge_approval_required"):
+                    return self.send_json({"error": "This task is not waiting for merge approval."}, HTTPStatus.CONFLICT)
+                ts = now_iso()
+                task["status"] = "Done"
+                task["merge_approved"] = True
+                task["merge_approval_required"] = False
+                task["merge_approved_at"] = ts
+                task["updated_at"] = ts
+                task.setdefault("activity", []).append(
+                    {
+                        "at": ts,
+                        "type": "merge_approved",
+                        "from": "Needs approval",
+                        "to": "Done",
+                        "message": "User approved the pull request merge.",
+                    }
+                )
+                write_task(task)
+            github_postprocess_task(tid)
+            return self.send_json({"task": read_task(tid)})
+
         m_ctx_res = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/restore", path)
         if m_ctx_res:
             pid, slug = m_ctx_res.groups()
@@ -5174,6 +5908,7 @@ def start_background_workers() -> None:
     for provider in PROVIDERS:
         threading.Thread(target=provider_worker_loop, args=(provider,), daemon=True).start()
     threading.Thread(target=watchdog_worker_loop, daemon=True).start()
+    threading.Thread(target=ci_poll_worker_loop, daemon=True).start()
 
 
 def main() -> None:

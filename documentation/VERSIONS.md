@@ -1,5 +1,14 @@
 # Version log
 
+## 0.31 — 2026-11-07
+
+- Added a chat **Plan** button that sends the current message to PM/PO planning (`/api/pm-requests`); chat replies remain advisory.
+- Added decision notifications for PM/PO clarification questions, project-overview and design-review approvals, and merge approvals; task notifications can open the related task.
+- Started the CI/milestone poller so pending-CI merges and milestone notifications run every 90 seconds.
+- Closed the escalation loop: escalation team tasks inherit phase/module/planning metadata, design-review approval queues drafted provisional tasks, and the blocked source task records review outcomes.
+- Added autonomy controls in Settings → Routing for plan approval, provisional escalation tasks, and merge approval.
+- Updated documentation to 0.31.
+
 ## 0.30 — 2026-11-07
 
 - Added periodic app self-update checks (every 30 minutes) against the configured repository; a newer version raises a notification with an Update now button that runs the standard update flow.

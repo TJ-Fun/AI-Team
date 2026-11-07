@@ -28,6 +28,7 @@
     routing: {},
     routingRoles: [],
     routingProviders: ["Gemini", "GroqCloud", "OpenRouter"],
+    autonomy: {},
     repoMode: "files",
     repoCurrentPath: "",
     pollBusy: false,
@@ -238,6 +239,7 @@
             <strong>${escapeHtml(item.title)}</strong>
             <p>${escapeHtml(item.message)}</p>
             ${item.action === "update" ? `<button type="button" class="notification-action" data-notification-action="update">Update now</button>` : ""}
+            ${item.task_id ? `<button type="button" class="notification-action" data-open-task="${escapeHtml(item.task_id)}">Open task</button>` : ""}
           </div>
           <button type="button" class="notification-dismiss" data-dismiss-notification="${escapeHtml(item.id)}" aria-label="Dismiss">×</button>
         </div>`
@@ -258,6 +260,13 @@
     const actionBtn = e.target.closest("[data-notification-action]");
     if (actionBtn?.getAttribute("data-notification-action") === "update") {
       await runAppUpdateFromNotification(actionBtn);
+      return;
+    }
+    const openBtn = e.target.closest("[data-open-task]");
+    if (openBtn) {
+      const taskId = openBtn.getAttribute("data-open-task");
+      notificationsDialog?.close();
+      void openTaskDetail(taskId);
       return;
     }
     const btn = e.target.closest("[data-dismiss-notification]");
@@ -775,7 +784,7 @@
     const providerFeedback = $("#detail-provider-feedback");
     if (providerRow && providerSelect) {
       const showProviderRow =
-        task.task_type !== "clarification_question" && task.task_type !== "project_overview";
+        !["clarification_question", "project_overview", "design_review", "pm_escalation"].includes(task.task_type);
       providerRow.hidden = !showProviderRow;
       if (showProviderRow) {
         const canChange = !["In progress", "Done", "Canceled"].includes(task.status);
@@ -854,6 +863,67 @@
       }
     } else {
       qSec.hidden = true;
+    }
+
+    // Design review section
+    const dSec = $("#detail-design-section");
+    if (task.task_type === "design_review") {
+      dSec.hidden = false;
+      const dBody = $("#detail-design-body");
+      const rd = task.review_data || {};
+      const dc = rd.design_change || {};
+      const alts = rd.alternatives || [];
+      const summaryHtml = `
+        <div class="design-review-summary">
+          ${rd.summary ? `<p><strong>Summary:</strong> ${escapeHtml(rd.summary)}</p>` : ""}
+          ${dc.description ? `<p><strong>Change:</strong> ${escapeHtml(dc.description)}</p>` : ""}
+          ${dc.reason ? `<p><strong>Reason:</strong> ${escapeHtml(dc.reason)}</p>` : ""}
+          ${rd.recommendation ? `<p><strong>PM/PO recommendation:</strong> ${escapeHtml(rd.recommendation)}</p>` : ""}
+          ${(rd.team_task_ids || []).length ? `<p><strong>Provisional team tasks:</strong> ${(rd.team_task_ids || []).map((id) => escapeHtml(id)).join(", ")}</p>` : ""}
+        </div>`;
+      if (task.status === "Needs approval") {
+        const altOptions = alts
+          .map((a, i) => `<option value="${i}">${escapeHtml(a.title || `Option ${i + 1}`)}${a.description ? ` — ${escapeHtml(a.description)}` : ""}</option>`)
+          .join("");
+        dBody.innerHTML = `
+          ${summaryHtml}
+          <div class="question-options">
+            ${alts.length ? `<label>Or choose an alternative<select id="design-alt-select"><option value="">Select an alternative</option>${altOptions}</select></label>` : ""}
+            <label>Your feedback (required to reject)<textarea id="design-free-text" rows="3" maxlength="5000" placeholder="Optional note, or explain the rejection"></textarea></label>
+            <div class="design-review-actions">
+              <button class="primary" type="button" id="design-approve">Approve design change</button>
+              <button class="secondary" type="button" id="design-alternative" ${alts.length ? "" : "disabled"}>Use selected alternative</button>
+              <button class="secondary" type="button" id="design-reject">Reject</button>
+            </div>
+          </div>`;
+        const submit = async (decision, altIndex) => {
+          const free_text = dBody.querySelector("#design-free-text")?.value || "";
+          await api(`/api/tasks/${encodeURIComponent(task.id)}/design-review`, {
+            method: "POST",
+            body: JSON.stringify({ decision, free_text, alternative_index: altIndex ?? null }),
+          });
+          await refreshBoard();
+        };
+        dBody.querySelector("#design-approve")?.addEventListener("click", async (ev) => {
+          ev.target.disabled = true;
+          try { await submit("approve"); } catch (err) { alert(err.message); } finally { ev.target.disabled = false; }
+        });
+        dBody.querySelector("#design-alternative")?.addEventListener("click", async (ev) => {
+          const idx = dBody.querySelector("#design-alt-select")?.value;
+          if (idx === "" || idx == null) { alert("Select an alternative first."); return; }
+          ev.target.disabled = true;
+          try { await submit("alternative", Number(idx)); } catch (err) { alert(err.message); } finally { ev.target.disabled = false; }
+        });
+        dBody.querySelector("#design-reject")?.addEventListener("click", async (ev) => {
+          ev.target.disabled = true;
+          try { await submit("reject"); } catch (err) { alert(err.message); } finally { ev.target.disabled = false; }
+        });
+      } else {
+        const decision = task.design_decision ? `Decision: ${escapeHtml(task.design_decision)}${task.design_alternative ? ` (${escapeHtml(task.design_alternative)})` : ""}.` : "";
+        dBody.innerHTML = `${summaryHtml}<p class="detail-copy">${decision}${task.design_free_text ? ` Feedback: ${escapeHtml(task.design_free_text)}` : ""}</p>`;
+      }
+    } else {
+      dSec.hidden = true;
     }
 
     // Project overview section
@@ -1017,6 +1087,9 @@
         <button class="secondary" type="button" data-overview-action="save">Save edits</button>
         <button class="primary" type="button" data-overview-action="approve">Approve and update Project context</button>`;
     }
+    if (task.status === "Needs approval" && task.merge_approval_required && task.pull_request) {
+      actionHtml += `<button class="primary" type="button" data-merge-approve="1">Approve merge</button>`;
+    }
     actionHtml += `
       <button class="secondary" type="button" data-detail-close="1">Close</button>
       <button class="danger" type="button" data-detail-delete="1">Delete task</button>`;
@@ -1082,6 +1155,24 @@
       button.disabled = true;
       try {
         await api(`/api/tasks/${encodeURIComponent(task.id)}/sync-local`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        await refreshBoard();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        button.disabled = false;
+      }
+      return;
+    }
+
+    if (e.target.closest("[data-merge-approve]")) {
+      const button = e.target.closest("[data-merge-approve]");
+      if (!confirm("Approve merging this pull request now? GitHub will re-check CI before merging.")) return;
+      button.disabled = true;
+      try {
+        await api(`/api/tasks/${encodeURIComponent(task.id)}/approve-merge`, {
           method: "POST",
           body: JSON.stringify({}),
         });
@@ -1689,6 +1780,21 @@
     state.routingProviders = routeRes.providers || ["Gemini", "GroqCloud", "OpenRouter"];
     state.routing = routeRes.routing || {};
     state.chatProvider = routeRes.chat_provider || "Gemini";
+    state.autonomy = routeRes.autonomy || {};
+    const autonomyDefaults = {
+      plan_requires_approval: false,
+      escalation_runs_provisional: true,
+      merge_requires_approval: false,
+    };
+    const autonomyControls = {
+      plan_requires_approval: "#autonomy-plan-approval",
+      escalation_runs_provisional: "#autonomy-escalation-provisional",
+      merge_requires_approval: "#autonomy-merge-approval",
+    };
+    for (const [key, selector] of Object.entries(autonomyControls)) {
+      const el = $(selector);
+      if (el) el.checked = Boolean(state.autonomy[key] ?? autonomyDefaults[key]);
+    }
     renderChatProviderSelect();
     renderConnectionsAndRouting();
   }
@@ -1803,7 +1909,15 @@
     try {
       await api("/api/routing", {
         method: "POST",
-        body: JSON.stringify({ routing: state.routing, chat_provider: state.chatProvider }),
+        body: JSON.stringify({
+          routing: state.routing,
+          chat_provider: state.chatProvider,
+          autonomy: {
+            plan_requires_approval: Boolean($("#autonomy-plan-approval")?.checked),
+            escalation_runs_provisional: $("#autonomy-escalation-provisional")?.checked ?? true,
+            merge_requires_approval: Boolean($("#autonomy-merge-approval")?.checked),
+          },
+        }),
       });
       $("#settings-dialog").close();
       await refreshBoard();
@@ -2355,6 +2469,32 @@
       chatMessages = [...chatMessages, { role: "assistant", content: err.message }];
       renderChatMessages(chatMessages);
     } finally {
+      $("#send-button").disabled = false;
+      chatInput.focus();
+    }
+  });
+
+  $("#plan-request")?.addEventListener("click", async () => {
+    const text = chatInput.value.trim();
+    if (!text) {
+      alert("Type a request to plan first.");
+      chatInput.focus();
+      return;
+    }
+    const planBtn = $("#plan-request");
+    planBtn.disabled = true;
+    $("#send-button").disabled = true;
+    try {
+      await api("/api/pm-requests", {
+        method: "POST",
+        body: JSON.stringify({ request: text, project_id: state.activeProjectId }),
+      });
+      chatInput.value = "";
+      await Promise.all([loadChat(), refreshBoard()]);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      planBtn.disabled = false;
       $("#send-button").disabled = false;
       chatInput.focus();
     }

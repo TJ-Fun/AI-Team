@@ -61,12 +61,12 @@
         <div><p class="eyebrow">AI CHAT</p><h2>PM/PO chat</h2></div>
         <div class="chat-tools"><select class="chat-provider-menu" id="chat-provider-menu" aria-label="Chat AI provider"></select><button class="secondary clear-chat" id="clear-chat" type="button">Clear conversation</button></div>
       </div>
-      <div class="chat-notice">Chat with the PM/PO agent about this project. Each project has its own conversation and context; ask it to clarify requirements or propose work, then create tasks from the board.</div>
+      <div class="chat-notice">Chat with the PM/PO agent about this project. Each project has its own conversation and context. Use Plan to send the message to PM/PO planning; chat replies are advisory.</div>
       <div class="messages" id="messages" aria-live="polite"></div>
       <form id="chat-form" class="chat-form">
         <label class="sr-only" for="chat-input">Message the PM/PO agent</label>
         <textarea id="chat-input" rows="2" placeholder="Ask the PM/PO…" maxlength="12000" required></textarea>
-        <div class="chat-actions"><button class="primary send-button" id="send-button" type="submit" aria-label="Send message">↑</button></div>
+        <div class="chat-actions"><button class="secondary plan-button" id="plan-request" type="button" title="Send this message to PM/PO planning">Plan</button><button class="primary send-button" id="send-button" type="submit" aria-label="Send message">↑</button></div>
       </form>
       <p class="hint">Enter sends · Shift+Enter for a new line</p>
     </section>
@@ -167,6 +167,11 @@
         <h3>Your answer</h3>
         <div id="detail-question-body"></div>
       </div>
+      <div id="detail-design-section" hidden>
+        <h3>Design change proposed by PM/PO</h3>
+        <p class="draft-note">Provisional team tasks are already running. Approve to confirm them, reject to cancel and send feedback back to PM/PO, or pick an alternative.</p>
+        <div id="detail-design-body"></div>
+      </div>
       <div id="detail-overview-section" hidden>
         <h3>Proposed Project context</h3>
         <p class="draft-note">Edit any document before approval. Approval replaces these three context documents; confirmed outcomes are kept. Previous versions are saved for rollback.</p>
@@ -248,6 +253,11 @@
           <section class="route-role"><strong>Chat window</strong><div class="route-order"><label>Provider
             <select id="chat-provider-select"></select>
           </label></div><p class="draft-note">The PM/PO chat uses this provider and always receives the active project's context and task board.</p></section>
+          <section class="route-role"><strong>Autonomy</strong><div class="autonomy-controls">
+            <label class="autonomy-check"><input type="checkbox" id="autonomy-plan-approval"> Require approval before PM-planned work tasks start</label>
+            <label class="autonomy-check"><input type="checkbox" id="autonomy-escalation-provisional" checked> Allow provisional escalation tasks to run during design review</label>
+            <label class="autonomy-check"><input type="checkbox" id="autonomy-merge-approval"> Require approval before merging validated PRs</label>
+          </div><p class="draft-note">Autonomy controls how much PM/PO and repository work can do without asking. Defaults preserve automatic planning, provisional escalation tasks, and automatic merges.</p></section>
           <div class="form-error" id="routing-error" role="alert"></div>
           <div class="dialog-actions"><button class="primary" type="submit">Save routing</button></div>
         </form>
