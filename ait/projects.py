@@ -469,6 +469,8 @@ def read_task_replies(task_id: str) -> list[dict[str, Any]]:
         "Antigravity": "antigravity",
         "GroqCloud": "groqcloud",
         "OpenRouter": "openrouter",
+        "OmniRoute": "omniroute",
+        "9Router": "9router",
     }
     replies: list[dict[str, Any]] = []
     for att in task.get("attempts", []) or []:

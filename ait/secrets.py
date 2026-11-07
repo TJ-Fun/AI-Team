@@ -81,4 +81,8 @@ def configured_providers() -> list[str]:
         result.append("GroqCloud")
     if get_provider_key("openrouter"):
         result.append("OpenRouter")
+    if get_provider_key("omniroute"):
+        result.append("OmniRoute")
+    if get_provider_key("ninerouter"):
+        result.append("9Router")
     return result

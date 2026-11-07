@@ -110,7 +110,7 @@
       <label>Request<textarea name="request" rows="4" maxlength="12000" placeholder="Describe what needs to be done" required></textarea></label>
       <div class="two-columns">
         <label>Work role<select name="role"><option>PM/PO</option><option>Frontend developer</option><option>Backend developer</option><option>QA</option><option>UI designer</option><option>Documentation</option></select></label>
-        <label>AI provider<select name="provider"><option>Automatic</option><option>Gemini</option><option>GroqCloud</option><option>OpenRouter</option></select></label>
+        <label>AI provider<select name="provider"><option>Automatic</option><option>Gemini</option><option>GroqCloud</option><option>OpenRouter</option><option>OmniRoute</option><option>9Router</option></select></label>
       </div>
       <div class="two-columns"><label>Project<select name="project_id"></select></label><label>Sub-project<select name="module_id"><option value="">Whole project</option></select></label></div>
       <label>Acceptance checks<textarea name="checks" rows="3" placeholder="One check per line. For automatic checks use exact:text, contains:text, or not_contains:text"></textarea></label>
@@ -152,6 +152,8 @@
           <option value="Gemini">Gemini</option>
           <option value="GroqCloud">GroqCloud</option>
           <option value="OpenRouter">OpenRouter</option>
+          <option value="OmniRoute">OmniRoute</option>
+          <option value="9Router">9Router</option>
         </select>
         <span id="detail-provider-feedback" class="detail-provider-feedback"></span>
       </div>

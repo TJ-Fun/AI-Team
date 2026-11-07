@@ -1,5 +1,17 @@
 # Version log
 
+## 0.38 — 2026-11-07
+
+- Switched the browser interface to a dark theme: dark surfaces, borders, form controls, dialogs, chat, statistics, and state badges, with `color-scheme: dark` for native controls and scrollbars.
+- Updated documentation to 0.38.
+
+## 0.37 — 2026-11-07
+
+- Added OmniRoute and 9Router as AI providers. Both are self-hosted OpenAI-compatible gateways; the app talks to them through configurable base URLs (`OMNIROUTE_BASE_URL`, `NINEROUTER_BASE_URL`, defaulting to `http://localhost:20128/v1` and `http://localhost:20129/v1`) and model names (`OMNIROUTE_MODEL`, `NINEROUTER_MODEL`, defaulting to `auto`).
+- New connection families `omniroute` and `ninerouter` with `OMNIROUTE_API_KEY` / `NINEROUTER_API_KEY` credentials, connection tests against each gateway's `/models` endpoint, and per-provider activity counters exposed in `/api/status`.
+- The OpenAI-compatible provider path was generalized into a provider config table shared by task dispatch and PM/PO chat; gateways participate in automatic routing, fallback, statistics, and repository manifest tasks like the existing providers.
+- Updated documentation to 0.37.
+
 ## 0.36 — 2026-11-07
 
 - Refined all default agent prompts to match the enforced system contracts: PM/PO planning and escalation limits are now stated explicitly, and the JSON-schema requirement is scoped to planning requests so it no longer conflicts with chat mode.

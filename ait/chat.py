@@ -14,7 +14,13 @@ def get_chat_provider() -> str:
 
 
 def chat_provider_model(provider: str) -> str:
-    return {"Gemini": GEMINI_MODEL, "GroqCloud": GROQ_MODEL, "OpenRouter": OPENROUTER_MODEL}.get(provider, GEMINI_MODEL)
+    return {
+        "Gemini": GEMINI_MODEL,
+        "GroqCloud": GROQ_MODEL,
+        "OpenRouter": OPENROUTER_MODEL,
+        "OmniRoute": OMNIROUTE_MODEL,
+        "9Router": NINEROUTER_MODEL,
+    }.get(provider, GEMINI_MODEL)
 
 
 def chat_system_prompt(project_id: str) -> str:
@@ -103,13 +109,12 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
             raise ProviderFailure("Gemini", 400, "Gemini returned no text.")
         return text, provider, model
 
-    conn_id = "groq" if provider == "GroqCloud" else "openrouter"
+    cfg = OPENAI_COMPAT_PROVIDERS.get(provider)
+    if not cfg:
+        raise ProviderFailure(provider, 400, f"Unsupported chat provider: {provider}")
+    conn_id = cfg["conn_id"]
     api_key = get_provider_key(conn_id)
-    endpoint = (
-        "https://api.groq.com/openai/v1/chat/completions"
-        if provider == "GroqCloud"
-        else "https://openrouter.ai/api/v1/chat/completions"
-    )
+    endpoint = cfg["endpoint"]
     messages: list[dict[str, str]] = [{"role": "system", "content": sys_prompt}]
     messages.extend(history)
     payload = {

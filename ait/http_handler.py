@@ -77,6 +77,10 @@ class Handler(BaseHTTPRequestHandler):
                     "openrouter_model": OPENROUTER_MODEL,
                     "openrouter_configured": bool(get_provider_key("openrouter")),
                     "groq_model": GROQ_MODEL,
+                    "omniroute_model": OMNIROUTE_MODEL,
+                    "omniroute_configured": bool(get_provider_key("omniroute")),
+                    "ninerouter_model": NINEROUTER_MODEL,
+                    "ninerouter_configured": bool(get_provider_key("ninerouter")),
                 }
             )
 
@@ -94,6 +98,10 @@ class Handler(BaseHTTPRequestHandler):
                     "openrouter_configured": bool(get_provider_key("openrouter")),
                     "openrouter_model": OPENROUTER_MODEL,
                     "groq_configured": bool(get_provider_key("groq")),
+                    "omniroute_working": activity["omniroute_working"],
+                    "omniroute_configured": bool(get_provider_key("omniroute")),
+                    "ninerouter_working": activity["ninerouter_working"],
+                    "ninerouter_configured": bool(get_provider_key("ninerouter")),
                     "github_configured": bool(get_provider_key("github")),
                     "watchdog": WATCHDOG_STATUS,
                 }

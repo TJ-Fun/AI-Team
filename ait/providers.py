@@ -879,17 +879,48 @@ def normalize_github_repo_url(raw_repo: str) -> str:
     return cleaned
 
 
+OPENAI_COMPAT_PROVIDERS: dict[str, dict[str, Any]] = {
+    "GroqCloud": {
+        "conn_id": "groq",
+        "model": GROQ_MODEL,
+        "endpoint": "https://api.groq.com/openai/v1/chat/completions",
+        "max_tokens_key": "max_completion_tokens",
+        "fixed_max_tokens": 8192,
+    },
+    "OpenRouter": {
+        "conn_id": "openrouter",
+        "model": OPENROUTER_MODEL,
+        "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+        "max_tokens_key": "max_tokens",
+        "fixed_max_tokens": None,
+    },
+    "OmniRoute": {
+        "conn_id": "omniroute",
+        "model": OMNIROUTE_MODEL,
+        "endpoint": f"{OMNIROUTE_BASE_URL}/chat/completions",
+        "max_tokens_key": "max_tokens",
+        "fixed_max_tokens": None,
+    },
+    "9Router": {
+        "conn_id": "ninerouter",
+        "model": NINEROUTER_MODEL,
+        "endpoint": f"{NINEROUTER_BASE_URL}/chat/completions",
+        "max_tokens_key": "max_tokens",
+        "fixed_max_tokens": None,
+    },
+}
+
+
 def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[str, str, dict[str, Any]]:
-    conn_id = "groq" if provider == "GroqCloud" else "openrouter"
+    cfg = OPENAI_COMPAT_PROVIDERS.get(provider)
+    if not cfg:
+        raise ProviderFailure(provider, 400, f"Unsupported OpenAI-compatible provider: {provider}")
+    conn_id = cfg["conn_id"]
     api_key = get_provider_key(conn_id)
     if not api_key:
         raise ProviderFailure(provider, 401, f"{provider} API key is not configured.")
-    model = GROQ_MODEL if provider == "GroqCloud" else OPENROUTER_MODEL
-    endpoint = (
-        "https://api.groq.com/openai/v1/chat/completions"
-        if provider == "GroqCloud"
-        else "https://openrouter.ai/api/v1/chat/completions"
-    )
+    model = cfg["model"]
+    endpoint = cfg["endpoint"]
     role = str(task.get("assigned_role") or "PM/PO")
     checks = task.get("acceptance_checks") or []
     ctx = project_context_for_role(role, task)
@@ -919,8 +950,8 @@ def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[st
         ],
         "temperature": 0.2,
     }
-    if provider == "GroqCloud":
-        payload["max_completion_tokens"] = 8192
+    if cfg["max_tokens_key"] == "max_completion_tokens":
+        payload["max_completion_tokens"] = int(cfg["fixed_max_tokens"])
     else:
         payload["max_tokens"] = 4096 if task.get("task_type") == "pm_planning" else 2048
 
@@ -1054,6 +1085,36 @@ def test_provider_connection(conn_id: str) -> dict[str, Any]:
             "message": f"OpenRouter connected (default model: {OPENROUTER_MODEL}).",
         }
 
+    if conn_id in ("omniroute", "ninerouter"):
+        base = OMNIROUTE_BASE_URL if conn_id == "omniroute" else NINEROUTER_BASE_URL
+        label = CONNECTION_SPECS[conn_id][0]
+        model = OMNIROUTE_MODEL if conn_id == "omniroute" else NINEROUTER_MODEL
+        req = urllib.request.Request(
+            f"{base}/models",
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {api_key}",
+                "User-Agent": HTTP_USER_AGENT,
+            },
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                parsed = json.loads(resp.read().decode("utf-8", errors="replace"))
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", errors="replace")[:400]
+            raise ValueError(f"{label} HTTP {exc.code}: {raw}") from exc
+        except Exception as exc:
+            raise ValueError(f"{label} request failed: {exc}") from exc
+        models = [str(m.get("id", "")) for m in (parsed.get("data") or []) if isinstance(m, dict)]
+        return {
+            "connected": True,
+            "provider": label,
+            "model": model,
+            "model_available": (model in models) if models else None,
+            "message": f"{label} connected ({len(models)} models listed; configured model '{model}').",
+        }
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(GEMINI_MODEL, safe='')}?key={urllib.parse.quote(api_key, safe='')}"
     req = urllib.request.Request(
         url,
@@ -1093,6 +1154,8 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         "Gemini": GEMINI_MODEL,
         "GroqCloud": GROQ_MODEL,
         "OpenRouter": OPENROUTER_MODEL,
+        "OmniRoute": OMNIROUTE_MODEL,
+        "9Router": NINEROUTER_MODEL,
     }
     model = model_map[provider]
     with STATE_LOCK:
@@ -1220,11 +1283,15 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
 
 
 def bump_provider_activity(provider: str, delta: int) -> None:
-    global ACTIVE_GEMINI_COUNT, ACTIVE_GROQ_COUNT, ACTIVE_OPENROUTER_COUNT
+    global ACTIVE_GEMINI_COUNT, ACTIVE_GROQ_COUNT, ACTIVE_OPENROUTER_COUNT, ACTIVE_OMNIROUTE_COUNT, ACTIVE_NINEROUTER_COUNT
     if provider == "Gemini":
         ACTIVE_GEMINI_COUNT = max(0, ACTIVE_GEMINI_COUNT + delta)
     elif provider == "GroqCloud":
         ACTIVE_GROQ_COUNT = max(0, ACTIVE_GROQ_COUNT + delta)
+    elif provider == "OmniRoute":
+        ACTIVE_OMNIROUTE_COUNT = max(0, ACTIVE_OMNIROUTE_COUNT + delta)
+    elif provider == "9Router":
+        ACTIVE_NINEROUTER_COUNT = max(0, ACTIVE_NINEROUTER_COUNT + delta)
     else:
         ACTIVE_OPENROUTER_COUNT = max(0, ACTIVE_OPENROUTER_COUNT + delta)
 
@@ -1677,4 +1744,6 @@ def provider_activity_status() -> dict[str, bool]:
         "gemini_working": ACTIVE_GEMINI_COUNT > 0,
         "groq_working": ACTIVE_GROQ_COUNT > 0,
         "openrouter_working": ACTIVE_OPENROUTER_COUNT > 0,
+        "omniroute_working": ACTIVE_OMNIROUTE_COUNT > 0,
+        "ninerouter_working": ACTIVE_NINEROUTER_COUNT > 0,
     }

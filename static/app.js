@@ -27,7 +27,7 @@
     encryptionAvailable: true,
     routing: {},
     routingRoles: [],
-    routingProviders: ["Gemini", "GroqCloud", "OpenRouter"],
+    routingProviders: ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"],
     autonomy: {},
     repoMode: "files",
     repoCurrentPath: "",
@@ -128,7 +128,7 @@
 
   // --- Header & Status ---
   function chatProviderOptions(selected) {
-    const providers = state.routingProviders.length ? state.routingProviders : ["Gemini", "GroqCloud", "OpenRouter"];
+    const providers = state.routingProviders.length ? state.routingProviders : ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"];
     const known = state.connections.length > 0;
     return providers
       .map(
@@ -170,7 +170,7 @@
       const track = $(".cpu-track");
       if (track) track.setAttribute("aria-valuenow", String(cpu ?? 0));
 
-      const working = Boolean(data.chat_working || data.gemini_working || data.groq_working || data.openrouter_working);
+      const working = Boolean(data.chat_working || data.gemini_working || data.groq_working || data.openrouter_working || data.omniroute_working || data.ninerouter_working);
       state.llmBusy = Boolean(data.chat_working);
       const llmState = $("#llm-state");
       llmState.textContent = data.gemini_working
@@ -179,9 +179,13 @@
           ? "GroqCloud working"
           : data.openrouter_working
             ? "Hosted AI working"
-            : data.chat_working
-              ? "Chat working"
-              : "Idle";
+            : data.omniroute_working
+              ? "OmniRoute working"
+              : data.ninerouter_working
+                ? "9Router working"
+                : data.chat_working
+                  ? "Chat working"
+                  : "Idle";
       llmState.classList.toggle("working", working);
       $("#clear-chat").disabled = state.llmBusy;
 
@@ -189,6 +193,8 @@
         `Gemini ${data.gemini_configured ? "connected" : "not connected"} · ` +
         `GroqCloud ${data.groq_configured ? "connected" : "not connected"} · ` +
         `OpenRouter ${data.openrouter_configured ? "connected" : "not connected"} · ` +
+        `OmniRoute ${data.omniroute_configured ? "connected" : "not connected"} · ` +
+        `9Router ${data.ninerouter_configured ? "connected" : "not connected"} · ` +
         `GitHub ${data.github_configured ? "connected" : "not connected"}`;
 
       const wd = data.watchdog || {};
@@ -1663,6 +1669,8 @@
       if ((providerName === "Gemini") && c.id === "gemini") return true;
       if (providerName === "GroqCloud" && c.id === "groq") return true;
       if (providerName === "OpenRouter" && c.id === "openrouter") return true;
+      if (providerName === "OmniRoute" && c.id === "omniroute") return true;
+      if (providerName === "9Router" && c.id === "ninerouter") return true;
       return false;
     });
   }
@@ -1779,7 +1787,7 @@
     state.connections = connRes.connections || [];
     state.encryptionAvailable = connRes.encryption_available !== false;
     state.routingRoles = routeRes.roles || [];
-    state.routingProviders = routeRes.providers || ["Gemini", "GroqCloud", "OpenRouter"];
+    state.routingProviders = routeRes.providers || ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"];
     state.routing = routeRes.routing || {};
     state.chatProvider = routeRes.chat_provider || "Gemini";
     state.autonomy = routeRes.autonomy || {};
