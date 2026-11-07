@@ -169,7 +169,7 @@
       </div>
       <div id="detail-design-section" hidden>
         <h3>Design change proposed by PM/PO</h3>
-        <p class="draft-note">Provisional team tasks are already running. Approve to confirm them, reject to cancel and send feedback back to PM/PO, or pick an alternative.</p>
+        <p class="draft-note">Provisional team tasks may already be running or drafted depending on autonomy. Approve to confirm them, reject to cancel and send feedback back to PM/PO, or pick an alternative.</p>
         <div id="detail-design-body"></div>
       </div>
       <div id="detail-overview-section" hidden>
@@ -254,10 +254,10 @@
             <select id="chat-provider-select"></select>
           </label></div><p class="draft-note">The PM/PO chat uses this provider and always receives the active project's context and task board.</p></section>
           <section class="route-role"><strong>Autonomy</strong><div class="autonomy-controls">
-            <label class="autonomy-check"><input type="checkbox" id="autonomy-plan-approval"> Require approval before PM-planned work tasks start</label>
+            <label class="autonomy-check"><input type="checkbox" id="autonomy-plan-approval"> Require plan approval before PM-planned work tasks start (approving the project overview releases them)</label>
             <label class="autonomy-check"><input type="checkbox" id="autonomy-escalation-provisional" checked> Allow provisional escalation tasks to run during design review</label>
             <label class="autonomy-check"><input type="checkbox" id="autonomy-merge-approval"> Require approval before merging validated PRs</label>
-          </div><p class="draft-note">Autonomy controls how much PM/PO and repository work can do without asking. Defaults preserve automatic planning, provisional escalation tasks, and automatic merges.</p></section>
+          </div><p class="draft-note">Autonomy controls how much PM/PO and repository work can do without asking. Defaults require plan approval before PM-planned work starts, allow provisional escalation tasks during design review, and merge validated PRs automatically.</p></section>
           <div class="form-error" id="routing-error" role="alert"></div>
           <div class="dialog-actions"><button class="primary" type="submit">Save routing</button></div>
         </form>

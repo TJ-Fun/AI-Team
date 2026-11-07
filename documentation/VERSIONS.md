@@ -1,5 +1,18 @@
 # Version log
 
+## 0.33 — 2026-11-07
+
+- Made plan approval the default gate: PM-planned work tasks are created as drafts and released by project-overview approval unless autonomy disables it.
+- Tightened PM escalation design reviews: a design change must include executable provisional team tasks and at least one alternative.
+- Approving a design review now cancels the superseded blocked source task automatically; reject/alternative still cancels unfinished provisional tasks and queues PM/PO round 2.
+- Updated documentation to 0.33.
+
+## 0.32 — 2026-11-07
+
+- Approving a PM/PO project overview now releases that plan's draft work tasks into the Ready queue, making overview approval the single plan gate when plan approval is required.
+- Clarified autonomy copy: plan approval is enforced by the project-overview approval step.
+- Updated documentation to 0.32.
+
 ## 0.31 — 2026-11-07
 
 - Added a chat **Plan** button that sends the current message to PM/PO planning (`/api/pm-requests`); chat replies remain advisory.

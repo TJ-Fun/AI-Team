@@ -243,7 +243,7 @@ def save_app_config(config: dict[str, Any]) -> None:
 
 
 AUTONOMY_DEFAULTS: dict[str, bool] = {
-    "plan_requires_approval": False,
+    "plan_requires_approval": True,
     "escalation_runs_provisional": True,
     "merge_requires_approval": False,
 }
@@ -334,6 +334,7 @@ ESCALATION_CONTRACT = (
     "team_tasks are executed immediately while the user reviews the design change; keep them small and reversible. "
     "Set phase when the work belongs to a planned phase; if omitted, the blocked task's phase is inherited. "
     "alternatives must list 1 to 4 other viable solutions with honest trade-offs. "
+    "If the user approves the design change, the blocked source task is canceled as superseded; include any still-required work in team_tasks. "
     "You may not edit existing confirmed tasks; express every requirement change through this response. "
     "If the failure needs no design change, return design_change as null and team_tasks as an empty list."
 )
@@ -2945,6 +2946,12 @@ def parse_escalation_response(reply: str, project_id: str) -> dict[str, Any]:
             elif isinstance(a, str) and a.strip():
                 alternatives.append({"title": a.strip()[:160], "description": ""})
 
+    if design_change:
+        if not team_tasks:
+            raise ValueError("A design change must include at least one provisional team task.")
+        if not alternatives:
+            raise ValueError("A design change must include at least one alternative.")
+
     return {
         "type": "escalation",
         "summary": summary,
@@ -5398,7 +5405,34 @@ class Handler(BaseHTTPRequestHandler):
                     {"at": ts, "type": "overview_approved", "from": "Needs approval", "to": "Done", "message": "User approved project overview."}
                 )
                 write_task(task)
-            return self.send_json({"task": task, "snapshots": snapshots})
+
+                released: list[str] = []
+                plan_id = str(task.get("source_plan_task_id") or "")
+                if plan_id:
+                    for wt in read_tasks():
+                        if (
+                            wt.get("task_type") == "work"
+                            and wt.get("status") == "Draft"
+                            and not wt.get("pending_design_review")
+                            and str(wt.get("source_plan_task_id") or "") == plan_id
+                        ):
+                            wt["status"] = "Ready"
+                            wt["updated_at"] = ts
+                            wt["dispatch_note"] = "Plan approved; queued for dispatch."
+                            wt.pop("retry_after", None)
+                            wt.pop("waiting_reason", None)
+                            wt.setdefault("activity", []).append(
+                                {"at": ts, "type": "plan_released", "from": "Draft", "to": "Ready", "message": f"Released by project overview approval {tid}."}
+                            )
+                            write_task(wt)
+                            released.append(str(wt.get("id")))
+                    if released:
+                        task.setdefault("activity", []).append(
+                            {"at": ts, "type": "plan_tasks_released", "message": f"Plan approval released {len(released)} draft work task(s): {', '.join(released)}."}
+                        )
+                        write_task(task)
+                        DISPATCH_EVENT.set()
+            return self.send_json({"task": task, "snapshots": snapshots, "released_task_ids": released})
 
         m_design = re.fullmatch(r"/api/tasks/(T-\d{4,})/design-review", path)
         if m_design:
@@ -5473,14 +5507,18 @@ class Handler(BaseHTTPRequestHandler):
                         pass
                     src = read_task(str(review.get("source_task_id") or ""))
                     if src and src.get("status") == "Blocked":
+                        src["status"] = "Canceled"
+                        src["updated_at"] = ts
+                        src["superseded_by_design_review"] = tid
                         src.setdefault("activity", []).append(
                             {
                                 "at": ts,
                                 "type": "design_review_approved",
-                                "message": f"Design review {tid} approved; provisional tasks confirmed. This task remains blocked—retry, edit, or cancel it.",
+                                "from": "Blocked",
+                                "to": "Canceled",
+                                "message": f"Design review {tid} approved; provisional tasks confirmed and this blocked task was canceled as superseded.",
                             }
                         )
-                        src["updated_at"] = ts
                         write_task(src)
                 else:
                     reason_bits = [f"User {decision} design review {tid}."]

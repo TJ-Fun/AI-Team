@@ -1782,7 +1782,7 @@
     state.chatProvider = routeRes.chat_provider || "Gemini";
     state.autonomy = routeRes.autonomy || {};
     const autonomyDefaults = {
-      plan_requires_approval: false,
+      plan_requires_approval: true,
       escalation_runs_provisional: true,
       merge_requires_approval: false,
     };
