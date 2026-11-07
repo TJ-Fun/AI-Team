@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.33 · Updated 2026-11-07
+Version 0.34 · Updated 2026-11-07
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -14,7 +14,8 @@ The application is intended for a trusted, single-user environment. The default 
 
 | Path | Purpose |
 |---|---|
-| `server.py` | HTTP API, persistent data helpers, AI-provider clients, Git operations, background workers, logging, and app update workflow. |
+| `server.py` | Thin entry point; delegates to the `ait` package. Kept for the systemd unit and existing deployment commands. |
+| `ait/` | Application package split from the former monolithic `server.py`. `common.py` holds constants, logging, locks, and shared helpers; `settings.py`, `secrets.py`, `prompts.py`, `projects.py`, `git_ops.py`, `notifications.py`, `providers.py`, `chat.py`, and `http_handler.py` hold the domain logic; `main.py` starts background workers and the HTTP server. The package shares one flat namespace across modules, mirroring the original single-file layout. |
 | `static/index.html` | Application layout, dialogs, forms, and tab structure. |
 | `static/app.js` | Browser behavior, API calls, rendering, polling, form submissions, and dialogs. |
 | `static/style.css` | Application styling and responsive layouts. |
@@ -227,7 +228,7 @@ The app's rotating file log and the systemd journal contain different informatio
 | `OPENROUTER_API_KEY` | optional | OpenRouter credential. |
 | `GITHUB_TOKEN` | optional | GitHub repository connector credential. |
 
-Additional model identifiers and user-agent values can be configured through the corresponding environment variables in `server.py`.
+Additional model identifiers and user-agent values can be configured through the corresponding environment variables in `ait/common.py`.
 
 ## 7. Operational and security notes
 
@@ -253,7 +254,7 @@ Open `http://127.0.0.1:8765`. For a custom data directory, set `TEAM_DATA_DIR` b
 Useful checks after changing server or frontend code:
 
 ```bash
-python3 -m py_compile server.py
+python3 -m py_compile server.py ait/*.py
 node --check static/app.js
 ```
 

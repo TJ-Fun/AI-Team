@@ -1,5 +1,12 @@
 # Version log
 
+## 0.34 — 2026-11-07
+
+- Split the monolithic `server.py` (~5,900 lines) into the `ait` package: `common.py` (constants, logging, locks, shared helpers), `settings.py`, `secrets.py`, `prompts.py`, `projects.py`, `git_ops.py`, `notifications.py`, `providers.py`, `chat.py`, `http_handler.py`, and `main.py`.
+- `server.py` remains a thin entry point so the systemd unit and existing deployment commands keep working unchanged.
+- The package shares one flat namespace across modules, mirroring the original single-file layout; provider busy flags are now read through `provider_activity_status()` so the status API reports live values.
+- Updated documentation to 0.34.
+
 ## 0.33 — 2026-11-07
 
 - Made plan approval the default gate: PM-planned work tasks are created as drafts and released by project-overview approval unless autonomy disables it.
