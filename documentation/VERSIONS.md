@@ -1,5 +1,14 @@
 # Version log
 
+## 0.35 — 2026-11-07
+
+- Fixed provider activity accounting: GroqCloud dispatches were counted as OpenRouter work; each provider now has its own busy counter and `/api/status` exposes `groq_working`.
+- The status bar now shows "GroqCloud working" when a GroqCloud task is in flight.
+- Provider worker loops now log dispatch exceptions instead of failing silently.
+- `automatic_retries` resets after a successful agent reply, so recovered tasks no longer hit the retry limit prematurely.
+- Secret key generation is now guarded by a lock to avoid a first-start race.
+- Updated documentation to 0.35.
+
 ## 0.34 — 2026-11-07
 
 - Split the monolithic `server.py` (~5,900 lines) into the `ait` package: `common.py` (constants, logging, locks, shared helpers), `settings.py`, `secrets.py`, `prompts.py`, `projects.py`, `git_ops.py`, `notifications.py`, `providers.py`, `chat.py`, `http_handler.py`, and `main.py`.

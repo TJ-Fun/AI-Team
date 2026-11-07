@@ -6,6 +6,9 @@ from ait.common import *
 
 
 # --- Encrypted Credentials & Connections ---
+SECRET_CIPHER_LOCK = threading.Lock()
+
+
 def secret_cipher() -> Any | None:
     if Fernet is None:
         return None
@@ -15,10 +18,12 @@ def secret_cipher() -> Any | None:
     ensure_data()
     key_path = DATA / "settings" / "secret.key"
     if not key_path.is_file():
-        generated = Fernet.generate_key()
-        fd = os.open(str(key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(generated)
+        with SECRET_CIPHER_LOCK:
+            if not key_path.is_file():
+                generated = Fernet.generate_key()
+                fd = os.open(str(key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "wb") as handle:
+                    handle.write(generated)
     return Fernet(key_path.read_bytes().strip())
 
 

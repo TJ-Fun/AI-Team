@@ -1214,8 +1214,17 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         return task
 
 
+def bump_provider_activity(provider: str, delta: int) -> None:
+    global ACTIVE_GEMINI_COUNT, ACTIVE_GROQ_COUNT, ACTIVE_OPENROUTER_COUNT
+    if provider == "Gemini":
+        ACTIVE_GEMINI_COUNT = max(0, ACTIVE_GEMINI_COUNT + delta)
+    elif provider == "GroqCloud":
+        ACTIVE_GROQ_COUNT = max(0, ACTIVE_GROQ_COUNT + delta)
+    else:
+        ACTIVE_OPENROUTER_COUNT = max(0, ACTIVE_OPENROUTER_COUNT + delta)
+
+
 def dispatch_one_for_provider(provider: str) -> bool:
-    global ACTIVE_GEMINI_COUNT, ACTIVE_OPENROUTER_COUNT
     task = claim_task_for_provider(provider)
     if not task:
         return False
@@ -1223,10 +1232,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
     repository_key = str(task.pop("_repository_key", ""))
     attempt_num = int(task["attempts"][-1]["number"])
     qa_active = bool(task.get("qa_attempt_active"))
-    if provider == "Gemini":
-        ACTIVE_GEMINI_COUNT += 1
-    else:
-        ACTIVE_OPENROUTER_COUNT += 1
+    bump_provider_activity(provider, 1)
 
     try:
         if provider == "Gemini":
@@ -1324,6 +1330,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
                         att["finished_at"] = ts
                         att["reply_file"] = rel
                 fresh["latest_reply_file"] = rel
+                fresh["automatic_retries"] = 0
                 fresh["updated_at"] = ts
 
                 if qa_active:
@@ -1444,9 +1451,11 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 ts = now_iso()
                 retryable = failure.status in (408, 429) or failure.status >= 500
                 fallbackable = retryable or failure.status in (400, 401, 403)
-                fallback = fallbackable and (
-                    qa_active or (fresh.get("provider") == "Automatic" and has_untried_alternate(fresh, provider))
-                ) and has_untried_alternate(fresh, provider)
+                fallback = (
+                    fallbackable
+                    and has_untried_alternate(fresh, provider)
+                    and (qa_active or fresh.get("provider") == "Automatic")
+                )
                 next_status = "Ready" if fallback else ("Waiting for capacity" if retryable else "Blocked")
                 folder = provider.lower().replace(" ", "")
                 rel = f"replies/{tid}/{folder}/attempt-{attempt_num:03d}.json"
@@ -1500,10 +1509,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
         if fallback:
             DISPATCH_EVENT.set()
     finally:
-        if provider == "Gemini":
-            ACTIVE_GEMINI_COUNT = max(0, ACTIVE_GEMINI_COUNT - 1)
-        else:
-            ACTIVE_OPENROUTER_COUNT = max(0, ACTIVE_OPENROUTER_COUNT - 1)
+        bump_provider_activity(provider, -1)
         if repository_key:
             with STATE_LOCK:
                 ACTIVE_REPOSITORY_TASKS.discard(repository_key)
@@ -1519,6 +1525,7 @@ def provider_worker_loop(provider: str) -> None:
                 DISPATCH_EVENT.wait(timeout=3.0)
                 DISPATCH_EVENT.clear()
         except Exception:
+            logger.exception("Provider worker %s dispatch failed", provider)
             time.sleep(3.0)
 
 
@@ -1663,5 +1670,6 @@ def provider_activity_status() -> dict[str, bool]:
     """Return live provider busy flags (read from this module's globals)."""
     return {
         "gemini_working": ACTIVE_GEMINI_COUNT > 0,
+        "groq_working": ACTIVE_GROQ_COUNT > 0,
         "openrouter_working": ACTIVE_OPENROUTER_COUNT > 0,
     }

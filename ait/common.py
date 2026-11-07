@@ -207,6 +207,7 @@ DISPATCH_EVENT = threading.Event()
 ACTIVE_CHAT_LOCK = threading.Lock()
 ACTIVE_CHAT_COUNT = 0
 ACTIVE_GEMINI_COUNT = 0
+ACTIVE_GROQ_COUNT = 0
 ACTIVE_OPENROUTER_COUNT = 0
 ACTIVE_REPOSITORY_TASKS: set[str] = set()
 MAX_QA_FAILURES = 3
@@ -285,6 +286,8 @@ def ensure_data() -> None:
         dst = DATA / "prompts" / f"{slug}.md"
         if src.is_file() and not dst.exists():
             shutil.copy2(src, dst)
+
+
 def append_event(event: dict[str, Any]) -> None:
     ensure_data()
     with STATE_LOCK:

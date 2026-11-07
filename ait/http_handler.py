@@ -87,6 +87,7 @@ class Handler(BaseHTTPRequestHandler):
                     "cpu_percent": get_cpu_percent(),
                     "chat_working": ACTIVE_CHAT_COUNT > 0,
                     "gemini_working": activity["gemini_working"],
+                    "groq_working": activity["groq_working"],
                     "gemini_configured": bool(get_provider_key("gemini")),
                     "gemini_model": GEMINI_MODEL,
                     "openrouter_working": activity["openrouter_working"],

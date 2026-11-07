@@ -170,16 +170,18 @@
       const track = $(".cpu-track");
       if (track) track.setAttribute("aria-valuenow", String(cpu ?? 0));
 
-      const working = Boolean(data.chat_working || data.gemini_working || data.openrouter_working);
+      const working = Boolean(data.chat_working || data.gemini_working || data.groq_working || data.openrouter_working);
       state.llmBusy = Boolean(data.chat_working);
       const llmState = $("#llm-state");
-      llmState.textContent = data.openrouter_working
-        ? "Hosted AI working"
-        : data.gemini_working
-          ? "Gemini working"
-          : data.chat_working
-            ? "Chat working"
-            : "Idle";
+      llmState.textContent = data.gemini_working
+        ? "Gemini working"
+        : data.groq_working
+          ? "GroqCloud working"
+          : data.openrouter_working
+            ? "Hosted AI working"
+            : data.chat_working
+              ? "Chat working"
+              : "Idle";
       llmState.classList.toggle("working", working);
       $("#clear-chat").disabled = state.llmBusy;
 
