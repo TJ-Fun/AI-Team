@@ -1,5 +1,13 @@
 # Version log
 
+## 0.29 — 2026-11-07
+
+- Added strict reply envelopes for all remaining agent roles; malformed replies are rejected and fall back to another provider.
+- PR branches are now based on the exact repository commit the agent's source snapshot was taken from, preventing stale-snapshot overwrites.
+- Added GitHub Actions check-run gating: merges wait for pending checks, failed checks block the merge with a notification, and a 90-second poller completes merges automatically once checks pass.
+- Removed the unused Orchestrator prompt; the chat is PM/PO-only.
+- Documented existing concurrency limits (one task per provider, serialized per repository) and attempt timeouts.
+
 ## 0.28 — 2026-11-07
 
 - Turned the chat panel into a direct PM/PO agent conversation with a provider dropdown in the chat header.

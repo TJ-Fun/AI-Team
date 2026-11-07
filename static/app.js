@@ -885,6 +885,8 @@
     const ghErr = $("#detail-github-error");
     const repositoryErrors = [
       task.github_error ? `GitHub: ${task.github_error}` : "",
+      task.ci_status === "failed" && task.ci_error ? `CI: ${task.ci_error}` : "",
+      task.ci_status === "pending" ? "CI: GitHub Actions checks are still running; merge is waiting for them." : "",
       task.local_sync_error ? `Local checkout: ${task.local_sync_error}` : "",
     ].filter(Boolean);
     if (repositoryErrors.length) {
@@ -1172,7 +1174,7 @@
     const res = await api("/api/prompts");
     state.prompts = res.prompts || [];
     const initial = state.prompts.find((p) => p.id === promptSelect?.value) ||
-      state.prompts.find((p) => p.id === "orchestrator") ||
+      state.prompts.find((p) => p.id === "pm_po") ||
       state.prompts[0];
     if (initial) {
       renderPromptOptions(initial.id);
@@ -2254,7 +2256,7 @@
     }
   });
 
-  // --- Orchestrator Chat ---
+  // --- PM/PO Chat ---
   const messagesEl = $("#messages");
   const chatForm = $("#chat-form");
   const chatInput = $("#chat-input");

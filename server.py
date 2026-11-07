@@ -79,7 +79,6 @@ ROUTING_DEFAULTS: dict[str, list[str]] = {
 
 PROMPT_FILES: dict[str, str] = {
     "shared_rules": "Shared rules",
-    "orchestrator": "Orchestrator",
     "pm_po": "PM/PO",
     "frontend_developer": "Frontend developer",
     "backend_developer": "Backend developer",
@@ -229,6 +228,12 @@ PM_PLANNING_CONTRACT = (
     "Use only sub-project IDs listed in the project context; use an empty module_id for the whole project. "
     "Propose 1 to 12 small tasks. When writing the overview, preserve confirmed existing context, separate facts from assumptions, "
     "and provide concise complete content for all three documents. Do not claim the tasks have already been created."
+)
+
+WORK_REPLY_CONTRACT = (
+    "Return ONLY one valid JSON object, no markdown, with this shape: "
+    '{"summary":"one-line outcome","details":"complete answer or report text"}. '
+    "Keep details complete but concise. Do not include file contents or diffs."
 )
 
 STATE_LOCK = threading.RLock()
@@ -1688,7 +1693,19 @@ def github_task_context(
     owner, repo = repository_parts(project["repository"])
     has_token = bool(get_provider_key("github"))
     meta = github_api(f"/repos/{owner}/{repo}", require_auth=has_token)
+    explicit_ref = bool(branch)
     branch = branch or str(meta.get("default_branch") or "main")
+    if not explicit_ref:
+        try:
+            ref = github_api(
+                f"/repos/{owner}/{repo}/git/ref/heads/{urllib.parse.quote(branch, safe='')}",
+                require_auth=has_token,
+            )
+            sha = str(((ref.get("object") or {}).get("sha")) or "")
+            if sha:
+                task["_snapshot_sha"] = sha
+        except Exception:
+            pass
     mod = next((m for m in project.get("modules", []) if m.get("id") == task.get("module_id")), None)
     scope = safe_repo_path(str((mod or {}).get("path", "")))
     tree_resp = github_api(
@@ -1746,6 +1763,21 @@ def github_task_context(
     )
 
 
+def github_check_runs_summary(owner: str, repo: str, sha: str) -> dict[str, Any]:
+    try:
+        data = github_api(f"/repos/{owner}/{repo}/commits/{sha}/check-runs?per_page=100")
+    except Exception:
+        return {"state": "unknown", "runs": [], "failed": []}
+    runs = [r for r in (data.get("check_runs") or []) if isinstance(r, dict)] if isinstance(data, dict) else []
+    if not runs:
+        return {"state": "none", "runs": [], "failed": []}
+    if any(str(r.get("status") or "") != "completed" for r in runs):
+        return {"state": "pending", "runs": runs, "failed": []}
+    ok = {"success", "neutral", "skipped"}
+    failed = [str(r.get("name") or "?") for r in runs if str(r.get("conclusion") or "") not in ok]
+    return {"state": "failure" if failed else "success", "runs": runs, "failed": failed}
+
+
 def apply_repository_manifest(task: dict[str, Any], reply: str, provider: str, attempt_number: int) -> None:
     project = github_project(str(task.get("project_id") or "default"))
     owner, repo = repository_parts(project["repository"])
@@ -1795,8 +1827,17 @@ def apply_repository_manifest(task: dict[str, Any], reply: str, provider: str, a
 
     meta = github_api(f"/repos/{owner}/{repo}")
     base = str(meta.get("default_branch") or "main")
-    base_ref = github_api(f"/repos/{owner}/{repo}/git/ref/heads/{urllib.parse.quote(base, safe='')}")
-    base_commit = base_ref["object"]["sha"]
+    base_commit = ""
+    snapshot_sha = str(task.get("_snapshot_sha") or "")
+    if snapshot_sha:
+        try:
+            github_api(f"/repos/{owner}/{repo}/git/commits/{snapshot_sha}")
+            base_commit = snapshot_sha
+        except Exception:
+            base_commit = ""
+    if not base_commit:
+        base_ref = github_api(f"/repos/{owner}/{repo}/git/ref/heads/{urllib.parse.quote(base, safe='')}")
+        base_commit = base_ref["object"]["sha"]
     commit_obj = github_api(f"/repos/{owner}/{repo}/git/commits/{base_commit}")
     base_tree = commit_obj["tree"]["sha"]
     branch = f"ai-team/{task['id'].lower()}-a{attempt_number:02d}"
@@ -1997,11 +2038,32 @@ def github_postprocess_task(task_id: str) -> None:
         return
     try:
         owner, repo = repository_parts(project["repository"])
-        if refreshed.get("qa_reviewed_head_sha"):
-            latest_pull = github_api(f"/repos/{owner}/{repo}/pulls/{pull['number']}")
-            latest_head = str(((latest_pull.get("head") or {}).get("sha") or "")) if isinstance(latest_pull, dict) else ""
-            if latest_head != refreshed["qa_reviewed_head_sha"]:
-                raise ValueError("The pull request changed after QA reviewed it; rerun QA before merging.")
+        latest_pull = github_api(f"/repos/{owner}/{repo}/pulls/{pull['number']}")
+        latest_head = str(((latest_pull.get("head") or {}).get("sha") or "")) if isinstance(latest_pull, dict) else ""
+        if refreshed.get("qa_reviewed_head_sha") and latest_head != refreshed["qa_reviewed_head_sha"]:
+            raise ValueError("The pull request changed after QA reviewed it; rerun QA before merging.")
+        checks = github_check_runs_summary(owner, repo, latest_head) if latest_head else {"state": "unknown", "runs": [], "failed": []}
+        if checks.get("state") == "pending":
+            if refreshed.get("ci_status") != "pending":
+                refreshed["ci_status"] = "pending"
+                refreshed.pop("ci_error", None)
+                refreshed["updated_at"] = now_iso()
+                write_task(refreshed)
+                append_event({"at": now_iso(), "task_id": task_id, "type": "ci_pending"})
+            return
+        if checks.get("state") == "failure":
+            failed_names = ", ".join(checks.get("failed") or [])[:300]
+            refreshed["ci_status"] = "failed"
+            refreshed["ci_error"] = f"CI checks failed on the pull request: {failed_names}"
+            refreshed["updated_at"] = now_iso()
+            refreshed.setdefault("activity", []).append(
+                {"at": now_iso(), "type": "ci_failed", "message": refreshed["ci_error"]}
+            )
+            write_task(refreshed)
+            append_event({"at": now_iso(), "task_id": task_id, "type": "ci_failed"})
+            return
+        refreshed["ci_status"] = str(checks.get("state") or "unknown")
+        refreshed.pop("ci_error", None)
         merged = github_api(
             f"/repos/{owner}/{repo}/pulls/{pull['number']}/merge",
             "PUT",
@@ -2012,6 +2074,7 @@ def github_postprocess_task(task_id: str) -> None:
         pull["state"] = "merged"
         pull["merged_at"] = now_iso()
         refreshed["pull_request"] = pull
+        refreshed["ci_status"] = "merged"
         refreshed.setdefault("activity", []).append(
             {
                 "at": now_iso(),
@@ -2116,6 +2179,17 @@ def get_notifications() -> list[dict[str, Any]]:
                     "severity": "medium",
                     "title": f"{prov} is unavailable",
                     "message": f"{tid} is waiting for capacity.",
+                    "task_id": tid,
+                }
+            )
+        if t.get("ci_status") == "failed":
+            items.append(
+                {
+                    "id": f"task:{tid}:ci:{upd}",
+                    "kind": "ci",
+                    "severity": "high",
+                    "title": f"CI checks failed for {tid}",
+                    "message": str(t.get("ci_error") or "GitHub Actions checks failed on the pull request."),
                     "task_id": tid,
                 }
             )
@@ -2699,6 +2773,36 @@ def parse_qa_result(reply: str) -> dict[str, Any]:
     }
 
 
+def needs_work_reply_envelope(task: dict[str, Any]) -> bool:
+    if task.get("task_type") == "pm_planning" or task.get("qa_attempt_active"):
+        return False
+    role = str(task.get("assigned_role") or "")
+    if role in ("Frontend developer", "Backend developer", "Documentation"):
+        proj = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
+        if proj and proj.get("repository"):
+            return False
+    return True
+
+
+def parse_work_reply_envelope(reply: str) -> str:
+    clean = reply.strip()
+    if clean.startswith("```"):
+        clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", clean, flags=re.IGNORECASE).strip()
+    try:
+        obj = json.loads(clean)
+    except Exception as exc:
+        raise ValueError("Agent reply must be a JSON envelope with 'summary' and 'details' fields.") from exc
+    if not isinstance(obj, dict):
+        raise ValueError("Agent reply envelope must be a JSON object.")
+    summary = str(obj.get("summary") or "").strip()
+    details = str(obj.get("details") or "").strip()
+    if not summary and not details:
+        raise ValueError("Agent reply envelope must include a non-empty 'summary' or 'details'.")
+    if summary and details:
+        return f"{summary}\n\n{details}"
+    return summary or details
+
+
 def build_repo_agent_instructions(task: dict[str, Any], provider: str) -> str:
     if task.get("qa_attempt_active"):
         return build_qa_review_instructions(task)
@@ -2734,6 +2838,8 @@ def call_gemini_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         + ("\n".join(f"- {c}" for c in checks) if checks else "- None specified")
     )
     prompt += build_repo_agent_instructions(task, "Gemini")
+    if needs_work_reply_envelope(task):
+        prompt += "\n\n" + WORK_REPLY_CONTRACT
     if task.get("task_type") == "pm_planning":
         prompt += "\n\n" + PM_PLANNING_CONTRACT
     if (task.get("validation") or {}).get("status") == "failed":
@@ -2805,6 +2911,8 @@ def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[st
         + ("\n".join(f"- {c}" for c in checks) if checks else "- None specified")
     )
     prompt += build_repo_agent_instructions(task, provider)
+    if needs_work_reply_envelope(task):
+        prompt += "\n\n" + WORK_REPLY_CONTRACT
     if (task.get("validation") or {}).get("status") == "failed":
         prompt += "\n\nPrevious attempt failed validation checks:\n" + json.dumps(task["validation"].get("checks", []), indent=2)
 
@@ -3138,6 +3246,12 @@ def dispatch_one_for_provider(provider: str) -> bool:
             actual_model = GEMINI_MODEL
         else:
             reply, actual_model, meta = call_openai_compatible_task(task, provider)
+
+        if needs_work_reply_envelope(task):
+            try:
+                reply = parse_work_reply_envelope(reply)
+            except ValueError as exc:
+                raise ProviderFailure(provider, 400, str(exc)) from exc
 
         with STATE_LOCK:
             current = read_task(tid)
@@ -3491,7 +3605,35 @@ def watchdog_worker_loop() -> None:
         time.sleep(WATCHDOG_INTERVAL_SECONDS)
 
 
-# --- Orchestrator Chat (hosted providers) ---
+CI_POLL_INTERVAL_SECONDS = 90
+
+
+def run_ci_poll_pass() -> None:
+    for task in read_tasks():
+        pull = task.get("pull_request")
+        if (
+            task.get("status") == "Done"
+            and (task.get("validation") or {}).get("status") == "passed"
+            and isinstance(pull, dict)
+            and pull.get("state") == "open"
+            and pull.get("number")
+        ):
+            try:
+                github_postprocess_task(str(task.get("id") or ""))
+            except Exception as exc:
+                logger.warning("CI poll failed for task %s: %s", task.get("id"), str(exc)[:300])
+
+
+def ci_poll_worker_loop() -> None:
+    while True:
+        try:
+            run_ci_poll_pass()
+        except Exception as exc:
+            logger.warning("CI poll pass failed: %s", str(exc)[:300])
+        time.sleep(CI_POLL_INTERVAL_SECONDS)
+
+
+# --- PM/PO Chat (hosted providers) ---
 def get_chat_provider() -> str:
     configured = str(read_app_config().get("chat_provider") or "").strip()
     if configured in PROVIDERS:
@@ -3986,7 +4128,7 @@ class Handler(BaseHTTPRequestHandler):
                 "created_at": ts,
                 "updated_at": ts,
                 "dispatch_note": "Planning request queued for the PM/PO agent.",
-                "activity": [{"at": ts, "type": "created", "message": "Project request sent to PM/PO from Orchestrator chat."}],
+                "activity": [{"at": ts, "type": "created", "message": "Project request sent to PM/PO from chat."}],
             }
             write_task(task)
             hist = read_chat_history(pid)
@@ -4684,7 +4826,7 @@ class Handler(BaseHTTPRequestHandler):
             project_id = str(project["id"])
             with ACTIVE_CHAT_LOCK:
                 if ACTIVE_CHAT_COUNT > 0:
-                    return self.send_json({"error": "Another Orchestrator reply is still in progress."}, HTTPStatus.CONFLICT)
+                    return self.send_json({"error": "Another PM/PO reply is still in progress."}, HTTPStatus.CONFLICT)
                 ACTIVE_CHAT_COUNT += 1
             t0 = time.time()
             try:
