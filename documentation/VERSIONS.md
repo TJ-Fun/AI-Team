@@ -1,5 +1,15 @@
 # Version log
 
+## 0.36 — 2026-11-07
+
+- Refined all default agent prompts to match the enforced system contracts: PM/PO planning and escalation limits are now stated explicitly, and the JSON-schema requirement is scoped to planning requests so it no longer conflicts with chat mode.
+- Frontend, Backend, and Documentation prompts now describe the repository file-change manifest workflow, including the 20-file limit, accepted text extensions, protected lock files, editable scope, and the optional `feedback` field.
+- Repository agents can now raise PM/PO feedback through an optional `feedback` field in the file-change JSON manifest; it is stored on the task, logged in activity, and included in the pull request body.
+- QA prompt now warns that repository snapshots may be partial and that self-reported checks are claims, not evidence.
+- Shared rules now route repository-task feedback through the manifest field instead of a `PM/PO feedback` section.
+- UI designer prompt welcomes concrete HTML/CSS snippets for implementation-detail tasks.
+- Updated documentation to 0.36.
+
 ## 0.35 — 2026-11-07
 
 - Fixed provider activity accounting: GroqCloud dispatches were counted as OpenRouter work; each provider now has its own busy counter and `/api/status` exposes `groq_working`.

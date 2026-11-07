@@ -881,6 +881,7 @@ def apply_repository_manifest(task: dict[str, Any], reply: str, provider: str, a
                 "message": f"Closed pull request #{previous_pull['number']} after creating a new rework attempt branch.",
             }
         )
+    feedback = str(manifest.get("feedback") or "").strip()[:2000]
     pull = github_api(
         f"/repos/{owner}/{repo}/pulls",
         "POST",
@@ -892,6 +893,7 @@ def apply_repository_manifest(task: dict[str, Any], reply: str, provider: str, a
                 f"Automated {provider} changes for {task['id']}.\n\n"
                 f"{str(task.get('request', ''))[:4000]}\n\n"
                 "Agent report and validation are recorded on the local task board."
+                + (f"\n\nAgent feedback for PM/PO:\n{feedback}" if feedback else "")
             ),
         },
     )
@@ -903,6 +905,15 @@ def apply_repository_manifest(task: dict[str, Any], reply: str, provider: str, a
         "created_at": now_iso(),
     }
     task["repository_change_summary"] = str(manifest.get("summary", ""))[:2000]
+    if feedback:
+        task["repository_agent_feedback"] = feedback
+        task.setdefault("activity", []).append(
+            {
+                "at": now_iso(),
+                "type": "agent_feedback",
+                "message": f"{provider} raised feedback for PM/PO: {feedback[:300]}",
+            }
+        )
     write_task(task)
 
 

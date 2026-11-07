@@ -802,8 +802,13 @@ def build_repo_agent_instructions(task: dict[str, Any], provider: str) -> str:
         "\n\nRepository snapshot (read-only context):\n"
         + snapshot
         + '\n\nReturn only valid JSON, no markdown, with this shape: '
-        + '{"summary":"brief change summary","files":[{"path":"relative/path","content":"complete replacement file text"}],"checks":["checks performed"]}. '
-        + "Include complete contents for each changed or new text file. Do not return diffs."
+        + '{"summary":"brief change summary","files":[{"path":"relative/path","content":"complete replacement file text"}],"checks":["checks performed"],"feedback":"optional blockers or scope concerns for PM/PO"}. '
+        + "Include complete contents for each changed or new text file. Do not return diffs. "
+        + "Return at most 20 files. Only text files with these extensions are accepted: "
+        + ".md .txt .html .css .js .ts .tsx .jsx .py .json .toml .yml .yaml .xml .sh. "
+        + "Lock files (package-lock.json, poetry.lock, etc.) and files outside the editable scope are rejected; "
+        + "one invalid entry fails the whole task. Each file content must be complete replacement text under 50,000 bytes. "
+        + "Use the optional feedback field for blockers or scope concerns instead of a PM/PO feedback section."
     )
 
 
