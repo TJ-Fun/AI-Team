@@ -1,5 +1,11 @@
 # Version log
 
+## 0.30 — 2026-11-07
+
+- Added periodic app self-update checks (every 30 minutes) against the configured repository; a newer version raises a notification with an Update now button that runs the standard update flow.
+- Made the notification badge neutral ("All clear" when empty, total count otherwise) and added a per-kind breakdown (issues vs updates) in the notification dialog.
+- Added `GET /api/app-update/check` for on-demand update status.
+
 ## 0.29 — 2026-11-07
 
 - Added strict reply envelopes for all remaining agent roles; malformed replies are rejected and fall back to another provider.

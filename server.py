@@ -168,6 +168,67 @@ def configure_file_log_level(level: Any) -> str:
     file_handler.setLevel(LOG_LEVELS[configured])
     return configured
 
+APP_UPDATE_CHECK_INTERVAL_SECONDS = 30 * 60
+APP_UPDATE_CACHE: dict[str, Any] = {"checked_at": 0.0, "status": {}}
+
+
+def current_app_version() -> str:
+    try:
+        text = (ROOT / "documentation" / "ABOUT.md").read_text(encoding="utf-8")
+        m = re.search(r"Version:\s*\*\*([0-9]+(?:\.[0-9]+)*)\*\*", text)
+        return m.group(1) if m else ""
+    except Exception:
+        return ""
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    parts = tuple(int(p) for p in re.findall(r"\d+", version)[:4])
+    return parts or (0,)
+
+
+def remote_app_version(owner: str, repo: str) -> str:
+    raw = github_api(f"/repos/{owner}/{repo}/contents/documentation/ABOUT.md")
+    if not isinstance(raw, dict) or raw.get("encoding") != "base64":
+        return ""
+    text = base64.b64decode(re.sub(r"\s+", "", str(raw.get("content", "")))).decode("utf-8", errors="replace")
+    m = re.search(r"Version:\s*\*\*([0-9]+(?:\.[0-9]+)*)\*\*", text)
+    return m.group(1) if m else ""
+
+
+def app_update_status(force: bool = False) -> dict[str, Any]:
+    now = time.time()
+    cached = APP_UPDATE_CACHE.get("status") or {}
+    if (
+        not force
+        and cached
+        and now - float(APP_UPDATE_CACHE.get("checked_at") or 0) < APP_UPDATE_CHECK_INTERVAL_SECONDS
+    ):
+        return cached
+    config = read_app_config()
+    repo_url = str(config.get("app_repo") or "").strip()
+    status: dict[str, Any] = {
+        "configured": False,
+        "current": current_app_version(),
+        "latest": "",
+        "update_available": False,
+        "checked_at": now_iso(),
+        "error": "",
+    }
+    if repo_url:
+        status["configured"] = True
+        try:
+            owner, repo = repository_parts(normalize_github_repo_url(repo_url))
+            latest = remote_app_version(owner, repo)
+            status["latest"] = latest
+            if latest and _version_tuple(latest) > _version_tuple(str(status["current"])):
+                status["update_available"] = True
+        except Exception as exc:
+            status["error"] = str(exc)[:300]
+    APP_UPDATE_CACHE["checked_at"] = now
+    APP_UPDATE_CACHE["status"] = status
+    return status
+
+
 def save_app_config(config: dict[str, Any]) -> None:
     """Save app configuration."""
     try:
@@ -2262,6 +2323,19 @@ def get_notifications() -> list[dict[str, Any]]:
             }
         )
 
+    upd = app_update_status()
+    if upd.get("update_available"):
+        items.append(
+            {
+                "id": f"app:update:{upd.get('latest')}",
+                "kind": "app_update",
+                "severity": "low",
+                "title": f"App update available: v{upd.get('latest')}",
+                "message": f"Version {upd.get('latest')} is available (current: {upd.get('current') or 'unknown'}).",
+                "action": "update",
+            }
+        )
+
     dismissed_path = DATA / "settings" / "notifications_dismissed.json"
     dismissed: set[str] = set()
     if dismissed_path.is_file():
@@ -4017,6 +4091,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/notifications":
             return self.send_json({"notifications": get_notifications()})
+
+        if path == "/api/app-update/check":
+            force = str(query.get("force", [""])[0]).lower() in ("1", "true", "yes")
+            return self.send_json({"update": app_update_status(force=force)})
 
         if path == "/api/provider-quality":
             return self.send_json({"quality": get_provider_quality()})

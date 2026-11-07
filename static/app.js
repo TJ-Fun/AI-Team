@@ -209,15 +209,20 @@
     const triggerEl = $("#open-notifications");
     const listEl = $("#notification-list");
     const items = state.notifications || [];
-    const countLabel = `${items.length} ${items.length === 1 ? "issue" : "issues"}`;
+    const updates = items.filter((i) => i.kind === "app_update").length;
+    const issues = items.length - updates;
+    const parts = [];
+    if (issues) parts.push(`${issues} ${issues === 1 ? "issue" : "issues"}`);
+    if (updates) parts.push(`${updates} ${updates === 1 ? "update" : "updates"}`);
+    const countLabel = parts.length ? parts.join(" · ") : "all clear";
     const latestTitle = items[0]?.title || "All clear";
 
-    if (countEl) countEl.textContent = countLabel;
+    if (countEl) countEl.textContent = items.length ? String(items.length) : "All clear";
     if (latestEl) latestEl.textContent = latestTitle;
     if (modalCountEl) modalCountEl.textContent = `(${countLabel})`;
     if (triggerEl) {
       triggerEl.classList.toggle("has-issues", items.length > 0);
-      triggerEl.title = items.length > 0 ? `${latestTitle} — click to view all issues` : "No active issues";
+      triggerEl.title = items.length > 0 ? `${latestTitle} — click to view all` : "No active issues";
     }
 
     if (!listEl) return;
@@ -232,6 +237,7 @@
           <div>
             <strong>${escapeHtml(item.title)}</strong>
             <p>${escapeHtml(item.message)}</p>
+            ${item.action === "update" ? `<button type="button" class="notification-action" data-notification-action="update">Update now</button>` : ""}
           </div>
           <button type="button" class="notification-dismiss" data-dismiss-notification="${escapeHtml(item.id)}" aria-label="Dismiss">×</button>
         </div>`
@@ -249,6 +255,11 @@
   $("#close-notifications-footer")?.addEventListener("click", () => notificationsDialog?.close());
 
   $("#notification-list")?.addEventListener("click", async (e) => {
+    const actionBtn = e.target.closest("[data-notification-action]");
+    if (actionBtn?.getAttribute("data-notification-action") === "update") {
+      await runAppUpdateFromNotification(actionBtn);
+      return;
+    }
     const btn = e.target.closest("[data-dismiss-notification]");
     if (!btn) return;
     const id = btn.getAttribute("data-dismiss-notification");
@@ -259,6 +270,33 @@
       alert(err.message);
     }
   });
+
+  async function runAppUpdateFromNotification(btn) {
+    btn.disabled = true;
+    try {
+      const cfgRes = await api("/api/settings/config");
+      const cfg = cfgRes.config || {};
+      if (!cfg.app_repo || !cfg.app_clone_dir || !cfg.app_working_dir) {
+        alert("App update is not configured. Set the repository and directories in Settings → About first.");
+        return;
+      }
+      if (!confirm(`Update the app to the latest version and restart?`)) return;
+      const res = await api("/api/settings/update", {
+        method: "POST",
+        body: JSON.stringify({
+          app_repo: cfg.app_repo,
+          app_clone_dir: cfg.app_clone_dir,
+          app_working_dir: cfg.app_working_dir,
+        }),
+      });
+      const statusShim = { textContent: "", className: "" };
+      await waitForAppRestart(statusShim, res.message || "Update complete.", "update-status");
+    } catch (err) {
+      alert(`Update failed: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+    }
+  }
 
   // --- Projects & Active Project / Sub-project Selectors ---
   function renderActiveSubprojectSelect() {

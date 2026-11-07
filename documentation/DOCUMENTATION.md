@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.29 · Updated 2026-11-07
+Version 0.30 · Updated 2026-11-07
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -66,6 +66,8 @@ After a validated PR is merged, the app synchronizes the configured local checko
 Use the configured service user's permitted paths. The example service grants project work under `/home/ubuntu/projects`; it does not grant unrestricted filesystem access.
 
 ### 4.5 App updates
+
+The app checks the configured app repository for a newer version (parsed from `documentation/ABOUT.md`) at most every 30 minutes. When a newer version is found, a low-severity notification with an **Update now** button appears in the notification center; clicking it runs the same guarded update flow as **Settings → About → Update App** using the saved configuration. The check is also available on demand via `GET /api/app-update/check` (add `?force=1` to bypass the cache).
 
 The **Settings → About** section contains application update controls:
 
