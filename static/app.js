@@ -2303,7 +2303,7 @@
           `Model test — ${res.provider} · ${res.model}`
         );
       } catch (err) {
-        $("#connections-error").textContent = err.message;
+        appAlert(err.message, "Model test failed");
       } finally {
         testModelBtn.disabled = false;
         testModelBtn.textContent = origLabel || "Test model";

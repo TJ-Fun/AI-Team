@@ -1,5 +1,12 @@
 # Version log
 
+## 0.45 — 2026-11-08
+
+- Shrunk the provider **Model** dropdown in **Settings → Connections** to a fixed 220px width and moved the **Test model** button directly beside it on the same line.
+- Unified control heights in Connections to 36px (model dropdown, Test model, credential inputs/buttons), matching the global button/input standard.
+- Fixed **Test model** errors again showing in the inline error line: they now open the popup dialog as intended (the fix had been overwritten by a stale editor buffer).
+- Updated documentation to 0.45.
+
 ## 0.44 — 2026-11-08
 
 - Fixed two custom-dialog bugs caused by CSS specificity: the **Details** input and the **Cancel** button were always visible because `display:flex`/`display:inline-flex` rules overrode the `hidden` attribute. A global `[hidden]{display:none!important}` rule now enforces correct behavior in every dialog.
