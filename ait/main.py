@@ -6,8 +6,7 @@ from ait.common import *
 
 
 def start_background_workers() -> None:
-    for provider in PROVIDERS:
-        threading.Thread(target=provider_worker_loop, args=(provider,), daemon=True).start()
+    reconcile_provider_workers()
     threading.Thread(target=watchdog_worker_loop, daemon=True).start()
     threading.Thread(target=ci_poll_worker_loop, daemon=True).start()
 

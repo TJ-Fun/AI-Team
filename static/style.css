@@ -379,3 +379,16 @@ dialog::backdrop{background:#000000aa}
 .update-progress-label{font-size:10px;color:#8a9189;margin:6px 0 0;min-height:14px;line-height:1.4}
 .update-progress .update-progress-track{background:#2c332e}
 .update-progress .update-progress-label{color:#9aa396}
+
+/* Provider control system */
+.provider-row{display:flex;gap:10px;align-items:flex-start}
+.provider-order{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.provider-move{padding:4px 9px;font-size:12px;line-height:1;min-width:34px}
+.provider-move:disabled{opacity:.35;cursor:default}
+.provider-main{flex:1;min-width:0}
+.provider-kind{font-size:9px;font-weight:600;color:#8b978c;border:1px solid var(--line);border-radius:6px;padding:2px 6px;margin-left:6px;white-space:nowrap}
+.provider-meta{font-size:10px;color:#8b978c;margin:4px 0 8px;overflow-wrap:anywhere}
+.add-provider{margin-top:14px}
+.add-provider label input{width:100%;box-sizing:border-box}
+.add-provider label input:disabled{opacity:.5}
+

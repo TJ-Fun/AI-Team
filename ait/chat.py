@@ -8,20 +8,15 @@ from ait.common import *
 # --- PM/PO Chat (hosted providers) ---
 def get_chat_provider() -> str:
     configured = str(read_app_config().get("chat_provider") or "").strip()
-    if configured in PROVIDERS:
-        return configured
-    return "Gemini"
+    if configured == "Auto" or configured in provider_names():
+        return configured or "Auto"
+    return "Auto"
 
 
 def chat_provider_model(provider: str) -> str:
-    return {
-        "Gemini": GEMINI_MODEL,
-        "GroqCloud": GROQ_MODEL,
-        "OpenRouter": OPENROUTER_MODEL,
-        "OmniRoute": OMNIROUTE_MODEL,
-        "9Router": NINEROUTER_MODEL,
-        "Nvidia": NVIDIA_MODEL,
-    }.get(provider, GEMINI_MODEL)
+    if provider == "Auto":
+        provider = select_auto_provider() or (configured_providers()[0] if configured_providers() else "")
+    return provider_model(provider) if provider else ""
 
 
 def chat_system_prompt(project_id: str) -> str:
@@ -53,7 +48,10 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
     if not configured:
         raise ProviderFailure("Chat", 401, "No AI provider is connected. Add a key in Settings → Connections.")
     preferred = get_chat_provider()
-    provider = preferred if preferred in configured else configured[0]
+    if preferred == "Auto":
+        provider = select_auto_provider() or configured[0]
+    else:
+        provider = preferred if preferred in configured else (select_auto_provider() or configured[0])
     model = chat_provider_model(provider)
     sys_prompt = chat_system_prompt(project_id)
     history = [
@@ -62,7 +60,7 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
         if m.get("role") in ("user", "assistant") and str(m.get("content", "")).strip()
     ]
 
-    if provider == "Gemini":
+    if provider_kind(provider) == "gemini":
         api_key = get_provider_key("gemini")
         while history and history[0]["role"] != "user":
             history.pop(0)
@@ -110,7 +108,7 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
             raise ProviderFailure("Gemini", 400, "Gemini returned no text.")
         return text, provider, model
 
-    cfg = OPENAI_COMPAT_PROVIDERS.get(provider)
+    cfg = openai_compat_config(provider)
     if not cfg:
         raise ProviderFailure(provider, 400, f"Unsupported chat provider: {provider}")
     conn_id = cfg["conn_id"]
@@ -130,7 +128,7 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
         "Authorization": f"Bearer {api_key}",
         "User-Agent": HTTP_USER_AGENT,
     }
-    if provider == "OpenRouter":
+    if cfg.get("openrouter"):
         headers["X-Title"] = "Personal AI Team"
     req = urllib.request.Request(
         endpoint,

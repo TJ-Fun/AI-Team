@@ -15,35 +15,82 @@ def get_routing() -> dict[str, list[str]]:
             saved = json.loads(routing_path.read_text(encoding="utf-8"))
         except Exception:
             saved = {}
+    active = provider_names()
     result: dict[str, list[str]] = {}
     for role in WORK_ROLES:
-        defaults = ROUTING_DEFAULTS[role]
         raw = saved.get(role) if isinstance(saved, dict) else None
-        order = [p for p in raw if p in PROVIDERS] if isinstance(raw, list) else list(defaults)
-        deduped: list[str] = []
-        for p in [*order, *defaults]:
-            if p not in deduped:
-                deduped.append(p)
-        result[role] = deduped
+        preferred: list[str] = []
+        if isinstance(raw, list):
+            for item in raw:
+                name = str(item).strip()
+                if name in active and name not in preferred:
+                    preferred.append(name)
+                if len(preferred) >= MAX_PREFERRED_PROVIDERS:
+                    break
+        result[role] = preferred
     return result
 
 
 def save_routing(value: Any) -> dict[str, list[str]]:
     if not isinstance(value, dict):
         raise ValueError("Routing settings must be an object.")
+    active = provider_names()
     cleaned: dict[str, list[str]] = {}
     for role in WORK_ROLES:
-        order = value.get(role)
-        if (
-            not isinstance(order, list)
-            or len(order) != len(PROVIDERS)
-            or len(set(order)) != len(PROVIDERS)
-            or not all(p in PROVIDERS for p in order)
-        ):
-            raise ValueError(f"Set each provider exactly once for {role}.")
-        cleaned[role] = list(order)
+        order = value.get(role, [])
+        if not isinstance(order, list):
+            raise ValueError(f"Provider preference for {role} must be a list.")
+        preferred: list[str] = []
+        for item in order:
+            name = str(item).strip()
+            if name in active and name not in preferred:
+                preferred.append(name)
+            if len(preferred) >= MAX_PREFERRED_PROVIDERS:
+                break
+        cleaned[role] = preferred
     atomic_json(DATA / "settings" / "routing.json", cleaned)
     return cleaned
+
+
+def selection_order_for_role(role: str) -> list[str]:
+    order: list[str] = []
+    for name in [*get_routing().get(role, []), *auto_provider_order()]:
+        if name not in order:
+            order.append(name)
+    return order
+
+
+def cleanup_provider_references(name: str) -> None:
+    target = str(name or "").strip()
+    if not target:
+        return
+    routing_path = DATA / "settings" / "routing.json"
+    if routing_path.is_file():
+        try:
+            saved = json.loads(routing_path.read_text(encoding="utf-8"))
+        except Exception:
+            saved = {}
+        if isinstance(saved, dict):
+            changed = False
+            for role in WORK_ROLES:
+                raw = saved.get(role)
+                if isinstance(raw, list) and target in [str(p) for p in raw]:
+                    saved[role] = [p for p in raw if str(p) != target]
+                    changed = True
+            if changed:
+                atomic_json(routing_path, saved)
+    if str(read_app_config().get("chat_provider") or "").strip() == target:
+        save_app_config({"chat_provider": "Auto"})
+    with STATE_LOCK:
+        for summary in read_tasks():
+            if str(summary.get("provider") or "") != target:
+                continue
+            if str(summary.get("status") or "") not in ("Ready", "Draft", "Waiting for capacity", "Rework needed"):
+                continue
+            task = read_task(str(summary.get("id", "")))
+            if task:
+                task["provider"] = "Automatic"
+                write_task(task)
 
 
 def migrate_legacy_project_context(projects: list[dict[str, Any]]) -> None:
@@ -464,18 +511,9 @@ def read_task_replies(task_id: str) -> list[dict[str, Any]]:
     task = read_task(task_id)
     if not task:
         return []
-    folder_map = {
-        "Gemini": "gemini",
-        "Antigravity": "antigravity",
-        "GroqCloud": "groqcloud",
-        "OpenRouter": "openrouter",
-        "OmniRoute": "omniroute",
-        "9Router": "9router",
-        "Nvidia": "nvidia",
-    }
     replies: list[dict[str, Any]] = []
     for att in task.get("attempts", []) or []:
-        folder = folder_map.get(str(att.get("provider", "")))
+        folder = str(att.get("provider", "")).lower().replace(" ", "")
         num = att.get("number")
         if not folder or not isinstance(num, int) or num < 1:
             continue
@@ -495,14 +533,14 @@ def task_provider(task: dict[str, Any]) -> str:
     if val == "Antigravity":
         val = "Automatic"
     configured = configured_providers()
-    if val in PROVIDERS:
+    if is_active_provider(val):
         return val if val in configured else ""
     legacy = {"Gemini": "Gemini", "OpenRouter free agent": "OpenRouter"}
     role = str(task.get("assigned_role", ""))
     if role in legacy:
         p = legacy[role]
         return p if p in configured else ""
-    if val != "Automatic":
+    if val not in ("Automatic", "Auto"):
         return ""
     attempts = task.get("attempts") or []
     start = max(0, int(task.get("routing_cycle_start") or 0))
@@ -511,7 +549,9 @@ def task_provider(task: dict[str, Any]) -> str:
         for a in attempts[start:]
         if str(a.get("role") or role) == role
     }
-    order = get_routing().get(role or "PM/PO", PROVIDERS)
+    if val == "Auto":
+        return select_auto_provider(tried)
+    order = selection_order_for_role(role or "PM/PO")
     return next((p for p in order if p in configured and p not in tried), "")
 
 
@@ -524,7 +564,8 @@ def provider_for_role(task: dict[str, Any], role: str, cycle_key: str) -> str:
         for attempt in attempts[start:]
         if str(attempt.get("role") or task.get("assigned_role") or "") == role
     }
-    return next((provider for provider in get_routing().get(role, []) if provider in configured and provider not in tried), "")
+    order = selection_order_for_role(role)
+    return next((provider for provider in order if provider in configured and provider not in tried), "")
 
 
 def has_untried_alternate(task: dict[str, Any], failed_provider: str) -> bool:
@@ -538,7 +579,7 @@ def has_untried_alternate(task: dict[str, Any], failed_provider: str) -> bool:
         for a in attempts[start:]
         if str(a.get("role") or role) == role
     }
-    order = get_routing().get(role, [])
+    order = selection_order_for_role(role)
     return any(p != failed_provider and p not in tried and p in configured for p in order)
 
 

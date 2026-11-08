@@ -70,42 +70,29 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "chat_provider": chat_provider,
                     "chat_model": chat_provider_model(chat_provider),
-                    "chat_configured": chat_provider in configured_providers(),
-                    "providers": PROVIDERS,
-                    "gemini_model": GEMINI_MODEL,
-                    "gemini_configured": bool(get_provider_key("gemini")),
-                    "openrouter_model": OPENROUTER_MODEL,
-                    "openrouter_configured": bool(get_provider_key("openrouter")),
-                    "groq_model": GROQ_MODEL,
-                    "omniroute_model": OMNIROUTE_MODEL,
-                    "omniroute_configured": bool(get_provider_key("omniroute")),
-                    "ninerouter_model": NINEROUTER_MODEL,
-                    "ninerouter_configured": bool(get_provider_key("ninerouter")),
-                    "nvidia_model": NVIDIA_MODEL,
-                    "nvidia_configured": bool(get_provider_key("nvidia")),
+                    "chat_configured": bool(configured_providers()),
+                    "providers": provider_names(),
+                    "provider_options": task_provider_options(),
                 }
             )
 
         if path == "/api/status":
             activity = provider_activity_status()
+            working = activity.get("provider_working") or {}
+            configured = configured_providers()
+            providers_status = {
+                name: {
+                    "configured": name in configured,
+                    "working": bool(working.get(name)),
+                    "model": provider_model(name),
+                }
+                for name in provider_names()
+            }
             return self.send_json(
                 {
                     "cpu_percent": get_cpu_percent(),
                     "chat_working": ACTIVE_CHAT_COUNT > 0,
-                    "gemini_working": activity["gemini_working"],
-                    "groq_working": activity["groq_working"],
-                    "gemini_configured": bool(get_provider_key("gemini")),
-                    "gemini_model": GEMINI_MODEL,
-                    "openrouter_working": activity["openrouter_working"],
-                    "openrouter_configured": bool(get_provider_key("openrouter")),
-                    "openrouter_model": OPENROUTER_MODEL,
-                    "groq_configured": bool(get_provider_key("groq")),
-                    "omniroute_working": activity["omniroute_working"],
-                    "omniroute_configured": bool(get_provider_key("omniroute")),
-                    "ninerouter_working": activity["ninerouter_working"],
-                    "ninerouter_configured": bool(get_provider_key("ninerouter")),
-                    "nvidia_working": activity["nvidia_working"],
-                    "nvidia_configured": bool(get_provider_key("nvidia")),
+                    "providers": providers_status,
                     "github_configured": bool(get_provider_key("github")),
                     "watchdog": WATCHDOG_STATUS,
                 }
@@ -113,18 +100,47 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/connections":
             conns = []
-            for cid, (label, _) in CONNECTION_SPECS.items():
-                val, src = get_provider_key_and_source(cid)
-                conns.append({"id": cid, "name": label, "configured": bool(val), "source": src or "Not connected"})
-            return self.send_json({"connections": conns, "encryption_available": secret_cipher() is not None})
+            for record in active_providers():
+                val, src = get_provider_key_and_source(str(record["id"]))
+                conns.append(
+                    {
+                        "id": str(record["id"]),
+                        "name": str(record["name"]),
+                        "configured": bool(val),
+                        "source": src or "Not connected",
+                        "kind": str(record.get("kind", "")),
+                        "model": str(record.get("model", "")),
+                        "base_url": str(record.get("base_url", "")),
+                        "order": int(record.get("order", 0)),
+                        "is_provider": True,
+                    }
+                )
+            val, src = get_provider_key_and_source("github")
+            conns.append(
+                {
+                    "id": "github",
+                    "name": "GitHub repository connector",
+                    "configured": bool(val),
+                    "source": src or "Not connected",
+                    "is_provider": False,
+                }
+            )
+            return self.send_json(
+                {
+                    "connections": conns,
+                    "presets": available_presets(),
+                    "encryption_available": secret_cipher() is not None,
+                }
+            )
 
         if path == "/api/routing":
             return self.send_json(
                 {
                     "roles": WORK_ROLES,
-                    "providers": PROVIDERS,
+                    "providers": provider_names(),
                     "configured": configured_providers(),
                     "routing": get_routing(),
+                    "max_preferred": MAX_PREFERRED_PROVIDERS,
                     "chat_provider": get_chat_provider(),
                     "autonomy": get_autonomy(),
                 }
@@ -284,7 +300,7 @@ class Handler(BaseHTTPRequestHandler):
             logger.info(f"Creating task: title='{title}', role={role}, provider={provider}")
             if not title or not req_text or len(title) > 160 or len(req_text) > 12000:
                 return self.send_json({"error": "Valid title and request are required."}, HTTPStatus.BAD_REQUEST)
-            if role not in WORK_ROLES or provider not in TASK_PROVIDERS:
+            if role not in WORK_ROLES or provider not in task_provider_options():
                 return self.send_json({"error": "Choose a valid work role and AI provider."}, HTTPStatus.BAD_REQUEST)
             pid = str(body.get("project_id") or "default")
             mid = str(body.get("module_id") or "")
@@ -406,7 +422,7 @@ class Handler(BaseHTTPRequestHandler):
                 chat_provider = body.get("chat_provider")
                 if chat_provider is not None:
                     chat_provider = str(chat_provider).strip()
-                    if chat_provider not in PROVIDERS:
+                    if chat_provider != "Auto" and chat_provider not in provider_names():
                         raise ValueError("Choose a valid chat provider.")
                     save_app_config({"chat_provider": chat_provider})
                 append_event({"at": now_iso(), "type": "routing_updated"})
@@ -421,10 +437,34 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
-        m_conn_test = re.fullmatch(r"/api/connections/([a-z_]+)/test", path)
+        if path == "/api/providers":
+            preset = str(body.get("preset", "")).strip()
+            name = str(body.get("name", "")).strip()
+            base_url = str(body.get("base_url", "")).strip()
+            model = str(body.get("model", "")).strip()
+            try:
+                record = add_provider(preset_id=preset, name=name, base_url=base_url, model=model)
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            append_event({"at": now_iso(), "type": "provider_added", "provider": record["name"]})
+            reconcile_provider_workers()
+            DISPATCH_EVENT.set()
+            return self.send_json({"provider": record})
+
+        if path == "/api/providers/order":
+            try:
+                providers = reorder_providers(body.get("order"))
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            append_event({"at": now_iso(), "type": "provider_order_updated"})
+            reconcile_provider_workers()
+            DISPATCH_EVENT.set()
+            return self.send_json({"providers": providers})
+
+        m_conn_test = re.fullmatch(r"/api/connections/([a-z0-9_-]+)/test", path)
         if m_conn_test:
             cid = m_conn_test.group(1)
-            if cid not in CONNECTION_SPECS:
+            if cid != "github" and cid not in connection_specs():
                 return self.send_json({"connected": False, "error": "Unknown connection."}, HTTPStatus.NOT_FOUND)
             try:
                 result = test_provider_connection(cid)
@@ -472,7 +512,7 @@ class Handler(BaseHTTPRequestHandler):
             period = str(body.get("period", "")).strip()
             bucket = str(body.get("bucket", "")).strip()
             patterns = {"today": r"^\d{4}-\d{2}-\d{2}$", "month": r"^\d{4}-\d{2}$", "year": r"^\d{4}$", "all": r"^all$"}
-            if provider not in PROVIDERS or not model or len(model) > 160:
+            if provider not in provider_names() or not model or len(model) > 160:
                 return self.send_json({"error": "Choose a valid provider and model."}, HTTPStatus.BAD_REQUEST)
             if period not in patterns or not re.fullmatch(patterns[period], bucket):
                 return self.send_json({"error": "Choose a valid statistic period."}, HTTPStatus.BAD_REQUEST)
@@ -784,8 +824,8 @@ class Handler(BaseHTTPRequestHandler):
         if m_prov:
             tid = m_prov.group(1)
             provider = str(body.get("provider", "")).strip()
-            if provider not in TASK_PROVIDERS:
-                return self.send_json({"error": "Choose Automatic or a valid AI provider."}, HTTPStatus.BAD_REQUEST)
+            if provider not in task_provider_options():
+                return self.send_json({"error": "Choose Automatic, Auto, or a valid AI provider."}, HTTPStatus.BAD_REQUEST)
             with STATE_LOCK:
                 task = read_task(tid)
                 if not task:
@@ -1336,10 +1376,10 @@ class Handler(BaseHTTPRequestHandler):
                 }
             )
 
-        m_conn = re.fullmatch(r"/api/connections/([a-z_]+)", path)
+        m_conn = re.fullmatch(r"/api/connections/([a-z0-9_-]+)", path)
         if m_conn:
             cid = m_conn.group(1)
-            if cid not in CONNECTION_SPECS:
+            if cid != "github" and cid not in connection_specs():
                 return self.send_json({"error": "Unknown connection."}, HTTPStatus.NOT_FOUND)
             secret = str(body.get("secret", "")).strip()
             if not secret or len(secret) > 4000:
@@ -1349,6 +1389,7 @@ class Handler(BaseHTTPRequestHandler):
                 secrets[cid] = secret
                 write_saved_secrets(secrets)
                 append_event({"at": now_iso(), "type": "connection_saved", "connection": cid})
+                reconcile_provider_workers()
                 DISPATCH_EVENT.set()
                 return self.send_json({"saved": True, "id": cid})
             except ValueError as exc:
@@ -1405,7 +1446,7 @@ class Handler(BaseHTTPRequestHandler):
             produces = bool(body.get("produces_deliverable"))
             if not title or not req_text or len(title) > 160 or len(req_text) > 12000:
                 return self.send_json({"error": "Enter a valid title and request."}, HTTPStatus.BAD_REQUEST)
-            if role not in WORK_ROLES or provider not in TASK_PROVIDERS or not isinstance(raw_checks, list):
+            if role not in WORK_ROLES or provider not in task_provider_options() or not isinstance(raw_checks, list):
                 return self.send_json({"error": "Invalid role, provider, or acceptance checks."}, HTTPStatus.BAD_REQUEST)
             pid = str(body.get("project_id") or "default")
             mid = str(body.get("module_id") or "")
@@ -1482,16 +1523,36 @@ class Handler(BaseHTTPRequestHandler):
                     shutil.rmtree(rdir, ignore_errors=True)
             return self.send_json({"deleted": True, "task_id": tid})
 
-        m_conn = re.fullmatch(r"/api/connections/([a-z_]+)", path)
+        m_provider_del = re.fullmatch(r"/api/providers/([a-z0-9-]+)", path)
+        if m_provider_del:
+            pid = m_provider_del.group(1)
+            try:
+                record = remove_provider(pid)
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            cleanup_provider_references(str(record.get("name", "")))
+            if str(record.get("id", "")).startswith("custom-"):
+                saved = read_saved_secrets()
+                if pid in saved:
+                    saved.pop(pid)
+                    write_saved_secrets(saved)
+            append_event({"at": now_iso(), "type": "provider_removed", "provider": record.get("name")})
+            reconcile_provider_workers()
+            DISPATCH_EVENT.set()
+            return self.send_json({"removed": record})
+
+        m_conn = re.fullmatch(r"/api/connections/([a-z0-9_-]+)", path)
         if m_conn:
             cid = m_conn.group(1)
-            if cid not in CONNECTION_SPECS:
+            if cid != "github" and cid not in connection_specs():
                 return self.send_json({"error": "Unknown connection."}, HTTPStatus.NOT_FOUND)
             try:
                 secrets = read_saved_secrets()
                 secrets.pop(cid, None)
                 write_saved_secrets(secrets)
                 append_event({"at": now_iso(), "type": "connection_cleared", "connection": cid})
+                reconcile_provider_workers()
+                DISPATCH_EVENT.set()
                 return self.send_json({"deleted": True, "id": cid})
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)

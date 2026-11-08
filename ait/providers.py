@@ -879,49 +879,10 @@ def normalize_github_repo_url(raw_repo: str) -> str:
     return cleaned
 
 
-OPENAI_COMPAT_PROVIDERS: dict[str, dict[str, Any]] = {
-    "GroqCloud": {
-        "conn_id": "groq",
-        "model": GROQ_MODEL,
-        "endpoint": "https://api.groq.com/openai/v1/chat/completions",
-        "max_tokens_key": "max_completion_tokens",
-        "fixed_max_tokens": 8192,
-    },
-    "OpenRouter": {
-        "conn_id": "openrouter",
-        "model": OPENROUTER_MODEL,
-        "endpoint": "https://openrouter.ai/api/v1/chat/completions",
-        "max_tokens_key": "max_tokens",
-        "fixed_max_tokens": None,
-    },
-    "OmniRoute": {
-        "conn_id": "omniroute",
-        "model": OMNIROUTE_MODEL,
-        "endpoint": f"{OMNIROUTE_BASE_URL}/chat/completions",
-        "max_tokens_key": "max_tokens",
-        "fixed_max_tokens": None,
-    },
-    "9Router": {
-        "conn_id": "ninerouter",
-        "model": NINEROUTER_MODEL,
-        "endpoint": f"{NINEROUTER_BASE_URL}/chat/completions",
-        "max_tokens_key": "max_tokens",
-        "fixed_max_tokens": None,
-    },
-    "Nvidia": {
-        "conn_id": "nvidia",
-        "model": NVIDIA_MODEL,
-        "endpoint": f"{NVIDIA_BASE_URL}/chat/completions",
-        "max_tokens_key": "max_tokens",
-        "fixed_max_tokens": None,
-    },
-}
-
-
 def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[str, str, dict[str, Any]]:
-    cfg = OPENAI_COMPAT_PROVIDERS.get(provider)
+    cfg = openai_compat_config(provider)
     if not cfg:
-        raise ProviderFailure(provider, 400, f"Unsupported OpenAI-compatible provider: {provider}")
+        raise ProviderFailure(provider, 400, f"Unsupported provider: {provider}")
     conn_id = cfg["conn_id"]
     api_key = get_provider_key(conn_id)
     if not api_key:
@@ -968,7 +929,7 @@ def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[st
         "Authorization": f"Bearer {api_key}",
         "User-Agent": HTTP_USER_AGENT,
     }
-    if provider == "OpenRouter":
+    if cfg.get("openrouter"):
         req_headers["X-Title"] = "Personal AI Team"
 
     req = urllib.request.Request(
@@ -1023,47 +984,35 @@ def test_provider_connection(conn_id: str) -> dict[str, Any]:
             "message": f"GitHub connected as {login}.",
         }
 
-    if conn_id not in CONNECTION_SPECS:
+    record = provider_record_by_id(conn_id)
+    if not record:
         raise ValueError("Unknown connection.")
+    name = str(record.get("name", ""))
     api_key = get_provider_key(conn_id)
     if not api_key:
-        raise ValueError(f"{CONNECTION_SPECS[conn_id][0]} key is not configured.")
+        raise ValueError(f"{name} key is not configured.")
 
-    if conn_id == "groq":
+    if record.get("kind") == "gemini":
+        model = provider_model(name)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model, safe='')}?key={urllib.parse.quote(api_key, safe='')}"
         req = urllib.request.Request(
-            "https://api.groq.com/openai/v1/models",
-            headers={
-                "Accept": "application/json",
-                "Authorization": f"Bearer {api_key}",
-                "User-Agent": HTTP_USER_AGENT,
-            },
+            url,
+            headers={"Accept": "application/json", "User-Agent": HTTP_USER_AGENT},
             method="GET",
         )
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
-                parsed = json.loads(resp.read().decode("utf-8", errors="replace"))
+                resp.read()
         except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", errors="replace")
-            try:
-                detail = json.loads(raw).get("error", {}).get("message") or raw
-            except Exception:
-                detail = raw
-            raise ValueError(f"GroqCloud HTTP {exc.code}: {str(detail)[:400]}") from exc
+            raw = exc.read().decode("utf-8", errors="replace")[:400]
+            raise ValueError(f"{name} HTTP {exc.code}: {raw}") from exc
         except Exception as exc:
-            raise ValueError(f"GroqCloud request failed: {exc}") from exc
-
-        models = [str(m.get("id", "")) for m in (parsed.get("data") or []) if isinstance(m, dict)]
-        found = GROQ_MODEL in models
+            raise ValueError(f"{name} request failed: {exc}") from exc
         return {
             "connected": True,
-            "provider": "GroqCloud",
-            "model": GROQ_MODEL,
-            "model_available": found,
-            "message": (
-                f"GroqCloud connected and model {GROQ_MODEL} is available."
-                if found
-                else f"GroqCloud connected ({len(models)} models listed; configured GROQ_MODEL '{GROQ_MODEL}' was not found)."
-            ),
+            "provider": name,
+            "model": model,
+            "message": f"{name} connected (model: {model}).",
         }
 
     if conn_id == "openrouter":
@@ -1082,68 +1031,43 @@ def test_provider_connection(conn_id: str) -> dict[str, Any]:
                 resp.read()
         except urllib.error.HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace")[:400]
-            raise ValueError(f"OpenRouter HTTP {exc.code}: {raw}") from exc
+            raise ValueError(f"{name} HTTP {exc.code}: {raw}") from exc
         except Exception as exc:
-            raise ValueError(f"OpenRouter request failed: {exc}") from exc
+            raise ValueError(f"{name} request failed: {exc}") from exc
+        model = provider_model(name)
         return {
             "connected": True,
-            "provider": "OpenRouter",
-            "model": OPENROUTER_MODEL,
-            "message": f"OpenRouter connected (default model: {OPENROUTER_MODEL}).",
-        }
-
-    if conn_id in ("omniroute", "ninerouter", "nvidia"):
-        if conn_id == "omniroute":
-            base, label, model = OMNIROUTE_BASE_URL, CONNECTION_SPECS[conn_id][0], OMNIROUTE_MODEL
-        elif conn_id == "ninerouter":
-            base, label, model = NINEROUTER_BASE_URL, CONNECTION_SPECS[conn_id][0], NINEROUTER_MODEL
-        else:
-            base, label, model = NVIDIA_BASE_URL, CONNECTION_SPECS[conn_id][0], NVIDIA_MODEL
-        req = urllib.request.Request(
-            f"{base}/models",
-            headers={
-                "Accept": "application/json",
-                "Authorization": f"Bearer {api_key}",
-                "User-Agent": HTTP_USER_AGENT,
-            },
-            method="GET",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                parsed = json.loads(resp.read().decode("utf-8", errors="replace"))
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", errors="replace")[:400]
-            raise ValueError(f"{label} HTTP {exc.code}: {raw}") from exc
-        except Exception as exc:
-            raise ValueError(f"{label} request failed: {exc}") from exc
-        models = [str(m.get("id", "")) for m in (parsed.get("data") or []) if isinstance(m, dict)]
-        return {
-            "connected": True,
-            "provider": label,
+            "provider": name,
             "model": model,
-            "model_available": (model in models) if models else None,
-            "message": f"{label} connected ({len(models)} models listed; configured model '{model}').",
+            "message": f"{name} connected (default model: {model}).",
         }
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(GEMINI_MODEL, safe='')}?key={urllib.parse.quote(api_key, safe='')}"
+    base = str(record.get("base_url", "")).strip().rstrip("/")
+    model = provider_model(name)
     req = urllib.request.Request(
-        url,
-        headers={"Accept": "application/json", "User-Agent": HTTP_USER_AGENT},
+        f"{base}/models",
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": HTTP_USER_AGENT,
+        },
         method="GET",
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            resp.read()
+            parsed = json.loads(resp.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")[:400]
-        raise ValueError(f"Gemini HTTP {exc.code}: {raw}") from exc
+        raise ValueError(f"{name} HTTP {exc.code}: {raw}") from exc
     except Exception as exc:
-        raise ValueError(f"Gemini request failed: {exc}") from exc
+        raise ValueError(f"{name} request failed: {exc}") from exc
+    models = [str(m.get("id", "")) for m in (parsed.get("data") or []) if isinstance(m, dict)]
     return {
         "connected": True,
-        "provider": "Gemini",
-        "model": GEMINI_MODEL,
-        "message": f"Gemini connected (model: {GEMINI_MODEL}).",
+        "provider": name,
+        "model": model,
+        "model_available": (model in models) if models else None,
+        "message": f"{name} connected ({len(models)} models listed; configured model '{model}').",
     }
 
 
@@ -1157,18 +1081,54 @@ def retry_after_time(header: str | None, fallback_hours: int = 2) -> str:
     return (datetime.now(timezone.utc) + timedelta(hours=fallback_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+AUTO_ORDER_CACHE: dict[str, Any] = {"at": 0.0, "order": []}
+AUTO_ORDER_TTL_SECONDS = 60.0
+
+
+def auto_provider_order() -> list[str]:
+    """Configured providers ordered by audit pass rate, ties broken by Connections order."""
+    now = time.time()
+    cached = AUTO_ORDER_CACHE.get("order") or []
+    if cached and now - float(AUTO_ORDER_CACHE.get("at") or 0) < AUTO_ORDER_TTL_SECONDS:
+        return list(cached)
+    configured = configured_providers()
+    scores: dict[str, dict[str, int]] = {}
+    for row in get_provider_quality():
+        prov = str(row.get("provider", ""))
+        if prov not in configured:
+            continue
+        agg = scores.setdefault(prov, {"measured": 0, "passed": 0})
+        agg["measured"] += int(row.get("measured") or 0)
+        agg["passed"] += int(row.get("passed") or 0)
+    registry_order = provider_names()
+
+    def sort_key(name: str) -> tuple[float, int]:
+        agg = scores.get(name)
+        score = (100.0 * agg["passed"] / agg["measured"]) if agg and agg["measured"] else 0.0
+        try:
+            idx = registry_order.index(name)
+        except ValueError:
+            idx = len(registry_order)
+        return (-score, idx)
+
+    order = sorted(configured, key=sort_key)
+    AUTO_ORDER_CACHE["at"] = now
+    AUTO_ORDER_CACHE["order"] = order
+    return list(order)
+
+
+def select_auto_provider(tried: set[str] | None = None) -> str:
+    skip = tried or set()
+    for name in auto_provider_order():
+        if name not in skip:
+            return name
+    return ""
+
+
 def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
     if provider not in configured_providers():
         return None
-    model_map = {
-        "Gemini": GEMINI_MODEL,
-        "GroqCloud": GROQ_MODEL,
-        "OpenRouter": OPENROUTER_MODEL,
-        "OmniRoute": OMNIROUTE_MODEL,
-        "9Router": NINEROUTER_MODEL,
-        "Nvidia": NVIDIA_MODEL,
-    }
-    model = model_map[provider]
+    model = provider_model(provider)
     with STATE_LOCK:
         summaries = reversed(read_tasks())
         qa_candidates = [
@@ -1293,20 +1253,11 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         return task
 
 
+ACTIVE_PROVIDER_COUNTS: dict[str, int] = {}
+
+
 def bump_provider_activity(provider: str, delta: int) -> None:
-    global ACTIVE_GEMINI_COUNT, ACTIVE_GROQ_COUNT, ACTIVE_OPENROUTER_COUNT, ACTIVE_OMNIROUTE_COUNT, ACTIVE_NINEROUTER_COUNT
-    if provider == "Gemini":
-        ACTIVE_GEMINI_COUNT = max(0, ACTIVE_GEMINI_COUNT + delta)
-    elif provider == "GroqCloud":
-        ACTIVE_GROQ_COUNT = max(0, ACTIVE_GROQ_COUNT + delta)
-    elif provider == "OmniRoute":
-        ACTIVE_OMNIROUTE_COUNT = max(0, ACTIVE_OMNIROUTE_COUNT + delta)
-    elif provider == "9Router":
-        ACTIVE_NINEROUTER_COUNT = max(0, ACTIVE_NINEROUTER_COUNT + delta)
-    elif provider == "Nvidia":
-        ACTIVE_NVIDIA_COUNT = max(0, ACTIVE_NVIDIA_COUNT + delta)
-    else:
-        ACTIVE_OPENROUTER_COUNT = max(0, ACTIVE_OPENROUTER_COUNT + delta)
+    ACTIVE_PROVIDER_COUNTS[provider] = max(0, ACTIVE_PROVIDER_COUNTS.get(provider, 0) + delta)
 
 
 def dispatch_one_for_provider(provider: str) -> bool:
@@ -1320,9 +1271,9 @@ def dispatch_one_for_provider(provider: str) -> bool:
     bump_provider_activity(provider, 1)
 
     try:
-        if provider == "Gemini":
+        if provider_kind(provider) == "gemini":
             reply, meta = call_gemini_task(task)
-            actual_model = GEMINI_MODEL
+            actual_model = provider_model(provider)
         else:
             reply, actual_model, meta = call_openai_compatible_task(task, provider)
 
@@ -1602,16 +1553,34 @@ def dispatch_one_for_provider(provider: str) -> bool:
     return True
 
 
-def provider_worker_loop(provider: str) -> None:
-    while True:
+PROVIDER_WORKER_LOCK = threading.Lock()
+PROVIDER_WORKERS: dict[str, threading.Event] = {}
+
+
+def provider_worker_loop(provider: str, stop_event: threading.Event) -> None:
+    while not stop_event.is_set():
         try:
             worked = dispatch_one_for_provider(provider)
             if not worked:
-                DISPATCH_EVENT.wait(timeout=3.0)
+                stop_event.wait(timeout=3.0)
                 DISPATCH_EVENT.clear()
         except Exception:
             logger.exception("Provider worker %s dispatch failed", provider)
-            time.sleep(3.0)
+            stop_event.wait(timeout=3.0)
+
+
+def reconcile_provider_workers() -> None:
+    with PROVIDER_WORKER_LOCK:
+        wanted = set(configured_providers())
+        for name in list(PROVIDER_WORKERS):
+            if name not in wanted:
+                PROVIDER_WORKERS[name].set()
+                del PROVIDER_WORKERS[name]
+        for name in wanted:
+            if name not in PROVIDER_WORKERS:
+                stop_event = threading.Event()
+                PROVIDER_WORKERS[name] = stop_event
+                threading.Thread(target=provider_worker_loop, args=(name, stop_event), daemon=True).start()
 
 
 def run_watchdog_pass() -> int:
@@ -1680,7 +1649,7 @@ def run_watchdog_pass() -> int:
                         for a in (task.get("attempts") or [])[start:]
                         if str(a.get("role") or role) == role
                     }
-                    order = get_routing().get("QA" if qa_active else role, PROVIDERS)
+                    order = selection_order_for_role("QA" if qa_active else role)
                     configured = configured_providers()
                     if not any(p in configured and p not in tried for p in order):
                         task[cycle_key] = len(task.get("attempts") or [])
@@ -1751,13 +1720,8 @@ def ci_poll_worker_loop() -> None:
         time.sleep(CI_POLL_INTERVAL_SECONDS)
 
 
-def provider_activity_status() -> dict[str, bool]:
-    """Return live provider busy flags (read from this module's globals)."""
+def provider_activity_status() -> dict[str, Any]:
+    """Return live provider busy flags keyed by provider name."""
     return {
-        "gemini_working": ACTIVE_GEMINI_COUNT > 0,
-        "groq_working": ACTIVE_GROQ_COUNT > 0,
-        "openrouter_working": ACTIVE_OPENROUTER_COUNT > 0,
-        "omniroute_working": ACTIVE_OMNIROUTE_COUNT > 0,
-        "ninerouter_working": ACTIVE_NINEROUTER_COUNT > 0,
-        "nvidia_working": ACTIVE_NVIDIA_COUNT > 0,
+        "provider_working": {name: ACTIVE_PROVIDER_COUNTS.get(name, 0) > 0 for name in provider_names()},
     }

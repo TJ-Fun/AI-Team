@@ -110,7 +110,7 @@
       <label>Request<textarea name="request" rows="4" maxlength="12000" placeholder="Describe what needs to be done" required></textarea></label>
       <div class="two-columns">
         <label>Work role<select name="role"><option>PM/PO</option><option>Frontend developer</option><option>Backend developer</option><option>QA</option><option>UI designer</option><option>Documentation</option></select></label>
-        <label>AI provider<select name="provider"><option>Automatic</option><option>Gemini</option><option>GroqCloud</option><option>OpenRouter</option><option>OmniRoute</option><option>9Router</option><option>Nvidia</option></select></label>
+        <label>AI provider<select name="provider"><option>Automatic</option><option>Auto</option></select></label>
       </div>
       <div class="two-columns"><label>Project<select name="project_id"></select></label><label>Sub-project<select name="module_id"><option value="">Whole project</option></select></label></div>
       <label>Acceptance checks<textarea name="checks" rows="3" placeholder="One check per line. For automatic checks use exact:text, contains:text, or not_contains:text"></textarea></label>
@@ -149,12 +149,7 @@
         <label for="detail-provider-select">AI provider</label>
         <select id="detail-provider-select">
           <option value="Automatic">Automatic</option>
-          <option value="Gemini">Gemini</option>
-          <option value="GroqCloud">GroqCloud</option>
-          <option value="OpenRouter">OpenRouter</option>
-          <option value="OmniRoute">OmniRoute</option>
-          <option value="9Router">9Router</option>
-          <option value="Nvidia">Nvidia</option>
+          <option value="Auto">Auto</option>
         </select>
         <span id="detail-provider-feedback" class="detail-provider-feedback"></span>
       </div>
@@ -241,8 +236,20 @@
       <section class="settings-tab-panel" id="settings-panel-connections" role="tabpanel" aria-labelledby="settings-tab-connections" hidden>
         <form id="connections-form" class="task-form settings-inner-form">
           <div class="dialog-heading"><div><p class="eyebrow">ENCRYPTED ON YOUR VM</p><h2>Connections</h2></div></div>
-          <p class="draft-note" id="connections-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. Test or replace each connection here; configure provider priorities in the Routing tab.</p>
+          <p class="draft-note" id="connections-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. The provider list order is the default routing for all agents: use the arrows to reorder, Remove to delete a provider, and the form below to add a built-in preset or a custom OpenAI-compatible endpoint. Test or replace each connection here; configure per-role preferences in the Routing tab.</p>
           <div id="connection-list"></div>
+          <section class="route-role add-provider">
+            <strong>Add provider</strong>
+            <div class="route-order">
+              <label>Preset
+                <select id="add-provider-preset"><option value="">Custom (OpenAI-compatible)</option></select>
+              </label>
+              <label>Name <input id="add-provider-name" maxlength="60" placeholder="My endpoint"></label>
+              <label>Base URL <input id="add-provider-base-url" placeholder="https://api.example.com/v1"></label>
+              <label>Model <input id="add-provider-model" maxlength="160" placeholder="model-name"></label>
+            </div>
+            <div class="dialog-actions"><button type="button" class="secondary" id="add-provider">Add provider</button></div>
+          </section>
           <div class="dialog-actions"><button class="secondary" type="button" id="test-github">Test GitHub connection</button></div>
           <div class="prompt-feedback" id="connections-success" hidden role="status"></div>
           <div class="form-error" id="connections-error" role="alert"></div>
@@ -251,7 +258,7 @@
       <section class="settings-tab-panel" id="settings-panel-routing" role="tabpanel" aria-labelledby="settings-tab-routing" hidden>
         <form id="routing-form" class="task-form settings-inner-form">
           <div class="dialog-heading"><div><p class="eyebrow">PROVIDER PRIORITY</p><h2>Routing</h2></div></div>
-          <p class="draft-note">Set the provider rank order for each role. Unavailable connections are skipped automatically; changing a rank swaps the providers so each one appears once.</p>
+          <p class="draft-note">Set up to 4 preferred providers per role. Unavailable connections are skipped automatically; changing a rank swaps the providers so each one appears once. After the preferred providers are exhausted, Auto selects by audit score, breaking ties by the Connections order.</p>
           <div id="routing-roles"></div>
           <section class="route-role"><strong>Chat window</strong><div class="route-order"><label>Provider
             <select id="chat-provider-select"></select>

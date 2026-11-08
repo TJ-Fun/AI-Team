@@ -57,15 +57,20 @@ def write_saved_secrets(secrets: dict[str, str]) -> None:
 
 
 def get_provider_key_and_source(conn_id: str) -> tuple[str, str]:
-    spec = CONNECTION_SPECS.get(conn_id)
+    specs = connection_specs()
+    if conn_id == "github":
+        specs = {"github": ("GitHub repository connector", "GITHUB_TOKEN")}
+    spec = specs.get(conn_id)
     if not spec:
         return "", ""
     saved = read_saved_secrets().get(conn_id, "").strip()
     if saved:
         return saved, "Encrypted on VM"
-    env_val = os.environ.get(spec[1], "").strip()
-    if env_val:
-        return env_val, f"Environment ({spec[1]})"
+    env_var = spec[1]
+    if env_var:
+        env_val = os.environ.get(env_var, "").strip()
+        if env_val:
+            return env_val, f"Environment ({env_var})"
     return "", ""
 
 
@@ -74,17 +79,4 @@ def get_provider_key(conn_id: str) -> str:
 
 
 def configured_providers() -> list[str]:
-    result: list[str] = []
-    if get_provider_key("gemini"):
-        result.append("Gemini")
-    if get_provider_key("groq"):
-        result.append("GroqCloud")
-    if get_provider_key("openrouter"):
-        result.append("OpenRouter")
-    if get_provider_key("omniroute"):
-        result.append("OmniRoute")
-    if get_provider_key("ninerouter"):
-        result.append("9Router")
-    if get_provider_key("nvidia"):
-        result.append("Nvidia")
-    return result
+    return [str(p.get("name", "")) for p in active_providers() if get_provider_key(str(p.get("id", "")))]

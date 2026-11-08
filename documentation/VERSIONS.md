@@ -1,5 +1,12 @@
 # Version log
 
+## 0.41 — 2026-11-08
+
+- Added a dynamic provider control system: providers can now be added (from built-in presets or as custom OpenAI-compatible endpoints with name/base URL/model), removed (including built-ins), and reordered in **Settings → Connections** via up/down arrows. The Connections list order is the default routing order for all agents.
+- Per-role routing in **Settings → Routing** now uses up to four preferred provider dropdowns; when preferred providers are exhausted or a task/chat provider is set to **Auto**, the dispatcher selects the best provider by audit score, breaking ties by the Connections order.
+- Provider workers start and stop automatically as providers are added or removed; `/api/status` and the header now report per-provider connection/working state dynamically, and provider selects in task forms are populated from the active provider list.
+- Updated documentation to 0.41.
+
 ## 0.40 — 2026-11-08
 
 - Added Nvidia (NIM / build.nvidia.com) as a provider: new `nvidia` connection family with `NVIDIA_API_KEY`, OpenAI-compatible dispatch through `NVIDIA_BASE_URL` (default `https://integrate.api.nvidia.com/v1`) and `NVIDIA_MODEL` (default `meta/llama-3.3-70b-instruct`), connection test against `/models`, per-provider activity counter and status reporting, routing defaults, chat provider option, and task provider selectors.

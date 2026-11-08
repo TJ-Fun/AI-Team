@@ -19,11 +19,13 @@ from ait import notifications  # noqa: F401
 from ait import projects  # noqa: F401
 from ait import prompts  # noqa: F401
 from ait import providers  # noqa: F401
+from ait import provider_registry  # noqa: F401
 from ait import secrets  # noqa: F401
 from ait import settings  # noqa: F401
 
 _DOMAIN_MODULES = (
     settings,
+    provider_registry,
     secrets,
     prompts,
     projects,

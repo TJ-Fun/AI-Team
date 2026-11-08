@@ -261,7 +261,7 @@ def get_provider_quality() -> list[dict[str, Any]]:
         for att in t.get("attempts") or []:
             role = str(att.get("role") or t.get("assigned_role") or "Unknown")
             prov = str(att.get("provider", ""))
-            if prov not in PROVIDERS:
+            if not prov:
                 continue
             key = (role, prov)
             row = grouped.setdefault(
