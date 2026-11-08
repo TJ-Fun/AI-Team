@@ -1071,6 +1071,62 @@ def test_provider_connection(conn_id: str) -> dict[str, Any]:
     }
 
 
+def list_provider_models(conn_id: str) -> dict[str, Any]:
+    """Fetch selectable models for a provider; selectable=False when the endpoint cannot list them."""
+    record = provider_record_by_id(conn_id)
+    if not record:
+        raise ValueError("Unknown provider.")
+    name = str(record.get("name", ""))
+    current = provider_model(name)
+    api_key = get_provider_key(str(record.get("id", "")))
+    if not api_key:
+        return {"provider": name, "current": current, "models": [], "selectable": False, "error": "Provider is not connected."}
+    kind = str(record.get("kind", ""))
+    try:
+        if kind == "gemini":
+            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={urllib.parse.quote(api_key, safe='')}&pageSize=200"
+            req = urllib.request.Request(
+                url,
+                headers={"Accept": "application/json", "User-Agent": HTTP_USER_AGENT},
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                parsed = json.loads(resp.read().decode("utf-8", errors="replace"))
+            models = []
+            for item in parsed.get("models") or []:
+                if not isinstance(item, dict):
+                    continue
+                methods = item.get("supportedGenerationMethods") or []
+                if "generateContent" not in methods:
+                    continue
+                mid = str(item.get("name", "")).removeprefix("models/").strip()
+                if mid:
+                    models.append(mid)
+            models.sort()
+        else:
+            base = str(record.get("base_url", "")).strip().rstrip("/")
+            req = urllib.request.Request(
+                f"{base}/models",
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": HTTP_USER_AGENT,
+                },
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                parsed = json.loads(resp.read().decode("utf-8", errors="replace"))
+            models = sorted({str(m.get("id", "")).strip() for m in (parsed.get("data") or []) if isinstance(m, dict) and str(m.get("id", "")).strip()})
+        if not models:
+            return {"provider": name, "current": current, "models": [], "selectable": False, "error": "Endpoint did not list any models."}
+        return {"provider": name, "current": current, "models": models, "selectable": True}
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")[:200]
+        return {"provider": name, "current": current, "models": [], "selectable": False, "error": f"HTTP {exc.code}: {raw}"}
+    except Exception as exc:
+        return {"provider": name, "current": current, "models": [], "selectable": False, "error": str(exc)[:200]}
+
+
 def retry_after_time(header: str | None, fallback_hours: int = 2) -> str:
     if header:
         try:

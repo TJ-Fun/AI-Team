@@ -261,15 +261,15 @@ def add_provider(preset_id: str = "", name: str = "", base_url: str = "", model:
     else:
         clean_name = str(name or "").strip()
         clean_base = str(base_url or "").strip().rstrip("/")
-        clean_model = str(model or "").strip()
+        clean_model = str(model or "").strip() or "auto"
         if not clean_name or len(clean_name) > 60 or "/" in clean_name or "\\" in clean_name:
             raise ValueError("Provider name must be 1-60 characters without slashes.")
         if clean_name.lower() in names:
             raise ValueError(f"A provider named {clean_name} already exists.")
         if not re.match(r"^https?://", clean_base, re.IGNORECASE) or len(clean_base) > 300:
             raise ValueError("Base URL must be a valid http(s) URL.")
-        if not clean_model or len(clean_model) > 160:
-            raise ValueError("Model name must be 1-160 characters.")
+        if len(clean_model) > 160:
+            raise ValueError("Model name must be 160 characters or fewer.")
         record = {
             "id": _unique_custom_id(clean_name),
             "name": clean_name,
@@ -281,6 +281,21 @@ def add_provider(preset_id: str = "", name: str = "", base_url: str = "", model:
     providers.append(record)
     save_provider_registry(providers)
     logger.info("Provider added: %s (%s)", record["name"], record["id"])
+    return record
+
+
+def update_provider_model(pid: str, model: str) -> dict[str, Any]:
+    target = str(pid or "").strip()
+    clean_model = str(model or "").strip()
+    if not clean_model or len(clean_model) > 160:
+        raise ValueError("Model name must be 1-160 characters.")
+    providers = [dict(p) for p in active_providers()]
+    record = next((p for p in providers if str(p.get("id", "")) == target), None)
+    if not record:
+        raise ValueError("Unknown provider.")
+    record["model"] = clean_model
+    save_provider_registry(providers)
+    logger.info("Provider model updated: %s -> %s", record.get("name"), clean_model)
     return record
 
 

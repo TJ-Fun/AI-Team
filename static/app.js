@@ -58,6 +58,65 @@
     return data;
   }
 
+  function openAppDialog({
+    title = "Confirm",
+    eyebrow = "PLEASE CONFIRM",
+    message = "",
+    confirmLabel = "OK",
+    cancelLabel = "Cancel",
+    showCancel = true,
+    input = null,
+    danger = false,
+  } = {}) {
+    const dlg = $("#app-dialog");
+    if (!dlg) return Promise.resolve({ confirmed: true, value: input || "" });
+    $("#app-dialog-title").textContent = title;
+    $("#app-dialog-eyebrow").textContent = eyebrow;
+    $("#app-dialog-message").textContent = message;
+    const wrap = $("#app-dialog-input-wrap");
+    const inputEl = $("#app-dialog-input");
+    if (input !== null) {
+      wrap.hidden = false;
+      inputEl.value = input;
+    } else {
+      wrap.hidden = true;
+      inputEl.value = "";
+    }
+    $("#app-dialog-error").textContent = "";
+    const okBtn = $("#app-dialog-ok");
+    okBtn.textContent = confirmLabel;
+    okBtn.className = danger ? "danger" : "primary";
+    const cancelBtn = $("#app-dialog-cancel");
+    cancelBtn.textContent = cancelLabel;
+    cancelBtn.hidden = !showCancel;
+    return new Promise((resolve) => {
+      const finish = (confirmed) => {
+        dlg.removeEventListener("close", onClose);
+        if (dlg.open) dlg.close();
+        resolve({ confirmed, value: inputEl.value });
+      };
+      const onClose = () => resolve({ confirmed: false, value: inputEl.value });
+      okBtn.onclick = () => finish(true);
+      cancelBtn.onclick = () => finish(false);
+      $("#app-dialog-close").onclick = () => finish(false);
+      dlg.addEventListener("close", onClose, { once: true });
+      if (!dlg.open) dlg.showModal();
+      if (input !== null) setTimeout(() => inputEl.focus(), 0);
+    });
+  }
+
+  function appAlert(message, title = "Notice") {
+    return openAppDialog({ title, eyebrow: "NOTICE", message, confirmLabel: "OK", showCancel: false });
+  }
+
+  function appConfirm(message, { title = "Confirm", danger = false } = {}) {
+    return openAppDialog({ title, message, confirmLabel: "Confirm", danger }).then((r) => r.confirmed);
+  }
+
+  function appPrompt(message, defaultValue = "", title = "Details needed") {
+    return openAppDialog({ title, eyebrow: "INPUT NEEDED", message, confirmLabel: "Submit", input: defaultValue });
+  }
+
   async function waitForAppRestart(statusEl, message, statusType = "restart-status", progress = null) {
     for (let attempt = 0; attempt < 30; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -387,7 +446,7 @@
       await api(`/api/notifications/${encodeURIComponent(id)}`, { method: "DELETE" });
       await refreshBoard();
     } catch (err) {
-      alert(err.message);
+      appAlert(err.message);
     }
   });
 
@@ -411,10 +470,10 @@
       const cfgRes = await api("/api/settings/config");
       const cfg = cfgRes.config || {};
       if (!cfg.app_repo || !cfg.app_clone_dir || !cfg.app_working_dir) {
-        alert("App update is not configured. Set the repository and directories in Settings → About first.");
+        appAlert("App update is not configured. Set the repository and directories in Settings → About first.", "Update unavailable");
         return;
       }
-      if (!confirm(`Update the app to the latest version and restart?`)) return;
+      if (!(await appConfirm("Update the app to the latest version and restart?", { title: "Update app" }))) return;
       appUpdateInProgress = true;
       progress?.begin("Preparing update…");
       const res = await api("/api/settings/update", {
@@ -430,7 +489,7 @@
       await waitForAppRestart(statusShim, res.message || "Update complete.", "update-status", progress);
     } catch (err) {
       progress?.fail(`Update failed: ${err.message}`);
-      alert(`Update failed: ${err.message}`);
+      appAlert(`Update failed: ${err.message}`, "Update failed");
     } finally {
       appUpdateInProgress = false;
       btn.disabled = false;
@@ -662,7 +721,7 @@
         });
         await refreshBoard();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       } finally {
         readyBtn.disabled = false;
       }
@@ -673,8 +732,11 @@
     if (delBtn) {
       const id = delBtn.getAttribute("data-delete-task");
       if (
-        !confirm(
-          "Permanently delete this task, its agent replies, and its task activity log entries? The overall chat conversation will remain. This cannot be undone."
+        !(
+          await appConfirm(
+            "Permanently delete this task, its agent replies, and its task activity log entries? The overall chat conversation will remain. This cannot be undone.",
+            { title: "Delete task", danger: true }
+          )
         )
       ) {
         return;
@@ -684,7 +746,7 @@
         await api(`/api/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
         await refreshBoard();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       } finally {
         delBtn.disabled = false;
       }
@@ -983,7 +1045,7 @@
               await refreshBoard();
               if (res.followup_task) await loadChat();
             } catch (err) {
-              alert(err.message);
+              appAlert(err.message);
             } finally {
               ev.target.disabled = false;
             }
@@ -1037,17 +1099,17 @@
         };
         dBody.querySelector("#design-approve")?.addEventListener("click", async (ev) => {
           ev.target.disabled = true;
-          try { await submit("approve"); } catch (err) { alert(err.message); } finally { ev.target.disabled = false; }
+          try { await submit("approve"); } catch (err) { appAlert(err.message); } finally { ev.target.disabled = false; }
         });
         dBody.querySelector("#design-alternative")?.addEventListener("click", async (ev) => {
           const idx = dBody.querySelector("#design-alt-select")?.value;
-          if (idx === "" || idx == null) { alert("Select an alternative first."); return; }
+          if (idx === "" || idx == null) { appAlert("Select an alternative first."); return; }
           ev.target.disabled = true;
-          try { await submit("alternative", Number(idx)); } catch (err) { alert(err.message); } finally { ev.target.disabled = false; }
+          try { await submit("alternative", Number(idx)); } catch (err) { appAlert(err.message); } finally { ev.target.disabled = false; }
         });
         dBody.querySelector("#design-reject")?.addEventListener("click", async (ev) => {
           ev.target.disabled = true;
-          try { await submit("reject"); } catch (err) { alert(err.message); } finally { ev.target.disabled = false; }
+          try { await submit("reject"); } catch (err) { appAlert(err.message); } finally { ev.target.disabled = false; }
         });
       } else {
         const decision = task.design_decision ? `Decision: ${escapeHtml(task.design_decision)}${task.design_alternative ? ` (${escapeHtml(task.design_alternative)})` : ""}.` : "";
@@ -1245,7 +1307,7 @@
     } catch (err) {
       if (feedback) feedback.textContent = "";
       select.value = getAskedProvider(task);
-      alert(err.message);
+      appAlert(err.message);
     } finally {
       const latest = state.tasks.find((t) => t.id === task.id) || task;
       select.disabled = ["In progress", "Done", "Canceled"].includes(latest.status);
@@ -1264,8 +1326,11 @@
 
     if (e.target.closest("[data-detail-delete]")) {
       if (
-        !confirm(
-          "Permanently delete this task, its agent replies, and its task activity log entries? The overall chat conversation will remain. This cannot be undone."
+        !(
+          await appConfirm(
+            "Permanently delete this task, its agent replies, and its task activity log entries? The overall chat conversation will remain. This cannot be undone.",
+            { title: "Delete task", danger: true }
+          )
         )
       ) {
         return;
@@ -1276,7 +1341,7 @@
         detailDialog.close();
         await refreshBoard();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       }
       return;
     }
@@ -1291,7 +1356,7 @@
         });
         await refreshBoard();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       } finally {
         button.disabled = false;
       }
@@ -1300,7 +1365,7 @@
 
     if (e.target.closest("[data-merge-approve]")) {
       const button = e.target.closest("[data-merge-approve]");
-      if (!confirm("Approve merging this pull request now? GitHub will re-check CI before merging.")) return;
+      if (!(await appConfirm("Approve merging this pull request now? GitHub will re-check CI before merging.", { title: "Approve merge" }))) return;
       button.disabled = true;
       try {
         await api(`/api/tasks/${encodeURIComponent(task.id)}/approve-merge`, {
@@ -1309,7 +1374,7 @@
         });
         await refreshBoard();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       } finally {
         button.disabled = false;
       }
@@ -1326,10 +1391,11 @@
       }
       let note = "";
       if (target === "Canceled") {
-        if (!confirm("Cancel this task? This cannot be undone.")) return;
+        if (!(await appConfirm("Cancel this task? This cannot be undone.", { title: "Cancel task", danger: true }))) return;
       } else if (target === "Blocked") {
-        const reason = prompt("Why is this task blocked? (Optional)", "");
-        if (reason === null) return;
+        const reasonRes = await appPrompt("Why is this task blocked? (Optional)", "", "Block task");
+        if (!reasonRes.confirmed) return;
+        const reason = reasonRes.value;
         note = reason;
       }
       try {
@@ -1340,7 +1406,7 @@
         detailDialog.close();
         await refreshBoard();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       }
       return;
     }
@@ -1350,9 +1416,10 @@
       const approve = ovBtn.getAttribute("data-overview-action") === "approve";
       if (
         approve &&
-        !confirm(
-          "Approve this overview and replace Project brief, Technical overview, and Decision log? Current versions will be saved in history; Confirmed outcomes are preserved."
-        )
+        !(await appConfirm(
+          "Approve this overview and replace Project brief, Technical overview, and Decision log? Current versions will be saved in history; Confirmed outcomes are preserved.",
+          { title: "Approve overview" }
+        ))
       ) {
         return;
       }
@@ -1372,7 +1439,7 @@
         );
         await refreshBoard();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       }
     }
   });
@@ -1494,9 +1561,10 @@
     const selected = state.prompts.find((p) => p.id === id);
     if (!selected) return;
     if (
-      !confirm(
-        `Reset "${selected.title}" back to its built-in default prompt? Your saved custom prompt for this role will be replaced with the default template.`
-      )
+      !(await appConfirm(
+        `Reset "${selected.title}" back to its built-in default prompt? Your saved custom prompt for this role will be replaced with the default template.`,
+        { title: "Reset prompt" }
+      ))
     ) {
       return;
     }
@@ -1620,7 +1688,7 @@
     const versionId = contextVersionSelect.value;
     const docId = contextSelect.value;
     if (!versionId) return;
-    if (!confirm("Restore this saved version? The current document will first be saved as a new history version.")) {
+    if (!(await appConfirm("Restore this saved version? The current document will first be saved as a new history version.", { title: "Restore version" }))) {
       return;
     }
     try {
@@ -1632,7 +1700,7 @@
       state.contextDocs = state.contextDocs.map((d) => (d.id === docId ? { ...d, content: res.content } : d));
       await loadContextHistory(docId);
     } catch (err) {
-      alert(err.message);
+      appAlert(err.message);
     }
   });
 
@@ -1640,7 +1708,7 @@
     const versionId = contextVersionSelect.value;
     const docId = contextSelect.value;
     if (!versionId) return;
-    if (!confirm("Permanently delete this saved version? The current Project context will not change.")) {
+    if (!(await appConfirm("Permanently delete this saved version? The current Project context will not change.", { title: "Delete version", danger: true }))) {
       return;
     }
     try {
@@ -1650,7 +1718,7 @@
       );
       await loadContextHistory(docId);
     } catch (err) {
-      alert(err.message);
+      appAlert(err.message);
     }
   });
 
@@ -1853,6 +1921,9 @@
               }</span>
             </div>
             <div class="provider-meta">${escapeHtml(p.model || "")}${p.base_url ? ` · ${escapeHtml(p.base_url)}` : ""}</div>
+            <label class="provider-model-label">Model
+              <select class="provider-model" data-provider-model="${escapeHtml(p.id)}" disabled><option value="">…</option></select>
+            </label>
             <div class="connection-controls">
               ${
                 state.encryptionAvailable
@@ -1904,33 +1975,17 @@
         </div>`
         : "");
 
-    const presetSelect = $("#add-provider-preset");
-    if (presetSelect) {
-      const currentPreset = presetSelect.value;
-      presetSelect.innerHTML =
-        `<option value="">Custom (OpenAI-compatible)</option>` +
-        (state.providerPresets || [])
-          .map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`)
-          .join("");
-      presetSelect.value = [...presetSelect.options].some((o) => o.value === currentPreset) ? currentPreset : "";
-      const custom = !presetSelect.value;
-      for (const id of ["#add-provider-name", "#add-provider-base-url", "#add-provider-model"]) {
-        const el = $(id);
-        if (el) el.disabled = !custom;
-      }
-    }
-
     const maxPreferred = state.maxPreferred || 4;
     $("#routing-roles").innerHTML =
       state.routingRoles
         .map((role) => {
           const preferred = state.routing[role] || [];
           const selects = Array.from({ length: maxPreferred }, (_, idx) => {
-            const val = preferred[idx] || "";
+            const val = preferred[idx] || "Auto";
             return `
             <label>${idx + 1}
               <select data-route-role="${escapeHtml(role)}" data-route-idx="${idx}">
-                <option value="">—</option>
+                <option value="Auto"${val === "Auto" ? " selected" : ""}>Auto</option>
                 ${state.routingProviders
                   .map(
                     (opt) =>
@@ -1945,7 +2000,50 @@
           return `<section class="route-role"><strong>${escapeHtml(role)}</strong><div class="route-order">${selects}</div></section>`;
         })
         .join("") +
-      `<p class="draft-note">Up to ${maxPreferred} preferred providers per role. After they are exhausted, Auto picks the best provider by audit score, breaking ties by the Connections order above.</p>`;
+      `<p class="draft-note">Up to ${maxPreferred} preferred providers per role. Auto expands to every provider ordered by audit score, breaking ties by the Connections order. After the preferred providers are exhausted, the same Auto order continues as fallback.</p>`;
+    refreshProviderModels();
+  }
+
+  async function refreshProviderModels() {
+    const selects = document.querySelectorAll("select.provider-model");
+    for (const sel of selects) {
+      const pid = sel.getAttribute("data-provider-model");
+      const rec = state.connections.find((c) => c.id === pid);
+      const compat = rec && rec.kind !== "gemini";
+      sel.disabled = true;
+      sel.innerHTML = `<option value="">…</option>`;
+      sel.title = "";
+      try {
+        const res = await api(`/api/providers/${encodeURIComponent(pid)}/models`);
+        const current = String(res.current || "auto");
+        const models = res.models || [];
+        if (!res.selectable || !models.length) {
+          sel.innerHTML = `<option value="${escapeHtml(current)}" selected>${escapeHtml(
+            current === "auto" ? "Auto" : current
+          )}</option>`;
+          sel.disabled = true;
+          sel.title = res.error || "Model selection is not available for this provider.";
+          continue;
+        }
+        const options = [];
+        if (compat) {
+          options.push(`<option value="auto"${current === "auto" ? " selected" : ""}>Auto</option>`);
+        }
+        for (const m of models) {
+          options.push(`<option value="${escapeHtml(m)}"${m === current ? " selected" : ""}>${escapeHtml(m)}</option>`);
+        }
+        if (current !== "auto" && !models.includes(current)) {
+          options.push(`<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}</option>`);
+        }
+        sel.innerHTML = options.join("");
+        sel.value = current === "auto" ? "auto" : current;
+        sel.disabled = false;
+      } catch (err) {
+        sel.innerHTML = `<option value="">Model unavailable</option>`;
+        sel.disabled = true;
+        sel.title = err.message;
+      }
+    }
   }
 
   function renderChatProviderSelect() {
@@ -2039,9 +2137,10 @@
       const id = removeBtn.getAttribute("data-remove-provider");
       const rec = state.connections.find((c) => c.id === id);
       if (
-        !confirm(
-          `Remove provider "${rec?.name || id}"? Built-in providers can be re-added from the preset list; custom providers are deleted completely.`
-        )
+        !(await appConfirm(
+          `Remove provider "${rec?.name || id}"? Built-in providers can be re-added from the preset list; custom providers are deleted completely.`,
+          { title: "Remove provider", danger: true }
+        ))
       )
         return;
       $("#connections-error").textContent = "";
@@ -2100,7 +2199,7 @@
         });
         const msg = res.message || (res.login ? `GitHub connected as ${res.login}.` : "Connection verified.");
         setConnectionsSuccess(msg);
-        alert(msg);
+        appAlert(msg, "Connection test");
       } catch (err) {
         $("#connections-error").textContent = err.message;
       } finally {
@@ -2113,7 +2212,7 @@
     const clearBtn = e.target.closest("[data-clear-conn]");
     if (clearBtn) {
       const id = clearBtn.getAttribute("data-clear-conn");
-      if (!confirm("Remove the saved credential from this VM?")) return;
+      if (!(await appConfirm("Remove the saved credential from this VM?", { title: "Clear credential", danger: true }))) return;
       $("#connections-error").textContent = "";
       setConnectionsSuccess("");
       try {
@@ -2135,8 +2234,9 @@
     const nextProv = sel.value;
     const maxPreferred = state.maxPreferred || 4;
     const current = [...(state.routing[role] || [])];
-    while (current.length < maxPreferred) current.push("");
-    const existingIdx = current.findIndex((p, i) => i !== idx && p && p === nextProv);
+    while (current.length < maxPreferred) current.push("Auto");
+    const existingIdx =
+      nextProv === "Auto" ? -1 : current.findIndex((p, i) => i !== idx && p && p === nextProv);
     if (existingIdx >= 0) {
       const tmp = current[idx];
       current[idx] = nextProv;
@@ -2148,48 +2248,50 @@
     renderConnectionsAndRouting();
   });
 
-  $("#add-provider-preset")?.addEventListener("change", (e) => {
-    const custom = !e.target.value;
-    for (const id of ["#add-provider-name", "#add-provider-base-url", "#add-provider-model"]) {
-      const el = $(id);
-      if (el) el.disabled = !custom;
+  $("#connection-list")?.addEventListener("change", async (e) => {
+    const sel = e.target.closest("select.provider-model");
+    if (!sel) return;
+    const pid = sel.getAttribute("data-provider-model");
+    const model = sel.value;
+    $("#connections-error").textContent = "";
+    setConnectionsSuccess("");
+    try {
+      await api(`/api/providers/${encodeURIComponent(pid)}`, {
+        method: "PUT",
+        body: JSON.stringify({ model }),
+      });
+      const rec = state.connections.find((c) => c.id === pid);
+      if (rec) rec.model = model;
+      setConnectionsSuccess(`Model updated for ${rec?.name || pid}.`);
+    } catch (err) {
+      $("#connections-error").textContent = err.message;
+      refreshProviderModels();
     }
   });
 
   $("#add-provider")?.addEventListener("click", async () => {
-    const preset = $("#add-provider-preset")?.value || "";
-    const body = preset
-      ? { preset }
-      : {
-          name: $("#add-provider-name")?.value?.trim() || "",
-          base_url: $("#add-provider-base-url")?.value?.trim() || "",
-          model: $("#add-provider-model")?.value?.trim() || "",
-        };
+    const body = {
+      name: $("#add-provider-name")?.value?.trim() || "",
+      base_url: $("#add-provider-base-url")?.value?.trim() || "",
+    };
+    const key = $("#add-provider-key")?.value?.trim() || "";
     $("#connections-error").textContent = "";
     setConnectionsSuccess("");
     try {
-      await api("/api/providers", { method: "POST", body: JSON.stringify(body) });
-      if (!preset) {
-        $("#add-provider-name").value = "";
-        $("#add-provider-base-url").value = "";
-        $("#add-provider-model").value = "";
+      const res = await api("/api/providers", { method: "POST", body: JSON.stringify(body) });
+      const pid = res?.provider?.id || "";
+      if (key && pid) {
+        await api(`/api/connections/${encodeURIComponent(pid)}`, {
+          method: "PUT",
+          body: JSON.stringify({ secret: key }),
+        });
       }
+      $("#add-provider-name").value = "";
+      $("#add-provider-base-url").value = "";
+      $("#add-provider-key").value = "";
       await reloadSettingsData();
       await refreshStatus();
-      setConnectionsSuccess("Provider added. Save its API key below, then Test.");
-    } catch (err) {
-      $("#connections-error").textContent = err.message;
-    }
-  });
-
-  $("#test-github")?.addEventListener("click", async () => {
-    $("#connections-error").textContent = "";
-    setConnectionsSuccess("");
-    try {
-      const res = await api("/api/connections/github/test", { method: "POST", body: "{}" });
-      const msg = res.message || `GitHub connected as ${res.login}.`;
-      setConnectionsSuccess(msg);
-      alert(msg);
+      setConnectionsSuccess(key ? "Provider added and key saved. Pick a model below, then Test." : "Provider added. Save its API key below, pick a model, then Test.");
     } catch (err) {
       $("#connections-error").textContent = err.message;
     }
@@ -2346,7 +2448,7 @@
     const rmBtn = e.target.closest("[data-proj-remove]");
     if (rmBtn) {
       if (projectDrafts.length < 2) {
-        alert("Keep at least one project.");
+        appAlert("Keep at least one project.");
         return;
       }
       projectDrafts.splice(Number(rmBtn.getAttribute("data-proj-remove")), 1);
@@ -2362,10 +2464,10 @@
       if (statusEl) statusEl.textContent = "Pulling…";
       try {
         const res = await api(`/api/git/${encodeURIComponent(d.id)}/pull`, { method: "POST" });
-        alert(`Pull successful:\n${res.output}`);
+        appAlert(`Pull successful:\n${res.output}`, "Git pull");
         renderProjectEditors();
       } catch (err) {
-        alert(`Pull failed: ${err.message}`);
+        appAlert(`Pull failed: ${err.message}`, "Git pull failed");
         if (statusEl) statusEl.textContent = "Pull failed";
       }
       return;
@@ -2379,10 +2481,10 @@
       if (statusEl) statusEl.textContent = "Pushing…";
       try {
         const res = await api(`/api/git/${encodeURIComponent(d.id)}/push`, { method: "POST" });
-        alert(`Push successful:\n${res.output}`);
+        appAlert(`Push successful:\n${res.output}`, "Git push");
         renderProjectEditors();
       } catch (err) {
-        alert(`Push failed: ${err.message}`);
+        appAlert(`Push failed: ${err.message}`, "Git push failed");
         if (statusEl) statusEl.textContent = "Push failed";
       }
       return;
@@ -2392,7 +2494,7 @@
     if (cloneBtn) {
       const d = projectDrafts[Number(cloneBtn.getAttribute("data-proj-clone"))];
       if (!d?.id) return;
-      if (!confirm(`Clone repository to ${d.local_path}? This will create a new git clone.`)) return;
+      if (!(await appConfirm(`Clone repository to ${d.local_path}? This will create a new git clone.`, { title: "Clone repository" }))) return;
       const statusEl = document.querySelector(`[data-proj-status="${cloneBtn.getAttribute('data-proj-clone')}"]`);
       if (statusEl) statusEl.textContent = "Cloning…";
       try {
@@ -2407,10 +2509,10 @@
         if (job.status !== "succeeded") {
           throw new Error(job.error || "Git clone ended without a result. Check the server logs for the clone job.");
         }
-        alert(`Clone successful:\n${job.result?.output || ""}`);
+        appAlert(`Clone successful:\n${job.result?.output || ""}`, "Git clone");
         renderProjectEditors();
       } catch (err) {
-        alert(`Clone failed: ${err.message}`);
+        appAlert(`Clone failed: ${err.message}`, "Git clone failed");
         if (statusEl) statusEl.textContent = "Clone failed";
       }
       return;
@@ -2420,7 +2522,7 @@
     if (resBtn) {
       const d = projectDrafts[Number(resBtn.getAttribute("data-proj-restore"))];
       if (!d?.id || !d.selectedVersion) return;
-      if (!confirm("Restore this saved background? The current notes will be saved as another version.")) return;
+      if (!(await appConfirm("Restore this saved background? The current notes will be saved as another version.", { title: "Restore background" }))) return;
       try {
         const res = await api(`/api/projects/${encodeURIComponent(d.id)}/restore-context`, {
           method: "POST",
@@ -2431,7 +2533,7 @@
         d.selectedVersion = d.history[0]?.id || "";
         renderProjectEditors();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       }
       return;
     }
@@ -2440,7 +2542,7 @@
     if (delVerBtn) {
       const d = projectDrafts[Number(delVerBtn.getAttribute("data-proj-del-ver"))];
       if (!d?.id || !d.selectedVersion) return;
-      if (!confirm("Permanently delete this saved project background version?")) return;
+      if (!(await appConfirm("Permanently delete this saved project background version?", { title: "Delete version", danger: true }))) return;
       try {
         await api(
           `/api/projects/${encodeURIComponent(d.id)}/context-history/${encodeURIComponent(d.selectedVersion)}`,
@@ -2450,7 +2552,7 @@
         d.selectedVersion = d.history[0]?.id || "";
         renderProjectEditors();
       } catch (err) {
-        alert(err.message);
+        appAlert(err.message);
       }
     }
   });
@@ -2696,7 +2798,7 @@
       });
       await refreshBoard();
     } catch (err) {
-      alert(err.message);
+      appAlert(err.message);
     } finally {
       btn.disabled = false;
     }
@@ -2786,7 +2888,7 @@
       chatInput.value = "";
       await Promise.all([loadChat(), refreshBoard()]);
     } catch (err) {
-      alert(err.message);
+      appAlert(err.message);
     } finally {
       planBtn.disabled = false;
       $("#send-button").disabled = false;
@@ -2809,7 +2911,7 @@
       await api(`/api/chat?project_id=${encodeURIComponent(state.activeProjectId)}`, { method: "DELETE" });
       await loadChat();
     } catch (err) {
-      alert(err.message);
+      appAlert(err.message);
     }
   });
 

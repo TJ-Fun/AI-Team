@@ -392,3 +392,12 @@ dialog::backdrop{background:#000000aa}
 .add-provider label input{width:100%;box-sizing:border-box}
 .add-provider label input:disabled{opacity:.5}
 
+
+/* Provider model dropdown + autonomy checkbox fix */
+.settings-section label.autonomy-check{flex-direction:row;align-items:flex-start;gap:8px;margin:0}
+.settings-section .autonomy-check input[type="checkbox"]{width:auto;margin:2px 0 0;flex-shrink:0}
+.provider-model-label{display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:600;color:#8b978c;margin-top:6px}
+.provider-model{max-width:300px;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:11px system-ui,sans-serif;background:#fff;color:var(--ink)}
+.provider-model:disabled{opacity:.55}
+.provider-model:focus{border-color:#94b395;outline:0}
+

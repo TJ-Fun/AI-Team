@@ -23,7 +23,7 @@ def get_routing() -> dict[str, list[str]]:
         if isinstance(raw, list):
             for item in raw:
                 name = str(item).strip()
-                if name in active and name not in preferred:
+                if (name == "Auto" or name in active) and name not in preferred:
                     preferred.append(name)
                 if len(preferred) >= MAX_PREFERRED_PROVIDERS:
                     break
@@ -43,7 +43,7 @@ def save_routing(value: Any) -> dict[str, list[str]]:
         preferred: list[str] = []
         for item in order:
             name = str(item).strip()
-            if name in active and name not in preferred:
+            if (name == "Auto" or name in active) and name not in preferred:
                 preferred.append(name)
             if len(preferred) >= MAX_PREFERRED_PROVIDERS:
                 break
@@ -54,9 +54,17 @@ def save_routing(value: Any) -> dict[str, list[str]]:
 
 def selection_order_for_role(role: str) -> list[str]:
     order: list[str] = []
-    for name in [*get_routing().get(role, []), *auto_provider_order()]:
-        if name not in order:
+    auto = auto_provider_order()
+    for name in get_routing().get(role, []):
+        if name == "Auto":
+            for provider in auto:
+                if provider not in order:
+                    order.append(provider)
+        elif name not in order:
             order.append(name)
+    for provider in auto:
+        if provider not in order:
+            order.append(provider)
     return order
 
 

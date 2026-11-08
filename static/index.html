@@ -103,6 +103,22 @@
     </div>
   </dialog>
 
+  <dialog id="app-dialog" class="app-dialog">
+    <div class="dialog-heading">
+      <div><p class="eyebrow" id="app-dialog-eyebrow">PLEASE CONFIRM</p><h2 id="app-dialog-title">Confirm</h2></div>
+      <button class="icon-button" type="button" id="app-dialog-close" aria-label="Close">×</button>
+    </div>
+    <p class="app-dialog-message" id="app-dialog-message"></p>
+    <label id="app-dialog-input-wrap" hidden>Details
+      <input id="app-dialog-input" maxlength="2000" autocomplete="off">
+    </label>
+    <div class="form-error" id="app-dialog-error" role="alert"></div>
+    <div class="dialog-actions">
+      <button class="secondary" type="button" id="app-dialog-cancel">Cancel</button>
+      <button class="primary" type="button" id="app-dialog-ok">OK</button>
+    </div>
+  </dialog>
+
   <dialog id="task-dialog">
     <form id="task-form" class="task-form">
       <div class="dialog-heading"><div><p class="eyebrow">ADD TO THE BOARD</p><h2 id="task-dialog-title">New task</h2></div><button class="icon-button" type="button" id="close-dialog" aria-label="Close">×</button></div>
@@ -236,21 +252,17 @@
       <section class="settings-tab-panel" id="settings-panel-connections" role="tabpanel" aria-labelledby="settings-tab-connections" hidden>
         <form id="connections-form" class="task-form settings-inner-form">
           <div class="dialog-heading"><div><p class="eyebrow">ENCRYPTED ON YOUR VM</p><h2>Connections</h2></div></div>
-          <p class="draft-note" id="connections-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. The provider list order is the default routing for all agents: use the arrows to reorder, Remove to delete a provider, and the form below to add a built-in preset or a custom OpenAI-compatible endpoint. Test or replace each connection here; configure per-role preferences in the Routing tab.</p>
+          <p class="draft-note" id="connections-note">Credentials entered here are encrypted on your VM before being saved, or read from environment variables. The provider list order is the default routing for all agents: use the arrows to reorder, Remove to delete a provider, and the form below to add a custom OpenAI-compatible endpoint (name, base URL, optional key). Each provider row has a Model dropdown populated from the endpoint once a key is saved. Test or replace each connection here; configure per-role preferences in the Routing tab.</p>
           <div id="connection-list"></div>
           <section class="route-role add-provider">
             <strong>Add provider</strong>
             <div class="route-order">
-              <label>Preset
-                <select id="add-provider-preset"><option value="">Custom (OpenAI-compatible)</option></select>
-              </label>
               <label>Name <input id="add-provider-name" maxlength="60" placeholder="My endpoint"></label>
               <label>Base URL <input id="add-provider-base-url" placeholder="https://api.example.com/v1"></label>
-              <label>Model <input id="add-provider-model" maxlength="160" placeholder="model-name"></label>
+              <label>Key <input id="add-provider-key" type="password" placeholder="API key / token (optional)" autocomplete="off"></label>
             </div>
             <div class="dialog-actions"><button type="button" class="secondary" id="add-provider">Add provider</button></div>
           </section>
-          <div class="dialog-actions"><button class="secondary" type="button" id="test-github">Test GitHub connection</button></div>
           <div class="prompt-feedback" id="connections-success" hidden role="status"></div>
           <div class="form-error" id="connections-error" role="alert"></div>
         </form>

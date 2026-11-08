@@ -278,6 +278,13 @@ class Handler(BaseHTTPRequestHandler):
             chat_pid = str((query.get("project_id") or ["default"])[0] or "default")
             return self.send_json({"messages": read_chat_history(chat_pid), "project_id": chat_pid})
 
+        m_prov_models = re.fullmatch(r"/api/providers/([a-z0-9-]+)/models", path)
+        if m_prov_models:
+            try:
+                return self.send_json(list_provider_models(m_prov_models.group(1)))
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
         self.send_json({"error": "Not found."}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
@@ -1375,6 +1382,17 @@ class Handler(BaseHTTPRequestHandler):
                     "is_custom": saved_txt != default_txt,
                 }
             )
+
+        m_provider_put = re.fullmatch(r"/api/providers/([a-z0-9-]+)", path)
+        if m_provider_put:
+            pid = m_provider_put.group(1)
+            model = str(body.get("model", "")).strip()
+            try:
+                record = update_provider_model(pid, model)
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            append_event({"at": now_iso(), "type": "provider_model_updated", "provider": record.get("name"), "model": record.get("model")})
+            return self.send_json({"provider": record})
 
         m_conn = re.fullmatch(r"/api/connections/([a-z0-9_-]+)", path)
         if m_conn:
