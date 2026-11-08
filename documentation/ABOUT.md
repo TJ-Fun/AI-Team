@@ -1,8 +1,8 @@
 # Personal AI Team
 
-Version: **0.38**
+Version: **0.39**
 
-Release date: **2026-11-07**
+Release date: **2026-11-08**
 
 Project: [github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 

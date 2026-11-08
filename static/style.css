@@ -252,10 +252,10 @@ body{background:#0f1210;color:var(--ink)}
 .chat-provider-menu{background:#1e2420;border-color:#3a423c;color:var(--ink)}
 .clear-chat{background:#1e2420;border-color:#3a423c;color:#d5ddd6}
 .clear-chat:hover:not(:disabled){background:#262d28}
-.chat-messages,.chat-history{color:var(--ink)}
-.message,.chat-message{background:#1e2420;border-color:#2c332e;color:#d5ddd6}
-.message.user,.chat-message.user{background:#1d3327;border-color:#2a4a38;color:#d5ddd6}
-.chat-input,textarea,input[type=text],input[type=search],input:not([type]){background:#1e2420;border-color:#3a423c;color:var(--ink)}
+.messages{color:var(--ink)}
+.message{background:#1e2420;border-color:#2c332e;color:#d5ddd6}
+.message.user-message{background:#1d3327;border-color:#2a4a38;color:#d5ddd6}
+textarea,input[type=text],input[type=search],input:not([type]){background:#1e2420;border-color:#3a423c;color:var(--ink)}
 textarea:focus,input:focus,select:focus{border-color:var(--green);outline:none}
 select{background:#1e2420;border-color:#3a423c;color:var(--ink)}
 dialog,.detail-dialog,.statistics-dialog,.notifications-dialog,.repository-view-dialog{background:#151a17;border-color:var(--line);color:var(--ink)}
@@ -286,9 +286,96 @@ dialog::backdrop{background:#000000aa}
 .llm-state{border-left-color:var(--line);color:#9aa396}
 .llm-state.working{color:#7fbf95}
 .local-badge{color:#9aa396}
-.send-button,.plan-button{background:var(--green);border-color:var(--green);color:#fff}
-.send-button:hover,.plan-button:hover{background:var(--green-dark)}
+.send-button{background:var(--green);border-color:var(--green);color:#fff}
+.send-button:hover{background:var(--green-dark)}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-track{background:#121614}
 ::-webkit-scrollbar-thumb{background:#333b35;border-radius:6px}
 ::-webkit-scrollbar-thumb:hover{background:#45504a}
+
+/* ===== Dark theme coverage fixes ===== */
+.chat-form{background:#1a201c;border-color:#3a423c}
+.chat-form:focus-within{border-color:#4c9a6f;box-shadow:0 0 0 3px #4c9a6f26}
+.chat-form textarea{background:transparent}
+.chat-notice{background:#1a201c;border-color:#2c332e;color:#9aa396}
+.local-badge{background:#1d3327;color:#8fd3a8}
+.header-notifications-trigger{background:#1a201c;border-color:#3a423c;color:#d5ddd6}
+.header-notifications-trigger:hover{background:#222a24}
+.header-notifications-trigger.has-issues{border-color:#6b4a26;background:#2e2417}
+.header-notifications-trigger.has-issues:hover{background:#3a2d1c}
+.header-notifications-trigger.has-issues .notification-counter{background:#4a3413;color:#e8c96a}
+.notification-counter{background:#262d28;color:#b9c2ba}
+.notification-latest-title{color:#b9c2ba}
+.active-project-label{color:#9aa396}
+.project-progress{background:#161b18}
+.draft-note{background:#1a201c;color:#9aa396}
+.question-why{background:#1a201c;color:#b9c2ba}
+.overview-field{color:#b9c2ba}
+.overview-field textarea:read-only{background:#1a201c;color:#b9c2ba}
+.settings-section{background:#161b18;border-color:#2c332e}
+.settings-section h3{color:#d5ddd6}
+.settings-section label:not(.log-control-label){color:#b9c2ba}
+.settings-section .log-control-label{color:#9aa396}
+.settings-section input:not([type="checkbox"]),.settings-section select,.settings-section textarea{background:#1e2420;border-color:#3a423c;color:var(--ink)}
+.settings-section input:not([type="checkbox"]):focus,.settings-section select:focus,.settings-section textarea:focus{border-color:#4c9a6f;box-shadow:0 0 0 3px #4c9a6f26}
+.settings-section input[readonly]{background:#1a201c;color:#9aa396}
+.git-controls{background:#161b18;border-color:#2c332e}
+.git-status{background:#222a24;color:#9aa396}
+.git-status-clean{color:#8fd3a8;background:#1d3327}
+.git-status-dirty{color:#e8c96a;background:#33291a}
+.detail-provider-row{background:#161b18}
+.detail-provider-row label{color:#b9c2ba}
+.detail-provider-row select{background:#1e2420;border-color:#3a423c;color:var(--ink)}
+.detail-provider-row select:focus{border-color:#4c9a6f;box-shadow:0 0 0 3px #4c9a6f26}
+.detail-provider-row select:disabled{background:#1a201c}
+.log-output{background:#121614;border-color:#2c332e;color:#b9c2ba}
+.log-controls select{background:#1e2420;border-color:#3a423c;color:#d5ddd6}
+.stat-period-label select{background:#1e2420;border-color:#3a423c;color:#d5ddd6}
+.stat-reset{background:#1e2420;border-color:#3a423c;color:#b9c2ba}
+.stat-reset:hover:not(:disabled){background:#262d28}
+.active-project-label select{background:#1e2420;border-color:#3a423c;color:#d5ddd6}
+.task-form label{color:#b9c2ba}
+.task-form input:not([type="checkbox"]),.task-form select,.task-form textarea{background:#1e2420;border-color:#3a423c;color:var(--ink)}
+.task-form input:not([type="checkbox"]):focus,.task-form select:focus,.task-form textarea:focus{border-color:#4c9a6f;box-shadow:0 0 0 3px #4c9a6f26}
+.question-options label{color:#b9c2ba}
+.question-options select,.question-options textarea{background:#1e2420;border-color:#3a423c;color:var(--ink)}
+.notifications-modal-list{background:#161b18;border-color:var(--line)}
+.repository-entry:hover{background:#222a24}
+#repository-file-content{background:#1a201c;color:#b9c2ba}
+.settings-tab:hover{color:var(--green);background:#1e2420}
+.settings-tab[aria-selected="true"]{background:#1d3327;color:var(--green)}
+.task-footer{border-top-color:#262d28}
+.quality-head{border-bottom-color:#262d28}
+.quality-row{border-bottom-color:#262d28}
+.quality-row strong{color:#d5ddd6}
+.message-content{color:#d5ddd6}
+.message-role{color:#8b978c}
+.reply-text{color:#b9c2ba}
+.reply-heading{color:#8b978c}
+.activity-title{color:#b9c2ba}
+.role-icon{color:#7fbf95}
+.inline-error{color:#d98d80}
+.prompt-feedback{background:#1d3327;color:#8fd3a8}
+.restart-status.success,.update-status.success{background:#1d3327;color:#8fd3a8}
+.restart-status.error,.update-status.error{background:#3a211e;color:#f0a99e}
+.restart-status.info,.update-status.info{background:#33291a;color:#e8c96a}
+.danger{background:#2e201c;border-color:#3a2f2c;color:#f0a99e}
+.danger:hover{background:#3a2422}
+
+/* ===== Button & control polish ===== */
+.icon-button{border-radius:8px;line-height:1}
+.send-button{display:inline-flex;align-items:center;justify-content:center}
+.send-button svg{width:17px;height:17px;flex:none}
+.design-review-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:12px}
+.design-review-actions .primary,.design-review-actions .secondary{font-size:11px;padding:8px 10px}
+
+/* ===== App update progress ===== */
+.update-progress{margin-top:12px}
+.update-progress[hidden]{display:none}
+.update-progress-track{height:7px;border-radius:8px;background:#e9ece7;overflow:hidden}
+.update-progress-bar{display:block;height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,#4c9a6f,#72a27a);transition:width .25s ease}
+.update-progress-bar.done{background:#4c9a6f}
+.update-progress-bar.error{background:#c45f55}
+.update-progress-label{font-size:10px;color:#8a9189;margin:6px 0 0;min-height:14px;line-height:1.4}
+.update-progress .update-progress-track{background:#2c332e}
+.update-progress .update-progress-label{color:#9aa396}

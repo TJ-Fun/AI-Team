@@ -66,7 +66,7 @@
       <form id="chat-form" class="chat-form">
         <label class="sr-only" for="chat-input">Message the PM/PO agent</label>
         <textarea id="chat-input" rows="2" placeholder="Ask the PM/PO…" maxlength="12000" required></textarea>
-        <div class="chat-actions"><button class="secondary plan-button" id="plan-request" type="button" title="Send this message to PM/PO planning">Plan</button><button class="primary send-button" id="send-button" type="submit" aria-label="Send message">↑</button></div>
+        <div class="chat-actions"><button class="secondary plan-button" id="plan-request" type="button" title="Send this message to PM/PO planning">Plan</button><button class="primary send-button" id="send-button" type="submit" aria-label="Send message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button></div>
       </form>
       <p class="hint">Enter sends · Shift+Enter for a new line</p>
     </section>
@@ -341,6 +341,10 @@
           <div class="app-update-actions">
             <button type="button" class="primary" id="update-app">Update App</button>
             <button type="button" class="danger" id="restart-app">Restart App</button>
+          </div>
+          <div class="update-progress" id="update-progress" hidden>
+            <div class="update-progress-track" role="progressbar" aria-label="App update progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="update-progress-bar" id="update-progress-bar"></span></div>
+            <p class="update-progress-label" id="update-progress-label"></p>
           </div>
           <div id="update-status" class="update-status"></div>
           <div id="restart-status" class="restart-status"></div>

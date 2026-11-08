@@ -1,5 +1,12 @@
 # Version log
 
+## 0.39 — 2026-11-08
+
+- Added an update progress bar with stage labels to the app update flow in both places: **Settings → About → Update App** and the **Update now** button in the notification center. The bar advances through preparing/fetching/copying stages while the update request runs, then shows service-restart polling progress until the page reloads; failures turn the bar red with the error message.
+- The notification list is not re-rendered while an update is in progress, so the injected progress bar is not wiped by the 5-second board refresh.
+- Fixed remaining dark-theme gaps: chat input frame, chat message bubbles, dialogs, settings sections, form controls, the header notification trigger, danger buttons, and status/feedback boxes now use dark surfaces; the Plan button stays secondary in dark mode; the send button uses an SVG arrow icon; close buttons are rounded; design-review action buttons are laid out.
+- Updated documentation to 0.39.
+
 ## 0.38 — 2026-11-07
 
 - Switched the browser interface to a dark theme: dark surfaces, borders, form controls, dialogs, chat, statistics, and state badges, with `color-scheme: dark` for native controls and scrollbars.

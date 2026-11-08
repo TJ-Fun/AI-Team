@@ -55,19 +55,122 @@
     return data;
   }
 
-  async function waitForAppRestart(statusEl, message, statusType = "restart-status") {
+  async function waitForAppRestart(statusEl, message, statusType = "restart-status", progress = null) {
     for (let attempt = 0; attempt < 30; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       try {
         await api("/api/status");
+        if (progress) {
+          progress.finish("Service is back — reloading…");
+          await new Promise((resolve) => setTimeout(resolve, 600));
+        }
         location.reload();
         return;
       } catch (_err) {
         statusEl.textContent = `${message} Waiting for the service to restart… (${(attempt + 1) * 2}s)`;
+        progress?.restartWait(attempt + 1);
       }
     }
     statusEl.textContent = `${message} The service did not respond within 60 seconds. Check the service logs.`;
     statusEl.className = `${statusType} error`;
+    progress?.fail("The service did not respond in time. Check the service logs.");
+  }
+
+  function createUpdateProgress(barEl, labelEl) {
+    if (!barEl) return null;
+    let value = 0;
+    let target = 0;
+    let text = "";
+    let timer = null;
+    let creepTimer = null;
+    let failed = false;
+    function paint() {
+      const pct = Math.max(3, Math.min(100, Math.round(value)));
+      barEl.style.width = `${pct}%`;
+      const track = barEl.parentElement;
+      if (track) track.setAttribute("aria-valuenow", String(pct));
+      if (labelEl) labelEl.textContent = text;
+    }
+    function loop() {
+      if (value < target) {
+        value = Math.min(target, value + Math.max(0.4, (target - value) * 0.07));
+        paint();
+        timer = setTimeout(loop, 90);
+      } else {
+        timer = null;
+      }
+    }
+    function stage(pct, msg) {
+      target = Math.max(target, pct);
+      text = msg;
+      if (!timer) loop();
+    }
+    function stopCreep() {
+      if (creepTimer) {
+        clearInterval(creepTimer);
+        creepTimer = null;
+      }
+    }
+    function stopLoop() {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }
+    return {
+      begin(msg = "Preparing update…") {
+        stopCreep();
+        stopLoop();
+        value = 0;
+        target = 0;
+        failed = false;
+        text = msg;
+        barEl.classList.remove("error", "done");
+        paint();
+        stage(12, msg);
+        const labels = [
+          "Fetching repository from GitHub…",
+          "Copying updated files into the app…",
+          "Finishing up…",
+        ];
+        let i = 0;
+        creepTimer = setInterval(() => {
+          if (target < 82) {
+            target = Math.min(82, target + 5);
+            text = labels[Math.min(i, labels.length - 1)];
+            i += 1;
+            if (!timer) loop();
+          }
+        }, 2600);
+      },
+      copyingDone(msg = "Update files installed. Restarting the service…") {
+        stopCreep();
+        stage(90, msg);
+      },
+      restartWait(attempt) {
+        stage(Math.min(97, 90 + attempt), `Waiting for the service to restart… (${attempt * 2}s)`);
+      },
+      finish(msg = "Update complete.") {
+        stopCreep();
+        stopLoop();
+        value = 100;
+        target = 100;
+        text = msg;
+        barEl.classList.add("done");
+        paint();
+      },
+      fail(msg = "Update failed.") {
+        stopCreep();
+        stopLoop();
+        failed = true;
+        barEl.classList.add("error");
+        text = msg;
+        paint();
+      },
+      get failed() {
+        return failed;
+      },
+    };
   }
 
   function formatTime(value) {
@@ -210,6 +313,7 @@
 
   // --- Notifications ---
   const notificationsDialog = $("#notifications-dialog");
+  let appUpdateInProgress = false;
 
   function renderNotifications() {
     const countEl = $("#notification-count");
@@ -235,6 +339,7 @@
     }
 
     if (!listEl) return;
+    if (appUpdateInProgress && listEl.querySelector(".update-progress")) return;
     if (!items.length) {
       listEl.innerHTML = `<p class="notification-empty">No current issues or provider suggestions.</p>`;
       return;
@@ -290,6 +395,20 @@
 
   async function runAppUpdateFromNotification(btn) {
     btn.disabled = true;
+    const item = btn.closest(".notification");
+    let progressWrap = item ? item.querySelector(".update-progress") : null;
+    if (item && !progressWrap) {
+      progressWrap = document.createElement("div");
+      progressWrap.className = "update-progress";
+      progressWrap.innerHTML =
+        '<div class="update-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="update-progress-bar"></span></div>' +
+        '<p class="update-progress-label"></p>';
+      item.firstElementChild?.appendChild(progressWrap);
+    }
+    const progress = createUpdateProgress(
+      progressWrap?.querySelector(".update-progress-bar"),
+      progressWrap?.querySelector(".update-progress-label")
+    );
     try {
       const cfgRes = await api("/api/settings/config");
       const cfg = cfgRes.config || {};
@@ -298,6 +417,8 @@
         return;
       }
       if (!confirm(`Update the app to the latest version and restart?`)) return;
+      appUpdateInProgress = true;
+      progress?.begin("Preparing update…");
       const res = await api("/api/settings/update", {
         method: "POST",
         body: JSON.stringify({
@@ -306,11 +427,14 @@
           app_working_dir: cfg.app_working_dir,
         }),
       });
+      progress?.copyingDone("Update files installed. Restarting the service…");
       const statusShim = { textContent: "", className: "" };
-      await waitForAppRestart(statusShim, res.message || "Update complete.", "update-status");
+      await waitForAppRestart(statusShim, res.message || "Update complete.", "update-status", progress);
     } catch (err) {
+      progress?.fail(`Update failed: ${err.message}`);
       alert(`Update failed: ${err.message}`);
     } finally {
+      appUpdateInProgress = false;
       btn.disabled = false;
     }
   }
@@ -2736,7 +2860,11 @@
     if (!confirm(`Update ${appRepo} in ${appCloneDir}, copy newer files into ${appWorkingDir}, and restart the app?`)) return;
     const statusEl = $("#update-status");
     const updateButton = $("#update-app");
+    const progressWrap = $("#update-progress");
+    const progress = createUpdateProgress($("#update-progress-bar"), $("#update-progress-label"));
     updateButton.disabled = true;
+    if (progressWrap) progressWrap.hidden = false;
+    progress?.begin("Preparing update…");
     statusEl.textContent = "Updating…";
     statusEl.className = "update-status info";
     try {
@@ -2748,10 +2876,12 @@
           app_working_dir: appWorkingDir,
         }),
       });
+      progress?.copyingDone(`${res.message} Restarting the service…`);
       statusEl.textContent = `${res.message} Restarting the service…`;
       statusEl.className = "update-status success";
-      await waitForAppRestart(statusEl, res.message, "update-status");
+      await waitForAppRestart(statusEl, res.message, "update-status", progress);
     } catch (err) {
+      progress?.fail(`Update failed: ${err.message}`);
       statusEl.textContent = `Update failed: ${err.message}`;
       statusEl.className = "update-status error";
     } finally {
