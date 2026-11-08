@@ -256,12 +256,14 @@
           <div id="connection-list"></div>
           <section class="route-role add-provider">
             <strong>Add provider</strong>
-            <div class="route-order">
-              <label>Name <input id="add-provider-name" maxlength="60" placeholder="My endpoint"></label>
-              <label>Base URL <input id="add-provider-base-url" placeholder="https://api.example.com/v1"></label>
-              <label>Key <input id="add-provider-key" type="password" placeholder="API key / token (optional)" autocomplete="off"></label>
+            <div class="add-provider-row">
+              <div class="route-order">
+                <label>Name <input id="add-provider-name" maxlength="60" placeholder="My endpoint"></label>
+                <label>Base URL <input id="add-provider-base-url" placeholder="https://api.example.com/v1"></label>
+                <label>Key <input id="add-provider-key" type="password" placeholder="API key / token (optional)" autocomplete="off"></label>
+              </div>
+              <button type="button" class="secondary" id="add-provider">Add provider</button>
             </div>
-            <div class="dialog-actions"><button type="button" class="secondary" id="add-provider">Add provider</button></div>
           </section>
           <div class="prompt-feedback" id="connections-success" hidden role="status"></div>
           <div class="form-error" id="connections-error" role="alert"></div>

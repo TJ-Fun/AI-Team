@@ -1924,12 +1924,14 @@
               }</span>
             </div>
             <div class="provider-meta">${escapeHtml(p.model || "")}${p.base_url ? ` · ${escapeHtml(p.base_url)}` : ""}</div>
-            <label class="provider-model-label">Model
-              <select class="provider-model" data-provider-model="${escapeHtml(p.id)}" disabled><option value="">…</option></select>
-            </label>
-            <button type="button" class="secondary provider-test-model" data-test-model="${escapeHtml(p.id)}" ${
-              p.configured ? "" : "disabled"
-            }>Test model</button>
+            <div class="provider-model-line">
+              <label class="provider-model-label">Model
+                <select class="provider-model" data-provider-model="${escapeHtml(p.id)}" disabled><option value="">…</option></select>
+              </label>
+              <button type="button" class="secondary provider-test-model" data-test-model="${escapeHtml(p.id)}" ${
+                p.configured ? "" : "disabled"
+              }>Test model</button>
+            </div>
             <div class="connection-controls">
               ${
                 state.encryptionAvailable
@@ -2271,7 +2273,7 @@
         const msg = res.message || (res.login ? `GitHub connected as ${res.login}.` : "Connection verified.");
         setConnectionsSuccess(msg);
       } catch (err) {
-        $("#connections-error").textContent = err.message;
+        appAlert(err.message, "Connection test failed");
       } finally {
         testBtn.disabled = false;
         testBtn.textContent = origLabel || "Test";

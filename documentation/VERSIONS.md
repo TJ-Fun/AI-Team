@@ -1,5 +1,13 @@
 # Version log
 
+## 0.44 — 2026-11-08
+
+- Fixed two custom-dialog bugs caused by CSS specificity: the **Details** input and the **Cancel** button were always visible because `display:flex`/`display:inline-flex` rules overrode the `hidden` attribute. A global `[hidden]{display:none!important}` rule now enforces correct behavior in every dialog.
+- Moved the **Test model** button inline with the provider Model dropdown in **Settings → Connections** instead of below it.
+- Connection **Test** and **Test model** failures now show in a popup dialog instead of the inline error line at the bottom of the section; successes remain inline.
+- Aligned the **Add provider** button on the same row as the Name/Base URL/Key inputs.
+- Updated documentation to 0.44.
+
 ## 0.43 — 2026-11-08
 
 - Added a model dropdown to the PM/PO chat header: when a specific chat provider is selected it overrides the model used for chat only (stored per provider in app configuration via `chat_models`); **Auto** keeps using each provider's configured model. The override is exposed through `/api/config` and `/api/routing`.
