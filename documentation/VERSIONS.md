@@ -1,5 +1,11 @@
 # Version log
 
+## 0.46 — 2026-11-08
+
+- Fixed clipped text in the provider **Model** dropdown: the Connections form's `.task-form select` styles (padding 10px, font 13px/1.5) override the dropdown's own styles, so its natural height matches the input fields (~41.5px); the fixed 36px height introduced in 0.45 shrank the content box below the line-height and hid the text. The fixed height was removed.
+- Enlarged buttons to match the input/dropdown height (~42px) across **Settings → Connections** (Test model, Save, Test, Clear, Remove, Add provider) and the **Logs** tab (Load logs, Clear logs), with inline-flex vertical centering.
+- Updated documentation to 0.46.
+
 ## 0.45 — 2026-11-08
 
 - Shrunk the provider **Model** dropdown in **Settings → Connections** to a fixed 220px width and moved the **Test model** button directly beside it on the same line.
