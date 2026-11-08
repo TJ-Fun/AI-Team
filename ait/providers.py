@@ -835,7 +835,8 @@ def call_gemini_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         prompt += "\n\nPrevious attempt failed validation checks:\n" + json.dumps(task["validation"].get("checks", []), indent=2)
 
     sys_inst = combined_agent_prompt(role) + (("\n\n" + contract) if contract else "")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(GEMINI_MODEL, safe='')}:generateContent?key={urllib.parse.quote(api_key, safe='')}"
+    model = provider_model("Gemini")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model, safe='')}:generateContent?key={urllib.parse.quote(api_key, safe='')}"
     payload = {
         "systemInstruction": {"parts": [{"text": sys_inst}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -1125,6 +1126,86 @@ def list_provider_models(conn_id: str) -> dict[str, Any]:
         return {"provider": name, "current": current, "models": [], "selectable": False, "error": f"HTTP {exc.code}: {raw}"}
     except Exception as exc:
         return {"provider": name, "current": current, "models": [], "selectable": False, "error": str(exc)[:200]}
+
+
+def test_provider_model(pid: str, model: str = "") -> dict[str, Any]:
+    """Send a minimal 'Hi' prompt to the selected model and return its reply."""
+    record = provider_record_by_id(pid)
+    if not record:
+        raise ValueError("Unknown provider.")
+    name = str(record.get("name", ""))
+    api_key = get_provider_key(str(record.get("id", "")))
+    if not api_key:
+        raise ValueError(f"{name} is not connected.")
+    clean_model = str(model or "").strip() or provider_model(name)
+    if record.get("kind") == "gemini":
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(clean_model, safe='')}:generateContent?key={urllib.parse.quote(api_key, safe='')}"
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": "Hi"}]}],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 64},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": HTTP_USER_AGENT,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read().decode("utf-8", errors="replace"))
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", errors="replace")[:300]
+            raise ValueError(f"{name} HTTP {exc.code}: {raw}") from exc
+        except Exception as exc:
+            raise ValueError(f"{name} request failed: {exc}") from exc
+        candidates = result.get("candidates") or []
+        parts = (((candidates[0] if candidates else {}).get("content") or {}).get("parts")) or []
+        reply = "".join(str(p.get("text", "")) for p in parts if isinstance(p, dict)).strip()
+        if not reply:
+            raise ValueError(f"{name} returned no text for model {clean_model}.")
+        return {"provider": name, "model": clean_model, "reply": reply[:1000]}
+
+    base = str(record.get("base_url", "")).strip().rstrip("/")
+    if not base:
+        raise ValueError(f"{name} has no base URL configured.")
+    payload = {
+        "model": clean_model,
+        "messages": [{"role": "user", "content": "Hi"}],
+        "temperature": 0,
+        "max_tokens": 64,
+    }
+    req = urllib.request.Request(
+        f"{base}/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": HTTP_USER_AGENT,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")[:300]
+        raise ValueError(f"{name} HTTP {exc.code}: {raw}") from exc
+    except Exception as exc:
+        raise ValueError(f"{name} request failed: {exc}") from exc
+    choices = result.get("choices") or []
+    choice = choices[0] if choices and isinstance(choices[0], dict) else {}
+    content = (choice.get("message") or {}).get("content")
+    if isinstance(content, list):
+        content = "".join(str(p.get("text", "")) for p in content if isinstance(p, dict))
+    reply = str(content or "").strip()
+    if not reply:
+        raise ValueError(f"{name} returned no text for model {clean_model}.")
+    return {"provider": name, "model": clean_model, "reply": reply[:1000]}
 
 
 def retry_after_time(header: str | None, fallback_hours: int = 2) -> str:

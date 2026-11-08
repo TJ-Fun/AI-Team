@@ -13,10 +13,35 @@ def get_chat_provider() -> str:
     return "Auto"
 
 
+def get_chat_models() -> dict[str, str]:
+    raw = read_app_config().get("chat_models")
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v).strip() for k, v in raw.items() if str(v).strip()}
+
+
+def chat_model_override(provider: str) -> str:
+    if provider == "Auto":
+        return ""
+    return get_chat_models().get(provider, "")
+
+
+def set_chat_model(provider: str, model: str) -> None:
+    models = get_chat_models()
+    clean = str(model or "").strip()
+    if clean:
+        models[provider] = clean
+    else:
+        models.pop(provider, None)
+    save_app_config({"chat_models": models})
+
+
 def chat_provider_model(provider: str) -> str:
     if provider == "Auto":
         provider = select_auto_provider() or (configured_providers()[0] if configured_providers() else "")
-    return provider_model(provider) if provider else ""
+    if not provider:
+        return ""
+    return chat_model_override(provider) or provider_model(provider)
 
 
 def chat_system_prompt(project_id: str) -> str:
@@ -82,7 +107,7 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
             "contents": contents,
             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
         }
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(GEMINI_MODEL, safe='')}:generateContent?key={urllib.parse.quote(api_key, safe='')}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model or GEMINI_MODEL, safe='')}:generateContent?key={urllib.parse.quote(api_key, safe='')}"
         req = urllib.request.Request(
             url,
             data=json.dumps(payload).encode("utf-8"),

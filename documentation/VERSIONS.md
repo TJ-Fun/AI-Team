@@ -1,5 +1,13 @@
 # Version log
 
+## 0.43 — 2026-11-08
+
+- Added a model dropdown to the PM/PO chat header: when a specific chat provider is selected it overrides the model used for chat only (stored per provider in app configuration via `chat_models`); **Auto** keeps using each provider's configured model. The override is exposed through `/api/config` and `/api/routing`.
+- Added a **Test model** button under each provider's Model dropdown in **Settings → Connections**: it sends a minimal "Hi" prompt to the selected model (`POST /api/providers/{id}/test-model`) and shows the reply in a dialog.
+- Completed the custom popup migration: all remaining native `alert`/`confirm` calls (clear conversation, clear logs, restart app, update app, settings save, statistic reset, and error paths) now use the styled app dialog, which finally received its missing CSS; the connection test result is shown inline instead of a popup.
+- Fixed Gemini model selection being ignored: chat and task dispatch now use the configured provider model instead of the `GEMINI_MODEL` environment default.
+- Updated documentation to 0.43.
+
 ## 0.42 — 2026-11-08
 
 - Added per-provider model selection in **Settings → Connections**: each provider row now shows a Model dropdown populated from the provider's own model list (`GET /api/providers/{id}/models` — Gemini's model API or the OpenAI-compatible `/models` endpoint). Choosing a model saves it via `PUT /api/providers/{id}`; OpenAI-compatible providers also offer an **Auto** model option, and providers whose endpoint cannot list models keep a read-only display of the configured model.

@@ -32,6 +32,7 @@
     providerPresets: [],
     maxPreferred: 4,
     autonomy: {},
+    chatModelOverride: "",
     repoMode: "files",
     repoCurrentPath: "",
     pollBusy: false,
@@ -313,11 +314,13 @@
       const cfg = await api("/api/config");
       const provider = cfg.chat_provider || "Auto";
       state.chatProvider = provider;
+      state.chatModelOverride = cfg.chat_model_override || "";
       if (Array.isArray(cfg.providers) && cfg.providers.length) {
         state.routingProviders = cfg.providers;
       }
       nameEl.textContent = `Chat · ${provider}`;
       if (menu) menu.innerHTML = chatProviderOptions(provider);
+      renderChatModelSelect();
       dot?.classList.toggle("offline", cfg.chat_configured === false);
       populateProviderSelects();
     } catch {
@@ -1655,7 +1658,7 @@
       }
       if (!contextDialog.open) contextDialog.showModal();
     } catch (err) {
-      alert(`Could not load project context: ${err.message}`);
+      appAlert(`Could not load project context: ${err.message}`);
     }
   });
 
@@ -1924,6 +1927,9 @@
             <label class="provider-model-label">Model
               <select class="provider-model" data-provider-model="${escapeHtml(p.id)}" disabled><option value="">…</option></select>
             </label>
+            <button type="button" class="secondary provider-test-model" data-test-model="${escapeHtml(p.id)}" ${
+              p.configured ? "" : "disabled"
+            }>Test model</button>
             <div class="connection-controls">
               ${
                 state.encryptionAvailable
@@ -2046,6 +2052,51 @@
     }
   }
 
+  async function renderChatModelSelect() {
+    const sel = $("#chat-model-select");
+    if (!sel) return;
+    const provider = state.chatProvider || "Auto";
+    sel.disabled = true;
+    if (provider === "Auto") {
+      sel.innerHTML = `<option value="" selected>Auto model</option>`;
+      sel.title = "Auto uses each provider's configured model.";
+      return;
+    }
+    try {
+      if (!state.connections.length) {
+        const connRes = await api("/api/connections");
+        state.connections = connRes.connections || [];
+      }
+      const rec = state.connections.find((c) => c.name === provider);
+      if (!rec) {
+        sel.innerHTML = `<option value="">Provider unavailable</option>`;
+        return;
+      }
+      const res = await api(`/api/providers/${encodeURIComponent(rec.id)}/models`);
+      const current = String(res.current || "auto");
+      const override = state.chatModelOverride || "";
+      const options = [
+        `<option value=""${override ? "" : " selected"}>Provider default (${escapeHtml(
+          current === "auto" ? "Auto" : current
+        )})</option>`,
+      ];
+      for (const m of res.models || []) {
+        options.push(`<option value="${escapeHtml(m)}"${m === override ? " selected" : ""}>${escapeHtml(m)}</option>`);
+      }
+      if (override && !(res.models || []).includes(override)) {
+        options.push(`<option value="${escapeHtml(override)}" selected>${escapeHtml(override)}</option>`);
+      }
+      sel.innerHTML = options.join("");
+      sel.disabled = false;
+      sel.title = res.selectable
+        ? "Model used by the PM/PO chat for this provider."
+        : res.error || "Model list unavailable; the provider default is used.";
+    } catch (err) {
+      sel.innerHTML = `<option value="">Model unavailable</option>`;
+      sel.title = err.message;
+    }
+  }
+
   function renderChatProviderSelect() {
     const options = chatProviderOptions(state.chatProvider);
     const sel = $("#chat-provider-select");
@@ -2056,6 +2107,7 @@
 
   $("#chat-provider-select")?.addEventListener("change", (e) => {
     state.chatProvider = e.target.value;
+    renderChatModelSelect();
     const menu = $("#chat-provider-menu");
     if (menu) menu.innerHTML = chatProviderOptions(state.chatProvider);
   });
@@ -2063,15 +2115,33 @@
   $("#chat-provider-menu")?.addEventListener("change", async (e) => {
     const provider = e.target.value;
     state.chatProvider = provider;
+    renderChatModelSelect();
     const sel = $("#chat-provider-select");
     if (sel) sel.innerHTML = chatProviderOptions(provider);
     try {
-      await api("/api/routing", {
+      const res = await api("/api/routing", {
         method: "POST",
         body: JSON.stringify({ chat_provider: provider }),
       });
+      state.chatModelOverride = res.chat_model_override || "";
+      renderChatModelSelect();
     } catch (err) {
-      alert(`Could not save chat provider: ${err.message}`);
+      appAlert(`Could not save chat provider: ${err.message}`, "Chat provider");
+    }
+  });
+
+  $("#chat-model-select")?.addEventListener("change", async (e) => {
+    const model = e.target.value;
+    try {
+      const res = await api("/api/routing", {
+        method: "POST",
+        body: JSON.stringify({ chat_provider: state.chatProvider, chat_model: model }),
+      });
+      state.chatProvider = res.chat_provider || state.chatProvider;
+      state.chatModelOverride = res.chat_model_override || "";
+    } catch (err) {
+      appAlert(`Could not save chat model: ${err.message}`, "Chat model");
+      renderChatModelSelect();
     }
   });
 
@@ -2101,6 +2171,7 @@
       if (el) el.checked = Boolean(state.autonomy[key] ?? autonomyDefaults[key]);
     }
     renderChatProviderSelect();
+    renderChatModelSelect();
     renderConnectionsAndRouting();
     populateProviderSelects();
   }
@@ -2199,12 +2270,41 @@
         });
         const msg = res.message || (res.login ? `GitHub connected as ${res.login}.` : "Connection verified.");
         setConnectionsSuccess(msg);
-        appAlert(msg, "Connection test");
       } catch (err) {
         $("#connections-error").textContent = err.message;
       } finally {
         testBtn.disabled = false;
         testBtn.textContent = origLabel || "Test";
+      }
+      return;
+    }
+
+    const testModelBtn = e.target.closest("[data-test-model]");
+    if (testModelBtn) {
+      const pid = testModelBtn.getAttribute("data-test-model");
+      const modelSel = document.querySelector(`select.provider-model[data-provider-model="${pid}"]`);
+      const model = modelSel?.value || "";
+      const origLabel = testModelBtn.textContent;
+      testModelBtn.disabled = true;
+      testModelBtn.textContent = "Testing…";
+      $("#connections-error").textContent = "";
+      setConnectionsSuccess("");
+      try {
+        const res = await api(`/api/providers/${encodeURIComponent(pid)}/test-model`, {
+          method: "POST",
+          body: JSON.stringify({ model }),
+        });
+        const reply = String(res.reply || "").trim();
+        setConnectionsSuccess(`${res.provider} · ${res.model} replied.`);
+        appAlert(
+          reply ? `“${reply.slice(0, 500)}${reply.length > 500 ? "…" : ""}”` : "The model returned an empty reply.",
+          `Model test — ${res.provider} · ${res.model}`
+        );
+      } catch (err) {
+        $("#connections-error").textContent = err.message;
+      } finally {
+        testModelBtn.disabled = false;
+        testModelBtn.textContent = origLabel || "Test model";
       }
       return;
     }
@@ -2787,7 +2887,7 @@
     const provider = btn.getAttribute("data-reset-provider");
     const model = btn.getAttribute("data-reset-model");
     const period = statPeriodSelect.value || "today";
-    if (!confirm(`Reset the displayed statistic for ${provider} · ${model}? Past usage history will be kept.`)) {
+    if (!(await appConfirm(`Reset the displayed statistic for ${provider} · ${model}? Past usage history will be kept.`, { title: "Reset statistic", danger: true }))) {
       return;
     }
     btn.disabled = true;
@@ -2873,7 +2973,7 @@
   $("#plan-request")?.addEventListener("click", async () => {
     const text = chatInput.value.trim();
     if (!text) {
-      alert("Type a request to plan first.");
+      appAlert("Type a request to plan first.", "Nothing to plan");
       chatInput.focus();
       return;
     }
@@ -2904,7 +3004,7 @@
   });
 
   $("#clear-chat")?.addEventListener("click", async () => {
-    if (!confirm("Clear the saved PM/PO conversation? This keeps all tasks and agent reply files.")) {
+    if (!(await appConfirm("Clear the saved PM/PO conversation? This keeps all tasks and agent reply files.", { title: "Clear conversation" }))) {
       return;
     }
     try {
@@ -3046,9 +3146,9 @@
           app_working_dir: appWorkingDir,
         }),
       });
-      alert("Configuration saved successfully.");
+      appAlert("Configuration saved successfully.", "Settings saved");
     } catch (err) {
-      alert(`Failed to save configuration: ${err.message}`);
+      appAlert(`Failed to save configuration: ${err.message}`, "Settings not saved");
     }
   });
 
@@ -3084,18 +3184,18 @@
 
   // Clear logs
   $("#clear-logs")?.addEventListener("click", async () => {
-    if (!confirm("Clear all application logs? This cannot be undone.")) return;
+    if (!(await appConfirm("Clear all application logs? This cannot be undone.", { title: "Clear logs", danger: true }))) return;
     try {
       await api("/api/settings/logs/clear", { method: "POST" });
       $("#log-output").innerHTML = `<span class="muted">Logs cleared.</span>`;
     } catch (err) {
-      alert(`Failed to clear logs: ${err.message}`);
+      appAlert(`Failed to clear logs: ${err.message}`, "Clear logs failed");
     }
   });
 
   // Restart app
   $("#restart-app")?.addEventListener("click", async () => {
-    if (!confirm("Restart the application? This will briefly interrupt the service.")) return;
+    if (!(await appConfirm("Restart the application? This will briefly interrupt the service.", { title: "Restart app" }))) return;
     const statusEl = $("#restart-status");
     statusEl.textContent = "Restarting…";
     statusEl.className = "restart-status info";
@@ -3116,10 +3216,10 @@
     const appCloneDir = $("#app-clone-dir")?.value?.trim();
     const appWorkingDir = $("#app-working-dir")?.value?.trim();
     if (!appRepo || !appCloneDir || !appWorkingDir) {
-      alert("Please fill in the app repository URL and local checkout directory.");
+      appAlert("Please fill in the app repository URL and local checkout directory.", "Update not configured");
       return;
     }
-    if (!confirm(`Update ${appRepo} in ${appCloneDir}, copy newer files into ${appWorkingDir}, and restart the app?`)) return;
+    if (!(await appConfirm(`Update ${appRepo} in ${appCloneDir}, copy newer files into ${appWorkingDir}, and restart the app?`, { title: "Update app" }))) return;
     const statusEl = $("#update-status");
     const updateButton = $("#update-app");
     const progressWrap = $("#update-progress");

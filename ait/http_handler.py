@@ -70,6 +70,7 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "chat_provider": chat_provider,
                     "chat_model": chat_provider_model(chat_provider),
+                    "chat_model_override": chat_model_override(chat_provider),
                     "chat_configured": bool(configured_providers()),
                     "providers": provider_names(),
                     "provider_options": task_provider_options(),
@@ -438,11 +439,22 @@ class Handler(BaseHTTPRequestHandler):
                     {
                         "routing": routing if routing is not None else get_routing(),
                         "chat_provider": get_chat_provider(),
+                        "chat_model": chat_provider_model(get_chat_provider()),
+                        "chat_model_override": chat_model_override(get_chat_provider()),
                         "autonomy": autonomy if autonomy is not None else get_autonomy(),
                     }
                 )
             except ValueError as exc:
                 return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+        m_prov_test_model = re.fullmatch(r"/api/providers/([a-z0-9-]+)/test-model", path)
+        if m_prov_test_model:
+            try:
+                result = test_provider_model(m_prov_test_model.group(1), str(body.get("model", "")).strip())
+            except ValueError as exc:
+                return self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            append_event({"at": now_iso(), "type": "provider_model_tested", "provider": result.get("provider"), "model": result.get("model")})
+            return self.send_json(result)
 
         if path == "/api/providers":
             preset = str(body.get("preset", "")).strip()
