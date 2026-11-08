@@ -1,5 +1,12 @@
 # Version log
 
+## 0.42 — 2026-11-08
+
+- Added per-provider model selection in **Settings → Connections**: each provider row now shows a Model dropdown populated from the provider's own model list (`GET /api/providers/{id}/models` — Gemini's model API or the OpenAI-compatible `/models` endpoint). Choosing a model saves it via `PUT /api/providers/{id}`; OpenAI-compatible providers also offer an **Auto** model option, and providers whose endpoint cannot list models keep a read-only display of the configured model.
+- **Auto** is now accepted as a preferred-provider choice in **Settings → Routing**: it expands to every active provider ordered by audit score (ties broken by Connections order), both within the preferred slots and as the fallback tail.
+- Custom providers can be created with `auto` as the model name; empty model input now defaults to `auto` instead of being rejected.
+- Updated documentation to 0.42.
+
 ## 0.41 — 2026-11-08
 
 - Added a dynamic provider control system: providers can now be added (from built-in presets or as custom OpenAI-compatible endpoints with name/base URL/model), removed (including built-ins), and reordered in **Settings → Connections** via up/down arrows. The Connections list order is the default routing order for all agents.
