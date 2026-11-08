@@ -20,6 +20,7 @@ def chat_provider_model(provider: str) -> str:
         "OpenRouter": OPENROUTER_MODEL,
         "OmniRoute": OMNIROUTE_MODEL,
         "9Router": NINEROUTER_MODEL,
+        "Nvidia": NVIDIA_MODEL,
     }.get(provider, GEMINI_MODEL)
 
 

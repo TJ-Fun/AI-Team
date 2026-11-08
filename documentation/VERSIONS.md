@@ -1,5 +1,10 @@
 # Version log
 
+## 0.40 — 2026-11-08
+
+- Added Nvidia (NIM / build.nvidia.com) as a provider: new `nvidia` connection family with `NVIDIA_API_KEY`, OpenAI-compatible dispatch through `NVIDIA_BASE_URL` (default `https://integrate.api.nvidia.com/v1`) and `NVIDIA_MODEL` (default `meta/llama-3.3-70b-instruct`), connection test against `/models`, per-provider activity counter and status reporting, routing defaults, chat provider option, and task provider selectors.
+- Updated documentation to 0.40.
+
 ## 0.39 — 2026-11-08
 
 - Added an update progress bar with stage labels to the app update flow in both places: **Settings → About → Update App** and the **Update now** button in the notification center. The bar advances through preparing/fetching/copying stages while the update request runs, then shows service-restart polling progress until the page reloads; failures turn the bar red with the error message.

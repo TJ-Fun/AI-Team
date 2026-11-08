@@ -85,4 +85,6 @@ def configured_providers() -> list[str]:
         result.append("OmniRoute")
     if get_provider_key("ninerouter"):
         result.append("9Router")
+    if get_provider_key("nvidia"):
+        result.append("Nvidia")
     return result

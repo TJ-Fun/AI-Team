@@ -81,6 +81,8 @@ class Handler(BaseHTTPRequestHandler):
                     "omniroute_configured": bool(get_provider_key("omniroute")),
                     "ninerouter_model": NINEROUTER_MODEL,
                     "ninerouter_configured": bool(get_provider_key("ninerouter")),
+                    "nvidia_model": NVIDIA_MODEL,
+                    "nvidia_configured": bool(get_provider_key("nvidia")),
                 }
             )
 
@@ -102,6 +104,8 @@ class Handler(BaseHTTPRequestHandler):
                     "omniroute_configured": bool(get_provider_key("omniroute")),
                     "ninerouter_working": activity["ninerouter_working"],
                     "ninerouter_configured": bool(get_provider_key("ninerouter")),
+                    "nvidia_working": activity["nvidia_working"],
+                    "nvidia_configured": bool(get_provider_key("nvidia")),
                     "github_configured": bool(get_provider_key("github")),
                     "watchdog": WATCHDOG_STATUS,
                 }

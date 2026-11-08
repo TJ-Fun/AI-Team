@@ -908,6 +908,13 @@ OPENAI_COMPAT_PROVIDERS: dict[str, dict[str, Any]] = {
         "max_tokens_key": "max_tokens",
         "fixed_max_tokens": None,
     },
+    "Nvidia": {
+        "conn_id": "nvidia",
+        "model": NVIDIA_MODEL,
+        "endpoint": f"{NVIDIA_BASE_URL}/chat/completions",
+        "max_tokens_key": "max_tokens",
+        "fixed_max_tokens": None,
+    },
 }
 
 
@@ -1085,10 +1092,13 @@ def test_provider_connection(conn_id: str) -> dict[str, Any]:
             "message": f"OpenRouter connected (default model: {OPENROUTER_MODEL}).",
         }
 
-    if conn_id in ("omniroute", "ninerouter"):
-        base = OMNIROUTE_BASE_URL if conn_id == "omniroute" else NINEROUTER_BASE_URL
-        label = CONNECTION_SPECS[conn_id][0]
-        model = OMNIROUTE_MODEL if conn_id == "omniroute" else NINEROUTER_MODEL
+    if conn_id in ("omniroute", "ninerouter", "nvidia"):
+        if conn_id == "omniroute":
+            base, label, model = OMNIROUTE_BASE_URL, CONNECTION_SPECS[conn_id][0], OMNIROUTE_MODEL
+        elif conn_id == "ninerouter":
+            base, label, model = NINEROUTER_BASE_URL, CONNECTION_SPECS[conn_id][0], NINEROUTER_MODEL
+        else:
+            base, label, model = NVIDIA_BASE_URL, CONNECTION_SPECS[conn_id][0], NVIDIA_MODEL
         req = urllib.request.Request(
             f"{base}/models",
             headers={
@@ -1156,6 +1166,7 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         "OpenRouter": OPENROUTER_MODEL,
         "OmniRoute": OMNIROUTE_MODEL,
         "9Router": NINEROUTER_MODEL,
+        "Nvidia": NVIDIA_MODEL,
     }
     model = model_map[provider]
     with STATE_LOCK:
@@ -1292,6 +1303,8 @@ def bump_provider_activity(provider: str, delta: int) -> None:
         ACTIVE_OMNIROUTE_COUNT = max(0, ACTIVE_OMNIROUTE_COUNT + delta)
     elif provider == "9Router":
         ACTIVE_NINEROUTER_COUNT = max(0, ACTIVE_NINEROUTER_COUNT + delta)
+    elif provider == "Nvidia":
+        ACTIVE_NVIDIA_COUNT = max(0, ACTIVE_NVIDIA_COUNT + delta)
     else:
         ACTIVE_OPENROUTER_COUNT = max(0, ACTIVE_OPENROUTER_COUNT + delta)
 
@@ -1746,4 +1759,5 @@ def provider_activity_status() -> dict[str, bool]:
         "openrouter_working": ACTIVE_OPENROUTER_COUNT > 0,
         "omniroute_working": ACTIVE_OMNIROUTE_COUNT > 0,
         "ninerouter_working": ACTIVE_NINEROUTER_COUNT > 0,
+        "nvidia_working": ACTIVE_NVIDIA_COUNT > 0,
     }

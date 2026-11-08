@@ -45,8 +45,10 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openrouter/free").strip()
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b").strip() or "openai/gpt-oss-20b"
 OMNIROUTE_MODEL = os.environ.get("OMNIROUTE_MODEL", "auto").strip() or "auto"
 NINEROUTER_MODEL = os.environ.get("NINEROUTER_MODEL", "auto").strip() or "auto"
+NVIDIA_MODEL = os.environ.get("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct").strip() or "meta/llama-3.3-70b-instruct"
 OMNIROUTE_BASE_URL = os.environ.get("OMNIROUTE_BASE_URL", "http://localhost:20128/v1").strip().rstrip("/") or "http://localhost:20128/v1"
 NINEROUTER_BASE_URL = os.environ.get("NINEROUTER_BASE_URL", "http://localhost:20129/v1").strip().rstrip("/") or "http://localhost:20129/v1"
+NVIDIA_BASE_URL = os.environ.get("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").strip().rstrip("/") or "https://integrate.api.nvidia.com/v1"
 HTTP_USER_AGENT = os.environ.get("TEAM_USER_AGENT", "Personal-AI-Team/1.0").strip() or "Personal-AI-Team/1.0"
 LOG_LEVELS = {
     "DEBUG": logging.DEBUG,
@@ -69,16 +71,16 @@ WORK_ROLES = [
     "Documentation",
 ]
 
-PROVIDERS = ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"]
+PROVIDERS = ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"]
 TASK_PROVIDERS = ["Automatic", *PROVIDERS]
 
 ROUTING_DEFAULTS: dict[str, list[str]] = {
-    "PM/PO": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"],
-    "Frontend developer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"],
-    "Backend developer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"],
-    "QA": ["GroqCloud", "Gemini", "OpenRouter", "OmniRoute", "9Router"],
-    "UI designer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"],
-    "Documentation": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router"],
+    "PM/PO": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
+    "Frontend developer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
+    "Backend developer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
+    "QA": ["GroqCloud", "Gemini", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
+    "UI designer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
+    "Documentation": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
 }
 
 PROMPT_FILES: dict[str, str] = {
@@ -104,6 +106,7 @@ CONNECTION_SPECS: dict[str, tuple[str, str]] = {
     "openrouter": ("OpenRouter", "OPENROUTER_API_KEY"),
     "omniroute": ("OmniRoute", "OMNIROUTE_API_KEY"),
     "ninerouter": ("9Router", "NINEROUTER_API_KEY"),
+    "nvidia": ("Nvidia", "NVIDIA_API_KEY"),
     "github": ("GitHub repository connector", "GITHUB_TOKEN"),
 }
 
@@ -217,6 +220,7 @@ ACTIVE_GROQ_COUNT = 0
 ACTIVE_OPENROUTER_COUNT = 0
 ACTIVE_OMNIROUTE_COUNT = 0
 ACTIVE_NINEROUTER_COUNT = 0
+ACTIVE_NVIDIA_COUNT = 0
 ACTIVE_REPOSITORY_TASKS: set[str] = set()
 MAX_QA_FAILURES = 3
 

@@ -471,6 +471,7 @@ def read_task_replies(task_id: str) -> list[dict[str, Any]]:
         "OpenRouter": "openrouter",
         "OmniRoute": "omniroute",
         "9Router": "9router",
+        "Nvidia": "nvidia",
     }
     replies: list[dict[str, Any]] = []
     for att in task.get("attempts", []) or []:
