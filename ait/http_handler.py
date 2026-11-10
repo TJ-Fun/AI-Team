@@ -59,10 +59,13 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in ("/", "/index.html", "/static/index.html"):
             return self.serve_file(resolve_web_asset("index.html"), "text/html; charset=utf-8")
-        if path == "/static/app.js":
-            return self.serve_file(resolve_web_asset("app.js"), "text/javascript; charset=utf-8")
-        if path == "/static/style.css":
-            return self.serve_file(resolve_web_asset("style.css"), "text/css; charset=utf-8")
+        if path.startswith("/static/"):
+            asset_path = urllib.parse.unquote(path[len("/static/"):])
+            try:
+                asset_file = resolve_static_asset(asset_path)
+            except ValueError:
+                return self.send_json({"error": "File not found."}, HTTPStatus.NOT_FOUND)
+            return self.serve_file(asset_file, static_content_type(asset_file))
 
         if path == "/api/config":
             chat_provider = get_chat_provider()

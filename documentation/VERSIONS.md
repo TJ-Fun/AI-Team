@@ -1,5 +1,11 @@
 # Version log
 
+## 0.47 — 2026-11-10
+
+- Started the frontend modularization: `static/app.js` is now an ES module entry point and shared state, API, dialog, update-progress, and formatting helpers moved to `static/js/core.js`.
+- The server now serves static assets generically under `/static/` with path-traversal protection, so future frontend modules under `static/js/` do not require per-file routes.
+- Updated documentation to 0.47.
+
 ## 0.46 — 2026-11-08
 
 - Fixed clipped text in the provider **Model** dropdown: the Connections form's `.task-form select` styles (padding 10px, font 13px/1.5) override the dropdown's own styles, so its natural height matches the input fields (~41.5px); the fixed 36px height introduced in 0.45 shrank the content box below the line-height and hid the text. The fixed height was removed.

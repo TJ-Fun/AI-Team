@@ -274,6 +274,28 @@ def resolve_web_asset(filename: str) -> Path:
     return STATIC / filename
 
 
+def resolve_static_asset(relative_path: str) -> Path:
+    """Resolve a static asset path safely below the static directory."""
+    candidate = (STATIC / relative_path).resolve()
+    try:
+        candidate.relative_to(STATIC.resolve())
+    except ValueError as exc:
+        raise ValueError("Invalid static asset path.") from exc
+    if candidate.suffix.lower() not in {".html", ".css", ".js", ".mjs"}:
+        raise ValueError("Unsupported static asset type.")
+    return candidate
+
+
+def static_content_type(file_path: Path) -> str:
+    """Return the content type for a supported static asset."""
+    return {
+        ".html": "text/html; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".js": "text/javascript; charset=utf-8",
+        ".mjs": "text/javascript; charset=utf-8",
+    }.get(file_path.suffix.lower(), "application/octet-stream")
+
+
 def atomic_json(file_path: Path, value: Any) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
