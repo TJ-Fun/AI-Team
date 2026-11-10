@@ -1,5 +1,11 @@
 # Version log
 
+## 0.71 — 2026-11-10
+
+- Completed the `ait/git_ops.py` split: moved the remaining task post-processing helpers (`apply_repository_manifest`, `sync_local_checkout_after_merge`, `github_postprocess_task`) into the new `ait/git_task_postprocess.py` module and deleted `git_ops.py`.
+- The former monolith is now four focused modules: `git_github_api.py`, `git_local_ops.py`, `git_app_sync.py`, and `git_task_postprocess.py`. Flat-namespace injection keeps all callers unchanged. No behavior change.
+- Updated documentation to 0.71.
+
 ## 0.70 — 2026-11-10
 
 - Continued splitting `ait/git_ops.py`: moved app checkout update, mirror sync, and service restart helpers (`update_app_checkout`, `mirror_path_protected`, `sync_app_files`, `restart_service_process`, plus `MIRROR_IGNORED_DIRECTORIES`/`MIRROR_PROTECTED_ROOTS` constants) into the new `ait/git_app_sync.py` module.

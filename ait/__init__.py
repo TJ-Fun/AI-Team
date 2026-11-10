@@ -15,7 +15,7 @@ from ait import chat  # noqa: F401
 from ait import git_app_sync  # noqa: F401
 from ait import git_github_api  # noqa: F401
 from ait import git_local_ops  # noqa: F401
-from ait import git_ops  # noqa: F401
+from ait import git_task_postprocess  # noqa: F401
 from ait import http_handler  # noqa: F401
 from ait import main  # noqa: F401
 from ait import notifications  # noqa: F401
@@ -43,7 +43,7 @@ _DOMAIN_MODULES = (
     git_app_sync,
     git_github_api,
     git_local_ops,
-    git_ops,
+    git_task_postprocess,
     notifications,
     provider_calls,
     provider_dispatch,
