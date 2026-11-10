@@ -1,5 +1,11 @@
 # Version log
 
+## 0.51 — 2026-11-10
+
+- Continued the frontend modularization: extracted project/sub-project selectors, task board rendering/actions/`refreshBoard()`, the create/edit task dialog, and the shared `getAskedProvider` helper from `static/app.js` into `static/js/project-selectors.js`, `static/js/task-board.js`, `static/js/task-dialog.js`, and `static/js/task-utils.js`.
+- `app.js` now initializes those modules with a shared `featureContext` for cross-module callbacks and passes the task-board `refreshBoard()` into providers/project-settings/task-dialog; behavior, API endpoints, and HTML IDs are unchanged.
+- Updated documentation to 0.51.
+
 ## 0.50 — 2026-11-10
 
 - Continued the frontend modularization: extracted header/status rendering, provider connections/routing/model selects, and the projects/modules editor with Git actions from `static/app.js` into `static/js/header.js`, `static/js/providers.js`, and `static/js/project-settings.js`.

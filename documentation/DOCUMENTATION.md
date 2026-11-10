@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.50 · Updated 2026-11-10
+Version 0.51 · Updated 2026-11-10
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -18,7 +18,7 @@ The application is intended for a trusted, single-user environment. The default 
 | `ait/` | Application package split from the former monolithic `server.py`. `common.py` holds constants, logging, locks, and shared helpers; `settings.py`, `provider_registry.py`, `secrets.py`, `prompts.py`, `projects.py`, `git_ops.py`, `notifications.py`, `providers.py`, `chat.py`, and `http_handler.py` hold the domain logic; `main.py` starts background workers and the HTTP server. The package shares one flat namespace across modules, mirroring the original single-file layout. |
 | `static/index.html` | Application layout, dialogs, forms, and tab structure. |
 | `static/app.js` | ES module entry point for browser behavior, API calls, rendering, polling, form submissions, and dialogs. |
-| `static/js/` | Shared frontend modules; `core.js` holds state, API, dialog, update-progress, and formatting helpers, and feature modules such as `prompts.js`, `project-context.js`, `repository-viewer.js`, `header.js`, `providers.js`, and `project-settings.js` are initialized by `app.js`. |
+| `static/js/` | Shared frontend modules; `core.js` holds state, API, dialog, update-progress, and formatting helpers, and feature modules such as `prompts.js`, `project-context.js`, `repository-viewer.js`, `header.js`, `providers.js`, `project-settings.js`, `task-utils.js`, `project-selectors.js`, `task-board.js`, and `task-dialog.js` are initialized by `app.js`. |
 | `static/style.css` | Application styling and responsive layouts. |
 | `personal-ai-team.service` | Example systemd unit for the `ubuntu` service account. |
 | `prompts/` | Built-in shared and role-specific agent prompts. |
