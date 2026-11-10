@@ -100,6 +100,28 @@ PROJECT_CONTEXT_FILES: dict[str, str] = {
     "outcomes": "Confirmed outcomes",
 }
 
+ROADMAP_DOC_SLUG = "master_plan"
+PHASE_DOC_RE = re.compile(r"phase_[1-9]")
+INFO_REQUEST_MAX_ROUNDS = 2
+INFO_REQUEST_MAX_DOCS = 4
+
+PROJECT_DOC_DESCRIPTIONS: dict[str, str] = {
+    "project_brief": "Project goals, scope, and audience.",
+    "technical_overview": "Tech stack, architecture, and repository structure.",
+    "decisions": "Approved decision log.",
+    "outcomes": "Confirmed delivered outcomes.",
+    ROADMAP_DOC_SLUG: "Big plan / roadmap overview.",
+}
+
+ROLE_AUTO_DOCS: dict[str, list[str]] = {
+    "PM/PO": ["project_brief", ROADMAP_DOC_SLUG],
+    "Frontend developer": ["technical_overview"],
+    "Backend developer": ["technical_overview"],
+    "QA": ["technical_overview", "outcomes"],
+    "UI designer": ["project_brief", "decisions", "outcomes"],
+    "Documentation": ["project_brief", "technical_overview", "outcomes"],
+}
+
 CONNECTION_SPECS: dict[str, tuple[str, str]] = {
     "gemini": ("Gemini", "GEMINI_API_KEY"),
     "groq": ("GroqCloud", "GROQ_API_KEY"),

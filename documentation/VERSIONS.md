@@ -1,5 +1,13 @@
 # Version log
 
+## 0.72 — 2026-11-10
+
+- Started the on-demand project-context rework: agents no longer receive every project document on each call. `project_context_for_role` now injects only the role's auto documents plus a compact **Project documents** map (slug, title, size, auto/on-request flag, one-line description, and the `active_phase` pointer when set).
+- Added the role → auto/on-request matrix (`ROLE_AUTO_DOCS`): PM/PO gets brief + master plan; developers get the technical overview; QA gets technical overview + outcomes; UI designer keeps brief/decisions/outcomes; Documentation gets brief/technical overview/outcomes. Everything else is on-request.
+- Added roadmap document support: `master_plan` and `phase_1`–`phase_9` slugs are valid project documents with the same history/versioning as the existing context docs, and the context-documents API now lists and edits them.
+- Added `info_requests` limits (`INFO_REQUEST_MAX_ROUNDS`, `INFO_REQUEST_MAX_DOCS`) and per-doc descriptions for the map; the follow-up mechanism lands in the next batch.
+- Updated documentation to 0.72.
+
 ## 0.71 — 2026-11-10
 
 - Completed the `ait/git_ops.py` split: moved the remaining task post-processing helpers (`apply_repository_manifest`, `sync_local_checkout_after_merge`, `github_postprocess_task`) into the new `ait/git_task_postprocess.py` module and deleted `git_ops.py`.

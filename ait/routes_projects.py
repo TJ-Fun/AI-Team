@@ -53,8 +53,8 @@ def handle_projects_get(handler, path, query) -> bool:
             return True
         ensure_project_context(project_id)
         docs = [
-            {"id": slug, "title": title, "content": load_project_context(project_id, slug)}
-            for slug, title in PROJECT_CONTEXT_FILES.items()
+            {"id": slug, "title": project_doc_title(slug), "content": load_project_context(project_id, slug)}
+            for slug in project_doc_slugs(project_id)
         ]
         handler.send_json({"documents": docs})
         return True
@@ -62,7 +62,7 @@ def handle_projects_get(handler, path, query) -> bool:
     m_ctx_hist = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/history", path)
     if m_ctx_hist:
         project_id, slug = m_ctx_hist.groups()
-        if slug not in PROJECT_CONTEXT_FILES:
+        if not is_project_doc_slug(slug):
             handler.send_json({"error": "Project document not found."}, HTTPStatus.NOT_FOUND)
             return True
         if not any(p.get("id") == project_id for p in read_projects()):
@@ -79,7 +79,7 @@ def handle_projects_post(handler, path, body) -> bool:
     if m_ctx_res:
         pid, slug = m_ctx_res.groups()
         vid = str(body.get("snapshot_id", ""))
-        if slug not in PROJECT_CONTEXT_FILES:
+        if not is_project_doc_slug(slug):
             handler.send_json({"error": "Project document not found."}, HTTPStatus.NOT_FOUND)
             return True
         if not any(p.get("id") == pid for p in read_projects()):
@@ -136,7 +136,7 @@ def handle_projects_put(handler, path, body) -> bool:
     m_ctx = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)", path)
     if m_ctx:
         pid, slug = m_ctx.groups()
-        if slug not in PROJECT_CONTEXT_FILES:
+        if not is_project_doc_slug(slug):
             handler.send_json({"error": "Project document not found."}, HTTPStatus.NOT_FOUND)
             return True
         if not any(p.get("id") == pid for p in read_projects()):
@@ -174,7 +174,7 @@ def handle_projects_delete(handler, path) -> bool:
     )
     if m_ctx_del:
         pid, slug, vid = m_ctx_del.groups()
-        if slug not in PROJECT_CONTEXT_FILES or not any(p.get("id") == pid for p in read_projects()):
+        if not is_project_doc_slug(slug) or not any(p.get("id") == pid for p in read_projects()):
             handler.send_json({"error": "Saved version not found."}, HTTPStatus.NOT_FOUND)
             return True
         snap = project_context_file(pid, slug).parent / "history" / slug / f"{vid}.md"

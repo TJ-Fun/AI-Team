@@ -292,6 +292,12 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
         completed_phases = sorted({int(p) for p in (raw_phases or []) if str(p).isdigit()})
         raw_milestones = raw.get("milestones") if isinstance(raw.get("milestones"), list) else old_proj.get("milestones")
         milestones = [m for m in (raw_milestones or []) if isinstance(m, dict)][:100]
+        try:
+            active_phase = int(raw.get("active_phase") or old_proj.get("active_phase") or 0) or None
+        except (TypeError, ValueError):
+            active_phase = None
+        if active_phase is not None:
+            active_phase = min(max(active_phase, 1), 9)
         cleaned.append(
             {
                 "id": pid,
@@ -303,6 +309,7 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
                 "version": version,
                 "completed_phases": completed_phases,
                 "milestones": milestones,
+                "active_phase": active_phase,
             }
         )
 
@@ -338,8 +345,37 @@ def project_background_history(project_id: str) -> list[dict[str, str]]:
     return rows
 
 
+def is_project_doc_slug(slug: str) -> bool:
+    return (
+        slug in PROJECT_CONTEXT_FILES
+        or slug == ROADMAP_DOC_SLUG
+        or bool(PHASE_DOC_RE.fullmatch(slug))
+    )
+
+
+def project_doc_title(slug: str) -> str:
+    if slug in PROJECT_CONTEXT_FILES:
+        return PROJECT_CONTEXT_FILES[slug]
+    if slug == ROADMAP_DOC_SLUG:
+        return "Master plan (big plan / roadmap)"
+    if PHASE_DOC_RE.fullmatch(slug):
+        return f"Phase {slug.split('_', 1)[1]} plan"
+    return slug
+
+
+def project_phase_doc_slugs(project_id: str) -> list[str]:
+    folder = DATA / "projects" / project_id / "context"
+    if not folder.is_dir():
+        return []
+    return sorted(f.stem for f in folder.glob("phase_*.md") if PHASE_DOC_RE.fullmatch(f.stem))
+
+
+def project_doc_slugs(project_id: str) -> list[str]:
+    return list(PROJECT_CONTEXT_FILES) + [ROADMAP_DOC_SLUG] + project_phase_doc_slugs(project_id)
+
+
 def project_context_file(project_id: str, slug: str) -> Path:
-    if slug not in PROJECT_CONTEXT_FILES or not re.fullmatch(r"[a-z0-9-]+", project_id):
+    if not is_project_doc_slug(slug) or not re.fullmatch(r"[a-z0-9-]+", project_id):
         raise ValueError("Unknown project context.")
     if not any(p.get("id") == project_id for p in read_projects()):
         raise ValueError("Project not found.")
@@ -361,7 +397,7 @@ def ensure_project_context(project_id: str) -> None:
 
 
 def load_project_context(project_id: str, slug: str) -> str:
-    if slug not in PROJECT_CONTEXT_FILES:
+    if not is_project_doc_slug(slug):
         return ""
     ensure_project_context(project_id)
     p = project_context_file(project_id, slug)
@@ -369,7 +405,7 @@ def load_project_context(project_id: str, slug: str) -> str:
 
 
 def save_project_context_document(project_id: str, slug: str, content: str) -> str | None:
-    if slug not in PROJECT_CONTEXT_FILES:
+    if not is_project_doc_slug(slug):
         raise ValueError("Unknown project context document.")
     ensure_project_context(project_id)
     p = project_context_file(project_id, slug)
@@ -386,7 +422,7 @@ def save_project_context_document(project_id: str, slug: str, content: str) -> s
 
 
 def get_project_context_history(project_id: str, slug: str) -> list[dict[str, str]]:
-    if slug not in PROJECT_CONTEXT_FILES:
+    if not is_project_doc_slug(slug):
         return []
     ensure_project_context(project_id)
     folder = project_context_file(project_id, slug).parent / "history" / slug
@@ -409,6 +445,33 @@ def get_project_context_history(project_id: str, slug: str) -> list[dict[str, st
     return rows
 
 
+def project_doc_map_text(project_id: str, role: str, project: dict[str, Any]) -> str:
+    auto = set(ROLE_AUTO_DOCS.get(role, []))
+    lines: list[str] = []
+    active = project.get("active_phase")
+    if active:
+        lines.append(f"Active phase: {active}")
+    for slug in project_doc_slugs(project_id):
+        try:
+            size = len(load_project_context(project_id, slug))
+        except Exception:
+            size = 0
+        if slug in PROJECT_DOC_DESCRIPTIONS:
+            desc = PROJECT_DOC_DESCRIPTIONS[slug]
+        elif PHASE_DOC_RE.fullmatch(slug):
+            desc = f"Phase {slug.split('_', 1)[1]} plan."
+        else:
+            desc = ""
+        tag = "auto-included above" if slug in auto else "on-request"
+        lines.append(f"- {slug} — {project_doc_title(slug)} ({size} chars, {tag}): {desc}")
+    lines.append(
+        "Documents marked on-request are not loaded. When you need one, include "
+        f'"info_requests": ["slug", ...] (max {INFO_REQUEST_MAX_DOCS} slugs) in your structured reply; '
+        "the app will provide the content and let you continue."
+    )
+    return "\n".join(lines)
+
+
 def project_context_for_role(role: str, task: dict[str, Any] | None = None) -> str:
     projects = read_projects()
     requested_project_id = str((task or {}).get("project_id") or "")
@@ -416,15 +479,12 @@ def project_context_for_role(role: str, task: dict[str, Any] | None = None) -> s
     if not project and not requested_project_id:
         project = next((p for p in projects if p.get("id") == "default"), projects[0] if projects else None)
     pid = str(project.get("id") if project else "")
+    auto_slugs = ROLE_AUTO_DOCS.get(role, ["technical_overview"])
     sections: list[tuple[str, str]] = [
-        ("Project brief", load_project_context(pid, "project_brief") if project else ""),
-        ("Technical overview", load_project_context(pid, "technical_overview") if project else ""),
-        ("Approved decisions", load_project_context(pid, "decisions") if project else ""),
-        ("Confirmed outcomes", load_project_context(pid, "outcomes") if project else ""),
+        (project_doc_title(slug), load_project_context(pid, slug) if project else "")
+        for slug in auto_slugs
     ]
-    if role == "UI designer":
-        sections = [sections[0], sections[2], sections[3]]
-    elif role == "PM/PO":
+    if role == "PM/PO":
         current = [
             t
             for t in read_tasks()
@@ -481,6 +541,7 @@ def project_context_for_role(role: str, task: dict[str, Any] | None = None) -> s
                 for m in project["modules"]
             )
             sections.append(("Available sub-projects", cat))
+        sections.append(("Project documents", project_doc_map_text(pid, role, project)))
 
     return "\n\n".join(f"## {title}\n{body[:6000]}" for title, body in sections if body and body.strip())
 
