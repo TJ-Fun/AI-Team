@@ -118,160 +118,88 @@ def canonical_github_repository(repository: str) -> tuple[str, str]:
 
 
 def update_app_checkout(repository_url: str, checkout_path: Path, token: str) -> str:
-    """Clone the configured app repo or fast-forward its existing checkout."""
+    """Replace the app checkout with a fresh clone of the configured repository.
+
+    The remote repository is always the source of truth, so any existing
+    checkout (including local modifications or untracked files) is discarded
+    and replaced by a clean clone.
+    """
     checkout_path = checkout_path.resolve()
     git_env = git_auth_environment(token)
-    staging_path: Path | None = None
-    if checkout_path.exists():
-        if not checkout_path.is_dir():
-            raise ValueError(f"Repository checkout path is not a directory: {checkout_path}")
-        probe = subprocess.run(
-            ["git", "-C", str(checkout_path), "rev-parse", "--is-inside-work-tree"],
-            capture_output=True, text=True, timeout=15,
-        )
-        if probe.returncode != 0:
-            raise ValueError(
-                f"Repository checkout path exists but is not a Git repository: {checkout_path}. "
-                "Choose an empty directory or an existing checkout."
-            )
-        remote = subprocess.run(
-            ["git", "-C", str(checkout_path), "remote", "get-url", "origin"],
-            capture_output=True, text=True, timeout=15,
-        )
-        if remote.returncode != 0:
-            raise ValueError(f"Could not read the origin remote for checkout: {remote.stderr.strip()}")
-        if canonical_github_repository(remote.stdout) != canonical_github_repository(repository_url):
-            raise ValueError(
-                f"The existing checkout at '{checkout_path}' belongs to a different repository. "
-                "Choose its matching repository URL or another checkout directory."
-            )
-        operation = "pull"
-        command = ["git", "-C", str(checkout_path), "pull", "--ff-only"]
-    else:
-        checkout_path.parent.mkdir(parents=True, exist_ok=True)
-        operation = "clone"
-        staging_path = Path(tempfile.mkdtemp(prefix=f".{checkout_path.name}.clone-", dir=checkout_path.parent))
-        command = ["git", "clone", "--progress", repository_url, str(staging_path)]
+    checkout_path.parent.mkdir(parents=True, exist_ok=True)
+    staging_path = Path(tempfile.mkdtemp(prefix=f".{checkout_path.name}.clone-", dir=checkout_path.parent))
+    command = ["git", "clone", "--progress", repository_url, str(staging_path)]
 
     def git_output(res: subprocess.CompletedProcess) -> str:
         return "\n".join(part.strip() for part in (res.stdout, res.stderr) if part and part.strip())
-
-    def run_git(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess:
-        return subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=git_env)
-
-    def recover_pull() -> tuple[subprocess.CompletedProcess | None, str]:
-        try:
-            fetch = run_git(["git", "-C", str(checkout_path), "fetch", "origin"], timeout=300)
-        except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError) as exc:
-            return None, f"git fetch failed: {exc}"
-        if fetch.returncode:
-            detail = git_output(fetch) or f"git exited with status {fetch.returncode}"
-            return None, redact_git_output(detail, token)
-        try:
-            target = ""
-            upstream = run_git(["git", "-C", str(checkout_path), "rev-parse", "--abbrev-ref", "@{u}"], timeout=15)
-            if upstream.returncode == 0 and upstream.stdout.strip():
-                target = upstream.stdout.strip()
-            if not target:
-                symbolic = run_git(
-                    ["git", "-C", str(checkout_path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
-                    timeout=15,
-                )
-                if symbolic.returncode == 0 and symbolic.stdout.strip():
-                    target = symbolic.stdout.strip()
-            if not target:
-                branch = run_git(["git", "-C", str(checkout_path), "rev-parse", "--abbrev-ref", "HEAD"], timeout=15)
-                if branch.returncode == 0:
-                    name = branch.stdout.strip()
-                    if name and name != "HEAD":
-                        target = f"origin/{name}"
-            if not target:
-                target = "origin/HEAD"
-            verify = run_git(["git", "-C", str(checkout_path), "rev-parse", "--verify", "--quiet", target], timeout=15)
-            if verify.returncode != 0:
-                for fallback in ("origin/main", "origin/master", "origin/HEAD"):
-                    verify = run_git(["git", "-C", str(checkout_path), "rev-parse", "--verify", "--quiet", fallback], timeout=15)
-                    if verify.returncode == 0:
-                        target = fallback
-                        break
-                else:
-                    return None, f"could not find a remote branch to reset to (tried {target})"
-            reset = run_git(["git", "-C", str(checkout_path), "reset", "--hard", target], timeout=300)
-        except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError) as exc:
-            return None, f"git reset failed: {exc}"
-        if reset.returncode:
-            detail = git_output(reset) or f"git exited with status {reset.returncode}"
-            return None, redact_git_output(detail, token)
-        return reset, target
 
     try:
         result = subprocess.run(
             command, capture_output=True, text=True, timeout=300, env=git_env,
         )
     except PermissionError as exc:
-        if staging_path is not None:
-            shutil.rmtree(staging_path, ignore_errors=True)
+        shutil.rmtree(staging_path, ignore_errors=True)
         raise ValueError(
             f"Permission denied accessing repository checkout '{checkout_path}'. "
             "Ensure the service user can write there and systemd allows the path."
         ) from exc
     except subprocess.TimeoutExpired as exc:
-        if staging_path is not None:
-            shutil.rmtree(staging_path, ignore_errors=True)
+        shutil.rmtree(staging_path, ignore_errors=True)
         detail = redact_git_output((exc.stderr or "") if isinstance(exc.stderr, str) else "", token).strip()
-        raise ValueError(f"Git {operation} timed out after 300 seconds. {detail}".strip()) from exc
+        raise ValueError(f"Git clone timed out after 300 seconds. {detail}".strip()) from exc
     except FileNotFoundError as exc:
-        if staging_path is not None:
-            shutil.rmtree(staging_path, ignore_errors=True)
+        shutil.rmtree(staging_path, ignore_errors=True)
         raise ValueError("Git is not installed or is not available to the application service.") from exc
 
-    output = git_output(result)
-    recovery_detail = ""
-    if result.returncode and operation == "pull":
-        lowered = output.lower()
-        needs_reset = any(
-            marker in lowered
-            for marker in (
-                "not possible to fast-forward",
-                "can't be fast-forwarded",
-                "cannot fast-forward",
-                "non-fast-forward",
-                "forced update",
-            )
-        )
-        if needs_reset:
-            recovered, recovery_detail = recover_pull()
-            if recovered is not None:
-                operation = "reset"
-                result = recovered
-                output = f"Reset checkout to remote branch after pull could not fast-forward.\n{git_output(result)}"
-            else:
-                logger.warning("App repository pull recovery failed: %s", recovery_detail)
-    output = redact_git_output(output, token)
+    output = redact_git_output(git_output(result), token)
     if result.returncode:
-        if staging_path is not None:
-            shutil.rmtree(staging_path, ignore_errors=True)
+        shutil.rmtree(staging_path, ignore_errors=True)
         detail = output or f"git exited with status {result.returncode}"
-        if recovery_detail:
-            detail = f"{detail}; automatic checkout reset failed: {recovery_detail}"
-        logger.error("App repository %s failed (exit=%s): %s", operation, result.returncode, detail)
-        raise ValueError(f"Git {operation} failed: {detail}")
-    if staging_path is not None:
-        try:
-            os.replace(staging_path, checkout_path)
-        except Exception:
-            shutil.rmtree(staging_path, ignore_errors=True)
-            raise
-    logger.info("App repository %s completed (checkout=%s): %s", operation, checkout_path, output or "no changes")
-    return operation
+        logger.error("App repository clone failed (exit=%s): %s", result.returncode, detail)
+        raise ValueError(f"Git clone failed: {detail}")
+    try:
+        if checkout_path.is_symlink() or checkout_path.is_file():
+            checkout_path.unlink()
+        elif checkout_path.exists():
+            shutil.rmtree(checkout_path)
+        os.replace(staging_path, checkout_path)
+    except Exception:
+        shutil.rmtree(staging_path, ignore_errors=True)
+        raise
+    logger.info("App repository cloned (checkout=%s): %s", checkout_path, output or "no changes")
+    return "clone"
 
 
-def copy_newer_app_files(source: Path, destination: Path) -> tuple[int, int]:
-    """Copy newer repository files without deleting files unique to the deployment."""
+MIRROR_IGNORED_DIRECTORIES = {".git", ".venv", "venv", "__pycache__", "node_modules"}
+MIRROR_PROTECTED_ROOTS = {"data"}
+
+
+def mirror_path_protected(relative: Path) -> bool:
+    """Return True for destination paths that must survive a mirror sync."""
+    parts = relative.parts
+    if not parts:
+        return False
+    if parts[0] in MIRROR_PROTECTED_ROOTS:
+        return True
+    if any(part in MIRROR_IGNORED_DIRECTORIES for part in parts):
+        return True
+    name = parts[-1]
+    return name.startswith(".env") or name.endswith(".log")
+
+
+def sync_app_files(source: Path, destination: Path) -> tuple[int, int]:
+    """Mirror repository files into the app directory, removing stale files.
+
+    Every repository file is copied (overwriting existing files), and files or
+    directories that only exist in the destination are deleted — except
+    protected runtime data such as ``data/``, ``.env*``, logs, virtualenvs,
+    caches, and ``.git``.
+    """
     source = source.resolve(strict=True)
     destination = destination.resolve(strict=True)
-    ignored_directories = {".git", ".venv", "venv", "__pycache__", "node_modules"}
-    copied = skipped = 0
+    copied = deleted = 0
+    source_files: set[Path] = set()
+    source_dirs: set[Path] = set()
 
     def raise_walk_error(error: OSError) -> None:
         raise error
@@ -280,9 +208,11 @@ def copy_newer_app_files(source: Path, destination: Path) -> tuple[int, int]:
         current_path = Path(current)
         dirs[:] = [
             name for name in dirs
-            if name not in ignored_directories and not (current_path / name).is_symlink()
+            if name not in MIRROR_IGNORED_DIRECTORIES and not (current_path / name).is_symlink()
         ]
         relative_dir = current_path.relative_to(source)
+        if relative_dir != Path("."):
+            source_dirs.add(relative_dir)
         target_dir = destination / relative_dir
         if target_dir.is_symlink():
             raise ValueError(f"Refusing to write through a symbolic link in the app directory: {target_dir}")
@@ -295,21 +225,14 @@ def copy_newer_app_files(source: Path, destination: Path) -> tuple[int, int]:
             if source_file.is_symlink():
                 continue
             relative_file = source_file.relative_to(source)
+            source_files.add(relative_file)
             target_file = destination / relative_file
             if target_file.is_symlink():
                 raise ValueError(f"Refusing to overwrite a symbolic link in the app directory: {target_file}")
             resolved_target = target_file.resolve(strict=False)
             if not resolved_target.is_relative_to(destination):
                 raise ValueError(f"Refusing to write outside the app working directory: {target_file}")
-            source_stat = source_file.stat()
-            try:
-                target_stat = target_file.stat()
-            except FileNotFoundError:
-                target_stat = None
-            if target_stat and target_stat.st_mtime_ns >= source_stat.st_mtime_ns:
-                skipped += 1
-                continue
-            if target_stat and not target_file.is_file():
+            if target_file.exists() and not target_file.is_file():
                 raise ValueError(f"Cannot replace non-file app path: {target_file}")
 
             fd, temporary_name = tempfile.mkstemp(prefix=f".{filename}.", dir=target_dir)
@@ -321,7 +244,34 @@ def copy_newer_app_files(source: Path, destination: Path) -> tuple[int, int]:
             finally:
                 temporary_file.unlink(missing_ok=True)
             copied += 1
-    return copied, skipped
+
+    for current, dirs, filenames in os.walk(destination, followlinks=False, onerror=raise_walk_error):
+        current_path = Path(current)
+        dirs[:] = [
+            name for name in dirs
+            if name not in MIRROR_IGNORED_DIRECTORIES and not (current_path / name).is_symlink()
+        ]
+        for filename in filenames:
+            target_file = current_path / filename
+            relative_file = target_file.relative_to(destination)
+            if relative_file in source_files or mirror_path_protected(relative_file):
+                continue
+            target_file.unlink()
+            deleted += 1
+
+    for current, dirs, _filenames in os.walk(destination, topdown=False, followlinks=False, onerror=raise_walk_error):
+        current_path = Path(current)
+        for name in dirs:
+            candidate = current_path / name
+            relative_dir = candidate.relative_to(destination)
+            if relative_dir in source_dirs or mirror_path_protected(relative_dir):
+                continue
+            try:
+                candidate.rmdir()
+                deleted += 1
+            except OSError:
+                pass
+    return copied, deleted
 
 
 def restart_service_process() -> None:

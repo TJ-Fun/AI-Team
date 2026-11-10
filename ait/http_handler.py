@@ -719,17 +719,17 @@ class Handler(BaseHTTPRequestHandler):
                 owner, repo = repository_parts(app_repo_url)
                 app_repo_url = f"https://github.com/{owner}/{repo}.git"
                 operation = update_app_checkout(app_repo_url, checkout_path, token)
-                copied, skipped = copy_newer_app_files(checkout_path, working_path)
+                copied, deleted = sync_app_files(checkout_path, working_path)
                 logger.info(
-                    "App files copied from checkout=%s to working_dir=%s (copied=%s, kept_newer_or_equal=%s)",
-                    checkout_path, working_path, copied, skipped,
+                    "App files synced from checkout=%s to working_dir=%s (copied=%s, deleted=%s)",
+                    checkout_path, working_path, copied, deleted,
                 )
                 response = {
                     "success": True,
                     "operation": operation,
                     "copied_files": copied,
-                    "kept_files": skipped,
-                    "message": f"Repository {operation} completed; copied {copied} newer file(s), kept {skipped} newer or unchanged file(s).",
+                    "deleted_files": deleted,
+                    "message": f"Repository {operation} completed; synced {copied} file(s), removed {deleted} stale file(s).",
                 }
                 self.send_json(response)
                 threading.Timer(2.0, restart_service_process).start()

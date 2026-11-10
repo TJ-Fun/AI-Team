@@ -1,5 +1,10 @@
 # Version log
 
+## 0.52 — 2026-11-10
+
+- Reworked the app self-update: the configured checkout is now always replaced with a fresh `git clone` of the repository (local modifications and untracked files in the checkout can no longer block the update), and the working directory is synced as an exact mirror — files are overwritten unconditionally and stale files/directories are removed, while `data/`, `.env*`, logs, virtualenvs, caches, and `.git` are protected.
+- Updated documentation to 0.52.
+
 ## 0.51 — 2026-11-10
 
 - Continued the frontend modularization: extracted project/sub-project selectors, task board rendering/actions/`refreshBoard()`, the create/edit task dialog, and the shared `getAskedProvider` helper from `static/app.js` into `static/js/project-selectors.js`, `static/js/task-board.js`, `static/js/task-dialog.js`, and `static/js/task-utils.js`.
