@@ -1,5 +1,11 @@
 # Version log
 
+## 0.61 — 2026-11-10
+
+- Continued splitting `ait/http_handler.py`: moved all project and project-context API routes (project list, GitHub/local file browsing, context documents, context history, restores, project save) into the new `ait/routes_projects.py` module.
+- `http_handler.py` now dispatches project routes to `handle_projects_get/post/put/delete`. No behavior change.
+- Updated documentation to 0.61.
+
 ## 0.60 — 2026-11-10
 
 - Started splitting `ait/http_handler.py`: moved all task and PM-request API routes (create, list, replies, status, provider, validation, sync-local, answer, approve-overview, design-review, approve-merge, overview edit, task edit, task delete) into the new `ait/routes_tasks.py` module.
