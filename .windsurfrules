@@ -2,7 +2,7 @@
 
 ## 1. Core Workflow (Mandatory Sequence)
 - **Phase 1: Discussion & Alignment.** When presented with a bug fix or new feature request, DO NOT write code immediately. Discuss the requirement, ask clarifying questions, and propose a conceptual approach. Wait for explicit user confirmation before proceeding.
-- **Phase 2: Plan Generation.** Once confirmed, write a high-level, brief implementation plan and save/update it inside the project under `ToDo/current_plan.md`.
+- **Phase 2: Plan Generation.** Once confirmed, write a high-level, brief implementation plan and save/update it inside the project under `ToDo/plan_{timestamp}.md`.
 - **Phase 3: Batching.** Break the plan down into small, bite-sized sequential batches to minimize context/token consumption.
 - **Phase 4: Execution & Gatekeeping.** Present the plan and WAIT for explicit user "go" before executing Step 1.
 
@@ -14,11 +14,11 @@
 
 ## 3. Execution & Post-Step Protocol
 After completing *each individual step* of the plan:
-1. Update relevant documentation/READMEs affected by the step.
+1. Update relevant documentation/READMEs affected by the step, create new documentation file if needed.
 2. Increment the project version.
 3. Commit and push changes to GitHub with a descriptive message referencing the step.
-4. Stop and wait for user approval before starting the next step.
+4. Proceed with the next step of the plan.
 
 ## 4. Token & Context Efficiency
 - **Selective Context:** Do not load or read files outside the immediate scope of the current step.
-- **Plan-Driven Focus:** Use `ToDo/current_plan.md` to maintain overarching context without re-scanning unchanged codebase files.
+- **Plan-Driven Focus:** Use `ToDo/plan_{timestamp}.md` to maintain overarching context without re-scanning unchanged codebase files.

@@ -1,5 +1,11 @@
 # Version log
 
+## 0.68 — 2026-11-10
+
+- Started splitting `ait/git_ops.py`: moved the GitHub API client, repository file viewers, and task-context helpers (`repository_parts`, `safe_repo_path`, `github_api`, `github_project`, `canonical_github_repository`, `github_file_listing`, `github_read_text_file`, `github_task_context`, `github_check_runs_summary`) into the new `ait/git_github_api.py` module.
+- Registered in `ait/__init__.py`; flat-namespace injection keeps all callers unchanged. No behavior change.
+- Updated documentation to 0.68.
+
 ## 0.67 — 2026-11-10
 
 - Added the **Repair App** button next to **Update App** in Settings → About. Repair always replaces the app with a fresh mirror of the configured repository (clone + sync + restart), regardless of version.
