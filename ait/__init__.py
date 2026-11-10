@@ -28,6 +28,9 @@ from ait import routes_providers  # noqa: F401
 from ait import routes_settings  # noqa: F401
 from ait import routes_projects  # noqa: F401
 from ait import routes_tasks  # noqa: F401
+from ait import routes_tasks_core  # noqa: F401
+from ait import routes_tasks_ops  # noqa: F401
+from ait import routes_tasks_pm  # noqa: F401
 from ait import pm_planning  # noqa: F401
 from ait import provider_calls  # noqa: F401
 from ait import provider_dispatch  # noqa: F401
@@ -56,6 +59,9 @@ _DOMAIN_MODULES = (
     routes_projects,
     routes_settings,
     routes_tasks,
+    routes_tasks_core,
+    routes_tasks_ops,
+    routes_tasks_pm,
     chat,
     doc_updates,
     info_requests,

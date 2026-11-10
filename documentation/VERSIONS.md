@@ -1,5 +1,11 @@
 # Version log
 
+## 0.77 — 2026-11-10
+
+- Refactored `ait/routes_tasks.py` (858 lines) into a thin dispatcher plus three focused modules: `routes_tasks_core.py` (task list/replies, create, edit, delete), `routes_tasks_pm.py` (PM planning requests, doc/roadmap updates, clarification answers, overview and design-review approvals), and `routes_tasks_ops.py` (status, provider, validation, local sync, merge approval).
+- No API or behavior changes; `handle_tasks_get/post/put/delete` signatures are unchanged and all endpoints verified by smoke test.
+- Updated documentation to 0.77.
+
 ## 0.76 — 2026-11-10
 
 - Completed the on-demand project-context feature with the frontend: **Update docs** and **Update roadmap** buttons in the board header create the corresponding PM/PO update tasks for the active project.
