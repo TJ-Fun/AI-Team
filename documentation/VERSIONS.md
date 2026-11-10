@@ -1,5 +1,12 @@
 # Version log
 
+## 0.74 — 2026-11-10
+
+- Extended `info_requests` to the PM/PO chat: when the PM replies with only a JSON object like `{"info_requests":["slug"]}`, the app loads the requested project documents, appends them to the conversation, and calls the provider again (same `INFO_REQUEST_MAX_ROUNDS` bound and per-conversation cache as task dispatch). Requests are logged as `chat_info_documents_requested` events.
+- Refactored `ait/chat.py`: the provider HTTP call moved into `chat_provider_request`; `call_chat_provider` now loops over it for document requests. Chat history alternation is preserved for both Gemini and OpenAI-compatible providers.
+- Updated agent prompts: `prompts/shared_rules.md` gained a "Project documents" section explaining the map, the auto/on-request split, and the strict request-only-what-you-need rule; the chat system prompt now documents the JSON-only request format.
+- Updated documentation to 0.74.
+
 ## 0.73 — 2026-11-10
 
 - Added the `info_requests` mechanism for task dispatch: any agent reply (work envelope, repo manifest, PM planning, escalation, or QA review JSON) may include `"info_requests": ["slug", ...]` to pull project documents on demand.

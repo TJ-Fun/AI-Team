@@ -59,7 +59,8 @@ def chat_system_prompt(project_id: str) -> str:
             combined_agent_prompt("PM/PO"),
             "Chat mode: you are talking directly with the user in a chat window, not processing a formal planning request. "
             "Answer conversationally in clear markdown. Do not return the planning JSON schema unless the user explicitly asks you to produce a plan; "
-            "when they do, remind them that plans become tasks when created from the board.",
+            "when they do, remind them that plans become tasks when created from the board. "
+            "When you need an on-request project document, reply with only a JSON object like {\"info_requests\":[\"slug\"]} and the app will provide it.",
             project_context_for_role("PM/PO", {"project_id": project_id}),
             f"Current task board (read-only context):\n{board_text}",
         ]
@@ -67,24 +68,8 @@ def chat_system_prompt(project_id: str) -> str:
     )
 
 
-def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) -> tuple[str, str, str]:
-    """Send the chat history to the configured chat provider. Returns (reply, provider, model)."""
-    configured = configured_providers()
-    if not configured:
-        raise ProviderFailure("Chat", 401, "No AI provider is connected. Add a key in Settings → Connections.")
-    preferred = get_chat_provider()
-    if preferred == "Auto":
-        provider = select_auto_provider() or configured[0]
-    else:
-        provider = preferred if preferred in configured else (select_auto_provider() or configured[0])
-    model = chat_provider_model(provider)
-    sys_prompt = chat_system_prompt(project_id)
-    history = [
-        {"role": m["role"], "content": str(m.get("content", ""))}
-        for m in context_messages[-16:]
-        if m.get("role") in ("user", "assistant") and str(m.get("content", "")).strip()
-    ]
-
+def chat_provider_request(provider: str, model: str, sys_prompt: str, history: list[dict[str, str]]) -> str:
+    """Single chat completion call. Returns the reply text."""
     if provider_kind(provider) == "gemini":
         api_key = get_provider_key("gemini")
         while history and history[0]["role"] != "user":
@@ -131,7 +116,7 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
         text = "".join(str(p.get("text", "")) for p in parts if isinstance(p, dict)).strip()
         if not text:
             raise ProviderFailure("Gemini", 400, "Gemini returned no text.")
-        return text, provider, model
+        return text
 
     cfg = openai_compat_config(provider)
     if not cfg:
@@ -182,6 +167,63 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
     text = str(content or "").strip()
     if not text:
         raise ProviderFailure(provider, 400, f"{provider} returned no text.")
+    return text
+
+
+def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) -> tuple[str, str, str]:
+    """Send the chat history to the configured chat provider. Returns (reply, provider, model).
+
+    When the PM/PO replies with only a JSON object containing "info_requests",
+    the requested project documents are appended to the conversation and the
+    provider is called again (bounded by INFO_REQUEST_MAX_ROUNDS).
+    """
+    configured = configured_providers()
+    if not configured:
+        raise ProviderFailure("Chat", 401, "No AI provider is connected. Add a key in Settings → Connections.")
+    preferred = get_chat_provider()
+    if preferred == "Auto":
+        provider = select_auto_provider() or configured[0]
+    else:
+        provider = preferred if preferred in configured else (select_auto_provider() or configured[0])
+    model = chat_provider_model(provider)
+    sys_prompt = chat_system_prompt(project_id)
+    history = [
+        {"role": m["role"], "content": str(m.get("content", ""))}
+        for m in context_messages[-16:]
+        if m.get("role") in ("user", "assistant") and str(m.get("content", "")).strip()
+    ]
+
+    cache: dict[str, str] = {}
+    text = ""
+    for round_no in range(INFO_REQUEST_MAX_ROUNDS + 1):
+        text = chat_provider_request(provider, model, sys_prompt, history)
+        if round_no >= INFO_REQUEST_MAX_ROUNDS:
+            break
+        new_slugs = [s for s in extract_info_requests(text) if s not in cache]
+        if not new_slugs:
+            break
+        for slug in new_slugs:
+            try:
+                cache[slug] = load_project_context(project_id, slug)
+            except Exception:
+                cache[slug] = ""
+        history.append({"role": "assistant", "content": text})
+        history.append(
+            {
+                "role": "user",
+                "content": requested_documents_text(cache)
+                + "\n\nContinue the conversation normally now.",
+            }
+        )
+        logger.info("Chat requested project documents provider=%s docs=%s", provider, new_slugs)
+        append_event(
+            {
+                "at": now_iso(),
+                "type": "chat_info_documents_requested",
+                "provider": provider,
+                "documents": new_slugs,
+            }
+        )
     return text, provider, model
 
 
