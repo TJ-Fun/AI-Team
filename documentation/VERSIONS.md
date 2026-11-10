@@ -1,5 +1,11 @@
 # Version log
 
+## 0.69 — 2026-11-10
+
+- Continued splitting `ait/git_ops.py`: moved local git operations, clone-job tracking, and local file viewer helpers (`git_project_path`, `git_auth_environment`, `redact_git_output`, `git_status`, `git_pull`, `git_push`, `git_clone`, `start_git_clone`, `get_git_clone_job`, `update_clone_job`, `append_clone_job_output`, `resolve_local_view_path`, `local_file_listing`, `read_local_text_file`, `local_project_root`) into the new `ait/git_local_ops.py` module.
+- Registered in `ait/__init__.py`; flat-namespace injection keeps all callers unchanged. No behavior change.
+- Updated documentation to 0.69.
+
 ## 0.68 — 2026-11-10
 
 - Started splitting `ait/git_ops.py`: moved the GitHub API client, repository file viewers, and task-context helpers (`repository_parts`, `safe_repo_path`, `github_api`, `github_project`, `canonical_github_repository`, `github_file_listing`, `github_read_text_file`, `github_task_context`, `github_check_runs_summary`) into the new `ait/git_github_api.py` module.
