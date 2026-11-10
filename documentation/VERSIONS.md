@@ -1,5 +1,11 @@
 # Version log
 
+## 0.60 — 2026-11-10
+
+- Started splitting `ait/http_handler.py`: moved all task and PM-request API routes (create, list, replies, status, provider, validation, sync-local, answer, approve-overview, design-review, approve-merge, overview edit, task edit, task delete) into the new `ait/routes_tasks.py` module.
+- `http_handler.py` now dispatches task routes to `handle_tasks_get/post/put/delete`; the flat-namespace injection keeps all cross-module calls unchanged. No behavior change.
+- Updated documentation to 0.60.
+
 ## 0.59 — 2026-11-10
 
 - Completed the `ait/providers.py` split: moved the remaining PM planning and escalation handling into the new `ait/pm_planning.py` module and deleted `ait/providers.py`.

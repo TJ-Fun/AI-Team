@@ -1,6 +1,6 @@
 # Personal AI Team
 
-Version: **0.59**
+Version: **0.60**
 
 Release date: **2026-11-10**
 
