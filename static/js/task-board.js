@@ -134,6 +134,27 @@ export function initTaskBoard(context = {}) {
       .join("");
   }
 
+  for (const [btnId, kind] of [
+    ["update-docs", "docs"],
+    ["update-roadmap", "roadmap"],
+  ]) {
+    $(`#${btnId}`)?.addEventListener("click", async () => {
+      const btn = $(`#${btnId}`);
+      btn.disabled = true;
+      try {
+        await api("/api/doc-updates", {
+          method: "POST",
+          body: JSON.stringify({ kind, project_id: state.activeProjectId }),
+        });
+        await refreshBoard();
+      } catch (err) {
+        appAlert(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   $("#task-list")?.addEventListener("click", async (e) => {
     const readyBtn = e.target.closest("[data-mark-ready], [data-retry-task]");
     if (readyBtn) {

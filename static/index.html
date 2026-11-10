@@ -37,6 +37,8 @@
           <label class="active-project-label">Project<select id="active-project"></select></label>
           <label class="active-project-label" id="active-subproject-wrap" hidden>Sub-project<select id="active-subproject"><option value="">Whole project</option></select></label>
           <button class="secondary" id="open-context" type="button">Project context</button>
+          <button class="secondary" id="update-docs" type="button" title="Ask PM/PO to propose updated project documents">Update docs</button>
+          <button class="secondary" id="update-roadmap" type="button" title="Ask PM/PO to propose an updated roadmap">Update roadmap</button>
           <button class="secondary" id="open-documentation" type="button">Documentation</button>
           <button class="secondary" id="open-files" type="button">Files</button>
           <button class="primary" id="new-task" type="button">＋ New task</button>
@@ -190,6 +192,11 @@
         <h3>Proposed Project context</h3>
         <p class="draft-note">Edit any document before approval. Approval replaces these three context documents; confirmed outcomes are kept. Previous versions are saved for rollback.</p>
         <div id="detail-overview-fields"></div>
+      </div>
+      <div id="detail-update-section" hidden>
+        <h3>Proposed project document update</h3>
+        <p class="draft-note">Review the proposed documents below, then approve to apply them (previous versions are saved in history) or reject to discard.</p>
+        <div id="detail-update-body"></div>
       </div>
       <h3>Acceptance checks</h3>
       <div id="detail-checks"></div>

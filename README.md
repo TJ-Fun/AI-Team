@@ -1,6 +1,6 @@
 # AI-Team
 
-Current application version: **0.75**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
+Current application version: **0.76**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
 
 The web client is served from `static/` (`index.html`, `app.js`, `style.css`, and ES modules under `js/`). The server keeps application data and logs under `TEAM_DATA_DIR` (default: `data/`).
 

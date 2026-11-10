@@ -1,5 +1,12 @@
 # Version log
 
+## 0.76 — 2026-11-10
+
+- Completed the on-demand project-context feature with the frontend: **Update docs** and **Update roadmap** buttons in the board header create the corresponding PM/PO update tasks for the active project.
+- Task detail now shows a "Proposed project document update" section for `doc_update`/`roadmap_update` tasks (read-only document previews plus the active phase for roadmap updates) with **Approve and apply** / **Reject** actions wired to `POST /api/tasks/{id}/doc-update-decision`.
+- The project context dialog already lists `master_plan` and phase documents since the context-documents API returns them; roadmap docs are editable and versioned like the other documents.
+- Updated documentation to 0.76.
+
 ## 0.75 — 2026-11-10
 
 - Added two approval-gated PM/PO update task types: **Update project documentation** (`doc_update`) and **Update roadmap** (`roadmap_update`), created via `POST /api/doc-updates` with `kind` = `docs` or `roadmap`.

@@ -48,7 +48,7 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
     const providerFeedback = $("#detail-provider-feedback");
     if (providerRow && providerSelect) {
       const showProviderRow =
-        !["clarification_question", "project_overview", "design_review", "pm_escalation"].includes(task.task_type);
+        !["clarification_question", "project_overview", "design_review", "pm_escalation", "doc_update", "roadmap_update"].includes(task.task_type);
       providerRow.hidden = !showProviderRow;
       if (showProviderRow) {
         const canChange = !["In progress", "Done", "Canceled"].includes(task.status);
@@ -219,6 +219,37 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
       ovSec.hidden = true;
     }
 
+    // Project document / roadmap update section
+    const updSec = $("#detail-update-section");
+    const isUpdateTask = ["doc_update", "roadmap_update"].includes(task.task_type);
+    if (isUpdateTask && task.update_payload) {
+      updSec.hidden = false;
+      const payload = task.update_payload;
+      const entries =
+        task.task_type === "doc_update"
+          ? Object.entries(payload.documents || {})
+          : [
+              ["master_plan", payload.master_plan || ""],
+              ...Object.entries(payload.phases || {}),
+            ];
+      const meta =
+        task.task_type === "roadmap_update" && payload.active_phase != null
+          ? `<p class="draft-note"><strong>Active phase:</strong> ${escapeHtml(String(payload.active_phase))}</p>`
+          : "";
+      $("#detail-update-body").innerHTML =
+        meta +
+        entries
+          .map(
+            ([slug, content]) => `
+            <label class="overview-field">${escapeHtml(slug)}
+              <textarea rows="8" readonly>${escapeHtml(content)}</textarea>
+            </label>`
+          )
+          .join("");
+    } else {
+      updSec.hidden = true;
+    }
+
     // Acceptance checks
     const checks = task.acceptance_checks || [];
     $("#detail-checks").innerHTML = checks.length
@@ -352,6 +383,11 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
         <button class="secondary" type="button" data-overview-action="save">Save edits</button>
         <button class="primary" type="button" data-overview-action="approve">Approve and update Project context</button>`;
     }
+    if (["doc_update", "roadmap_update"].includes(task.task_type) && task.status === "Needs approval") {
+      actionHtml += `
+        <button class="secondary" type="button" data-update-decision="reject">Reject</button>
+        <button class="primary" type="button" data-update-decision="approve">Approve and apply</button>`;
+    }
     if (task.status === "Needs approval" && task.merge_approval_required && task.pull_request) {
       actionHtml += `<button class="primary" type="button" data-merge-approve="1">Approve merge</button>`;
     }
@@ -479,6 +515,33 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
         await refreshBoard();
       } catch (err) {
         appAlert(err.message);
+      }
+      return;
+    }
+
+    const updBtn = e.target.closest("[data-update-decision]");
+    if (updBtn) {
+      const decision = updBtn.getAttribute("data-update-decision");
+      if (
+        decision === "approve" &&
+        !(await appConfirm(
+          "Approve this update and apply it to the project documents? Previous versions are saved in history.",
+          { title: "Approve update" }
+        ))
+      ) {
+        return;
+      }
+      updBtn.disabled = true;
+      try {
+        await api(`/api/tasks/${encodeURIComponent(task.id)}/doc-update-decision`, {
+          method: "POST",
+          body: JSON.stringify({ decision }),
+        });
+        await refreshBoard();
+      } catch (err) {
+        appAlert(err.message);
+      } finally {
+        updBtn.disabled = false;
       }
       return;
     }
