@@ -12,6 +12,7 @@ from pathlib import Path as _Path
 
 from ait import common  # noqa: F401
 from ait import chat  # noqa: F401
+from ait import git_app_sync  # noqa: F401
 from ait import git_github_api  # noqa: F401
 from ait import git_local_ops  # noqa: F401
 from ait import git_ops  # noqa: F401
@@ -39,6 +40,7 @@ _DOMAIN_MODULES = (
     secrets,
     prompts,
     projects,
+    git_app_sync,
     git_github_api,
     git_local_ops,
     git_ops,

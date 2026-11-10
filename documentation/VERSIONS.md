@@ -1,5 +1,11 @@
 # Version log
 
+## 0.70 — 2026-11-10
+
+- Continued splitting `ait/git_ops.py`: moved app checkout update, mirror sync, and service restart helpers (`update_app_checkout`, `mirror_path_protected`, `sync_app_files`, `restart_service_process`, plus `MIRROR_IGNORED_DIRECTORIES`/`MIRROR_PROTECTED_ROOTS` constants) into the new `ait/git_app_sync.py` module.
+- Registered in `ait/__init__.py`; flat-namespace injection keeps all callers unchanged. No behavior change.
+- Updated documentation to 0.70.
+
 ## 0.69 — 2026-11-10
 
 - Continued splitting `ait/git_ops.py`: moved local git operations, clone-job tracking, and local file viewer helpers (`git_project_path`, `git_auth_environment`, `redact_git_output`, `git_status`, `git_pull`, `git_push`, `git_clone`, `start_git_clone`, `get_git_clone_job`, `update_clone_job`, `append_clone_job_output`, `resolve_local_view_path`, `local_file_listing`, `read_local_text_file`, `local_project_root`) into the new `ait/git_local_ops.py` module.
