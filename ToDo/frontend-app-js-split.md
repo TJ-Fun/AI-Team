@@ -1,6 +1,6 @@
 # Frontend `app.js` split — refactoring tracker
 
-Status: **Phase 6 complete** in version **0.54**. Next phase: **Phase 7 — settings orchestration + final bootstrap**.
+Status: **All phases complete** in version **0.55**. The `app.js` split is finished.
 Last updated: 2026-11-10
 
 ## Goal
@@ -9,13 +9,14 @@ Split `static/app.js` into smaller ES modules without changing behavior. Work mu
 
 ## Current state
 
-- `static/app.js` is an ES module entry point. It imports shared helpers from `static/js/core.js`, initializes Phase 2/3/4 feature modules, and still contains the remaining feature code inside the existing IIFE.
+- `static/app.js` is an ES module entry point containing only module imports, feature-module initialization, cross-feature callback wiring, and boot/polling startup (no IIFE, no feature code).
 - `static/js/core.js` contains shared frontend primitives: `state`, `$`, `escapeHtml`, `api`, app dialog helpers, update-progress helper, and formatting/date helpers.
 - `static/js/prompts.js`, `static/js/project-context.js`, and `static/js/repository-viewer.js` contain the Phase 2 dialog modules and export `initX()` functions used by `app.js`.
 - `static/js/header.js`, `static/js/providers.js`, and `static/js/project-settings.js` contain the Phase 3 header/provider/project-settings modules; `app.js` passes `refreshStatus()`/`refreshBoard()` callbacks into the provider/project-settings initializers.
 - `static/js/task-utils.js`, `static/js/project-selectors.js`, `static/js/task-board.js`, and `static/js/task-dialog.js` contain the Phase 4 task selector/board/dialog modules; `app.js` shares a `featureContext` for cross-module callbacks and passes `refreshBoard()` into providers/project-settings/task-dialog.
 - `static/js/task-detail.js` contains the Phase 5 task detail module; `app.js` initializes it with `refreshBoard`, `loadChat`, `populateProviderSelects`, and `openTaskDialog`, and exposes `openTaskDetail`/`renderTaskDetailContent` through `featureContext`.
 - `static/js/notifications.js`, `static/js/statistics.js`, and `static/js/chat.js` contain the Phase 6 modules; `app.js` initializes them with `refreshBoard`/`openTaskDetail`/`loadChat` wired through `featureContext`.
+- `static/js/settings.js` contains the Phase 7 settings module; `app.js` is now pure module wiring plus boot/polling startup (no IIFE).
 - `static/index.html` loads `app.js` with `type="module"`.
 - The Python server serves `/static/*` assets safely, including future files under `static/js/`.
 
@@ -155,21 +156,31 @@ Verification already run:
 - Line-count and boundary verification of extracted module bodies against the removed `app.js` sections
 - Node smoke test evaluating `app.js` with DOM stubs (no ReferenceError)
 
+## Phase 7 — completed
+
+What was done:
+
+- Extracted `static/js/settings.js` (settings dialog tab switching, app config save, logs viewer/clear, restart, and app update) from `app.js`.
+- `settings.js` exports `initSettings({ loadProjectsIntoSettings, reloadSettingsData, setConnectionsSuccess, loadAgentPrompts, openDocumentationFile })`.
+- Removed the IIFE from `app.js`; it is now pure module wiring (context creation, module initialization, cross-feature callback wiring) plus boot/polling startup.
+- Updated README/project documentation and bumped version to **0.55**.
+
+How it was done:
+
+- Moved the Settings Dialog section without changing behavior, API endpoints, or HTML IDs; the extracted body is byte-identical to the removed code.
+- `app.js` no longer imports `core.js` helpers directly — all feature code lives in modules.
+
+Verification already run:
+
+- `node --check static/app.js`
+- `node --check static/js/*.js`
+- `git diff --check`
+- Identifier scan confirming `settings.js` uses only its imports and context params
+- Node smoke test evaluating `app.js` with DOM stubs (no ReferenceError)
+
 ## Remaining phases
 
-### Phase 7 — settings orchestration + final bootstrap
-
-Extract `settings.js` and reduce `static/app.js` to:
-
-- context creation,
-- module initialization,
-- cross-feature callback wiring,
-- boot/polling startup.
-
-How:
-
-- Remove the temporary IIFE once all feature modules are extracted.
-- Update documentation/version again if this is released as a separate version.
+None — the split is complete.
 
 ## Progress checklist
 
@@ -179,7 +190,7 @@ How:
 - [x] Phase 4 — project selectors, task board, task dialog
 - [x] Phase 5 — task detail
 - [x] Phase 6 — notifications, statistics, chat
-- [ ] Phase 7 — settings orchestration + final bootstrap/docs
+- [x] Phase 7 — settings orchestration + final bootstrap/docs
 
 ## Resume after interruption
 

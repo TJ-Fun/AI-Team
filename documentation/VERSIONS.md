@@ -1,5 +1,11 @@
 # Version log
 
+## 0.55 — 2026-11-10
+
+- Completed the frontend modularization: extracted the settings dialog (tab switching, app config save, logs viewer/clear, restart, and app update) from `static/app.js` into `static/js/settings.js`, and removed the IIFE so `app.js` is now pure module wiring plus boot/polling startup.
+- `app.js` initializes all feature modules and passes shared callbacks (`refreshBoard`, `loadChat`, `openTaskDetail`, provider/project-settings helpers, `openDocumentationFile`) through `featureContext` and initializer parameters; behavior, API endpoints, and HTML IDs are unchanged.
+- Updated documentation to 0.55.
+
 ## 0.54 — 2026-11-10
 
 - Continued the frontend modularization: extracted notifications (including the app-update action), provider statistics/quality rendering and reset, and the PM/PO chat from `static/app.js` into `static/js/notifications.js`, `static/js/statistics.js`, and `static/js/chat.js`.
