@@ -1,6 +1,6 @@
 # Frontend `app.js` split — refactoring tracker
 
-Status: **Phase 2 complete** in version **0.49**. Next phase: **Phase 3 — providers, header/status, project settings**.
+Status: **Phase 3 complete** in version **0.50**. Next phase: **Phase 4 — task board, selectors, task dialog**.
 Last updated: 2026-11-10
 
 ## Goal
@@ -9,9 +9,10 @@ Split `static/app.js` into smaller ES modules without changing behavior. Work mu
 
 ## Current state
 
-- `static/app.js` is an ES module entry point. It imports shared helpers from `static/js/core.js`, initializes Phase 2 feature modules, and still contains the remaining feature code inside the existing IIFE.
+- `static/app.js` is an ES module entry point. It imports shared helpers from `static/js/core.js`, initializes Phase 2/3 feature modules, and still contains the remaining feature code inside the existing IIFE.
 - `static/js/core.js` contains shared frontend primitives: `state`, `$`, `escapeHtml`, `api`, app dialog helpers, update-progress helper, and formatting/date helpers.
-- `static/js/prompts.js`, `static/js/project-context.js`, and `static/js/repository-viewer.js` contain the extracted dialog modules and export `initX()` functions used by `app.js`.
+- `static/js/prompts.js`, `static/js/project-context.js`, and `static/js/repository-viewer.js` contain the Phase 2 dialog modules and export `initX()` functions used by `app.js`.
+- `static/js/header.js`, `static/js/providers.js`, and `static/js/project-settings.js` contain the Phase 3 header/provider/project-settings modules; `app.js` passes `refreshStatus()`/`refreshBoard()` callbacks into the provider/project-settings initializers.
 - `static/index.html` loads `app.js` with `type="module"`.
 - The Python server serves `/static/*` assets safely, including future files under `static/js/`.
 
@@ -60,20 +61,30 @@ Verification already run:
 - `git diff --check`
 - Local HTTP smoke test for `/static/app.js` and all `static/js/*.js` modules
 
+## Phase 3 — completed
+
+What was done:
+
+- Extracted `static/js/header.js`, `static/js/providers.js`, and `static/js/project-settings.js` from `app.js`.
+- `header.js` exports `loadConfig(providers)` and `refreshStatus()`; `app.js` passes the providers API into `loadConfig`.
+- `providers.js` exports `initProviders({ refreshStatus, refreshBoard })` and returns provider/routing/chat-select helpers used by `app.js` and `header.js`.
+- `project-settings.js` exports `initProjectSettings({ refreshBoard })` and returns `loadProjectsIntoSettings`.
+- Updated README/project documentation and bumped version to **0.50**.
+
+How it was done:
+
+- Moved the Header & Status, Connections/Routing, and Projects & Sub-projects sections without changing behavior, API endpoints, or HTML IDs.
+- Avoided circular imports by injecting `refreshStatus()`/`refreshBoard()` callbacks and passing the providers API into `loadConfig`.
+- Kept shared mutable state in `core.js`; modules mutate the same `state` object.
+
+Verification already run:
+
+- `node --check static/app.js`
+- `node --check static/js/*.js`
+- `git diff --check`
+- Local HTTP smoke test for `/static/app.js` and all `static/js/*.js` modules
+
 ## Remaining phases
-
-### Phase 3 — providers, header/status, project settings
-
-Extract:
-
-- `providers.js` — connections, routing, provider models, chat provider/model selects.
-- `header.js` — config/status header rendering.
-- `project-settings.js` — projects/modules editor and git actions.
-
-How:
-
-- Use injected callbacks for cross-feature calls such as `refreshStatus()` and `refreshBoard()`.
-- Avoid direct circular imports between providers/header/task modules.
 
 ### Phase 4 — task board, selectors, task dialog
 
@@ -130,7 +141,7 @@ How:
 
 - [x] Phase 1 — module infrastructure + `core.js`
 - [x] Phase 2 — prompts, project context, repository viewer
-- [ ] Phase 3 — providers, header/status, project settings
+- [x] Phase 3 — providers, header/status, project settings
 - [ ] Phase 4 — project selectors, task board, task dialog
 - [ ] Phase 5 — task detail
 - [ ] Phase 6 — notifications, statistics, chat

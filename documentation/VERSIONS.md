@@ -1,5 +1,11 @@
 # Version log
 
+## 0.50 — 2026-11-10
+
+- Continued the frontend modularization: extracted header/status rendering, provider connections/routing/model selects, and the projects/modules editor with Git actions from `static/app.js` into `static/js/header.js`, `static/js/providers.js`, and `static/js/project-settings.js`.
+- `app.js` now initializes those modules and passes `refreshStatus()`/`refreshBoard()` callbacks plus the providers API where needed; behavior, API endpoints, and HTML IDs are unchanged.
+- Updated documentation to 0.50.
+
 ## 0.49 — 2026-11-10
 
 - Continued the frontend modularization: extracted the agent prompt editor, project context dialog, and local documentation/project file viewer from `static/app.js` into `static/js/prompts.js`, `static/js/project-context.js`, and `static/js/repository-viewer.js`.
