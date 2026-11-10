@@ -117,6 +117,11 @@ export function initNotifications({ refreshBoard, openTaskDetail } = {}) {
           app_working_dir: cfg.app_working_dir,
         }),
       });
+      if (res.up_to_date) {
+        progress?.finish(res.message || "Up to Date");
+        appAlert(`${res.message || "Up to Date"} (current: ${res.current || "unknown"}, latest: ${res.latest || "unknown"})`, "App up to date");
+        return;
+      }
       progress?.copyingDone("Update files installed. Restarting the service…");
       const statusShim = { textContent: "", className: "" };
       await waitForAppRestart(statusShim, res.message || "Update complete.", "update-status", progress);

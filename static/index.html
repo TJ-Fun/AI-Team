@@ -349,7 +349,7 @@
         </div>
         <div class="settings-section">
           <h3>App Update</h3>
-          <p class="draft-note">Fetch the repository into a local checkout, copy files newer than the deployed versions, then restart the service. Files that are newer in the app working directory are kept; files not present in the repository are not deleted.</p>
+          <p class="draft-note">Update compares the current version with the repository and only proceeds when a newer version is available. Repair always replaces the app with a fresh copy of the repository. Both mirror the repository into the app working directory, removing stale files, then restart the service.</p>
           <label>App GitHub repository URL
             <input id="app-repo-url" type="text" placeholder="https://github.com/user/repo">
           </label>
@@ -362,6 +362,7 @@
           <button type="button" class="secondary" id="save-app-config">Save configuration</button>
           <div class="app-update-actions">
             <button type="button" class="primary" id="update-app">Update App</button>
+            <button type="button" class="secondary" id="repair-app">Repair App</button>
             <button type="button" class="danger" id="restart-app">Restart App</button>
           </div>
           <div class="update-progress" id="update-progress" hidden>

@@ -1,5 +1,12 @@
 # Version log
 
+## 0.67 — 2026-11-10
+
+- Added the **Repair App** button next to **Update App** in Settings → About. Repair always replaces the app with a fresh mirror of the configured repository (clone + sync + restart), regardless of version.
+- **Update App** now shows "Up to Date" (with current/latest versions) when the remote version is not newer, instead of reinstalling; the notification-triggered update handles the same response.
+- Updated the App Update section description to match the mirror-sync behavior. No backend behavior change.
+- Updated documentation to 0.67.
+
 ## 0.66 — 2026-11-10
 
 - Added a version gate to `POST /api/settings/update`: `mode=update` (default) now compares the current app version with the remote repository version first. If the remote version is the same or older, the endpoint returns `{"up_to_date": true, "message": "Up to Date"}` without cloning or restarting. A new `mode=repair` skips the check and always performs the fresh clone + mirror sync + restart.

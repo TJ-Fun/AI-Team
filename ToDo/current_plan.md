@@ -1,6 +1,6 @@
 # Update App version gate + Repair App — plan
 
-Status: **Batch 1 complete** (2026-11-10). Next: Batch 2 — frontend.
+Status: **Batch 2 complete** (2026-11-10). Next: Batch 3 — wrap-up.
 
 ## Goal
 

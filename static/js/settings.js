@@ -196,8 +196,8 @@ export function initSettings({ loadProjectsIntoSettings, reloadSettingsData, set
     }
   });
 
-  // Update app
-  $("#update-app")?.addEventListener("click", async () => {
+  // Update / Repair app
+  async function runAppSync(mode) {
     const appRepo = $("#app-repo-url")?.value?.trim();
     const appCloneDir = $("#app-clone-dir")?.value?.trim();
     const appWorkingDir = $("#app-working-dir")?.value?.trim();
@@ -205,15 +205,19 @@ export function initSettings({ loadProjectsIntoSettings, reloadSettingsData, set
       appAlert("Please fill in the app repository URL and local checkout directory.", "Update not configured");
       return;
     }
-    if (!(await appConfirm(`Update ${appRepo} in ${appCloneDir}, copy newer files into ${appWorkingDir}, and restart the app?`, { title: "Update app" }))) return;
+    const isRepair = mode === "repair";
+    const confirmText = isRepair
+      ? `Replace ${appRepo} in ${appCloneDir}, mirror it into ${appWorkingDir} (removing stale files), and restart the app?`
+      : `Update ${appRepo} in ${appCloneDir}, mirror it into ${appWorkingDir} (removing stale files), and restart the app?`;
+    if (!(await appConfirm(confirmText, { title: isRepair ? "Repair app" : "Update app" }))) return;
     const statusEl = $("#update-status");
-    const updateButton = $("#update-app");
+    const button = isRepair ? $("#repair-app") : $("#update-app");
     const progressWrap = $("#update-progress");
     const progress = createUpdateProgress($("#update-progress-bar"), $("#update-progress-label"));
-    updateButton.disabled = true;
+    button.disabled = true;
     if (progressWrap) progressWrap.hidden = false;
-    progress?.begin("Preparing update…");
-    statusEl.textContent = "Updating…";
+    progress?.begin(isRepair ? "Preparing repair…" : "Preparing update…");
+    statusEl.textContent = isRepair ? "Repairing…" : "Updating…";
     statusEl.className = "update-status info";
     try {
       const res = await api("/api/settings/update", {
@@ -222,18 +226,28 @@ export function initSettings({ loadProjectsIntoSettings, reloadSettingsData, set
           app_repo: appRepo,
           app_clone_dir: appCloneDir,
           app_working_dir: appWorkingDir,
+          mode,
         }),
       });
+      if (res.up_to_date) {
+        progress?.finish(res.message || "Up to Date");
+        statusEl.textContent = `${res.message || "Up to Date"} (current: ${res.current || "unknown"}, latest: ${res.latest || "unknown"})`;
+        statusEl.className = "update-status success";
+        return;
+      }
       progress?.copyingDone(`${res.message} Restarting the service…`);
       statusEl.textContent = `${res.message} Restarting the service…`;
       statusEl.className = "update-status success";
       await waitForAppRestart(statusEl, res.message, "update-status", progress);
     } catch (err) {
-      progress?.fail(`Update failed: ${err.message}`);
-      statusEl.textContent = `Update failed: ${err.message}`;
+      progress?.fail(`${isRepair ? "Repair" : "Update"} failed: ${err.message}`);
+      statusEl.textContent = `${isRepair ? "Repair" : "Update"} failed: ${err.message}`;
       statusEl.className = "update-status error";
     } finally {
-      updateButton.disabled = false;
+      button.disabled = false;
     }
-  });
+  }
+
+  $("#update-app")?.addEventListener("click", () => runAppSync("update"));
+  $("#repair-app")?.addEventListener("click", () => runAppSync("repair"));
 }
