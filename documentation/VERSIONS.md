@@ -1,5 +1,11 @@
 # Version log
 
+## 0.49 — 2026-11-10
+
+- Continued the frontend modularization: extracted the agent prompt editor, project context dialog, and local documentation/project file viewer from `static/app.js` into `static/js/prompts.js`, `static/js/project-context.js`, and `static/js/repository-viewer.js`.
+- `app.js` now initializes those modules and uses their exported APIs; behavior, API endpoints, and HTML IDs are unchanged.
+- Updated documentation to 0.49.
+
 ## 0.48 — 2026-11-10
 
 - Fixed app updates failing when the configured app checkout could not fast-forward after a remote force-update or divergence: the updater now fetches `origin` and hard-resets the dedicated checkout to its tracked remote branch before copying files, while leaving other pull failures unchanged.

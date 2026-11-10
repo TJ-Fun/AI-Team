@@ -1,16 +1,17 @@
 # Frontend `app.js` split — refactoring tracker
 
-Status: **Phase 1 complete** in version **0.47**. Next phase: **Phase 2 — low-coupling dialogs**.
+Status: **Phase 2 complete** in version **0.49**. Next phase: **Phase 3 — providers, header/status, project settings**.
 Last updated: 2026-11-10
 
 ## Goal
 
 Split `static/app.js` into smaller ES modules without changing behavior. Work must stay in small, independently verifiable batches so the refactor can be interrupted and resumed safely.
 
-## Current state after Phase 1
+## Current state
 
-- `static/app.js` is now an ES module entry point. It imports shared helpers from `static/js/core.js` and still contains the remaining feature code inside the existing IIFE.
+- `static/app.js` is an ES module entry point. It imports shared helpers from `static/js/core.js`, initializes Phase 2 feature modules, and still contains the remaining feature code inside the existing IIFE.
 - `static/js/core.js` contains shared frontend primitives: `state`, `$`, `escapeHtml`, `api`, app dialog helpers, update-progress helper, and formatting/date helpers.
+- `static/js/prompts.js`, `static/js/project-context.js`, and `static/js/repository-viewer.js` contain the extracted dialog modules and export `initX()` functions used by `app.js`.
 - `static/index.html` loads `app.js` with `type="module"`.
 - The Python server serves `/static/*` assets safely, including future files under `static/js/`.
 
@@ -38,22 +39,28 @@ Verification already run:
 - `git diff --check`
 - Static resolver smoke test for `js/core.js` and blocked `../secret.js`
 
+## Phase 2 — completed
+
+What was done:
+
+- Extracted `static/js/prompts.js`, `static/js/project-context.js`, and `static/js/repository-viewer.js` from `app.js`.
+- Each module imports shared helpers from `./core.js` and exports an `initX()` function; `app.js` initializes them inside the existing IIFE and uses returned APIs (`loadAgentPrompts`, `openRepositoryView`, `openDocumentationFile`).
+- Updated README/project documentation and bumped version to **0.49**.
+
+How it was done:
+
+- Moved the Agent Prompts, Project Context Dialog, and Local Documentation/Project Files sections without changing behavior, API endpoints, or HTML IDs.
+- Kept shared mutable state in `core.js`; modules mutate the same `state` object.
+- Verified extracted bodies match the original `app.js` sections exactly and that `app.js` equals the expected transformation.
+
+Verification already run:
+
+- `node --check static/app.js`
+- `node --check static/js/*.js`
+- `git diff --check`
+- Local HTTP smoke test for `/static/app.js` and all `static/js/*.js` modules
+
 ## Remaining phases
-
-### Phase 2 — low-coupling dialogs
-
-Extract self-contained feature modules:
-
-- `prompts.js` — agent prompt editor.
-- `project-context.js` — project context documents/history.
-- `repository-viewer.js` — documentation/local file viewer.
-
-How:
-
-- Move each section from `app.js` into `static/js/*.js`.
-- Import shared helpers from `./core.js`.
-- Register DOM listeners inside `initX(context)` functions or keep temporary local wiring until the final bootstrap phase.
-- Keep behavior unchanged; do not rename APIs or alter HTML IDs.
 
 ### Phase 3 — providers, header/status, project settings
 
@@ -122,7 +129,7 @@ How:
 ## Progress checklist
 
 - [x] Phase 1 — module infrastructure + `core.js`
-- [ ] Phase 2 — prompts, project context, repository viewer
+- [x] Phase 2 — prompts, project context, repository viewer
 - [ ] Phase 3 — providers, header/status, project settings
 - [ ] Phase 4 — project selectors, task board, task dialog
 - [ ] Phase 5 — task detail
