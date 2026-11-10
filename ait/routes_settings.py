@@ -181,7 +181,30 @@ def handle_settings_post(handler, path, body) -> bool:
         if not re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?", app_repo):
             handler.send_json({"error": "Invalid GitHub repository URL."}, HTTPStatus.BAD_REQUEST)
             return True
-        
+
+        mode = str(body.get("mode", "update")).strip().lower()
+        if mode not in ("update", "repair"):
+            handler.send_json({"error": "Unknown update mode."}, HTTPStatus.BAD_REQUEST)
+            return True
+        if mode == "update":
+            status = app_update_status(force=True)
+            if status.get("error") or not status.get("latest"):
+                detail = str(status.get("error") or "remote version could not be determined")
+                logger.error("App update blocked: version check failed: %s", detail)
+                append_event({"at": now_iso(), "type": "app_update_check_failed", "error": detail[:300]})
+                handler.send_json({"error": f"Could not check for updates: {detail}"}, HTTPStatus.BAD_GATEWAY)
+                return True
+            if not status.get("update_available"):
+                handler.send_json(
+                    {
+                        "up_to_date": True,
+                        "current": status.get("current"),
+                        "latest": status.get("latest"),
+                        "message": "Up to Date",
+                    }
+                )
+                return True
+
         try:
             logger.info(
                 "App update requested: repo=%s checkout=%s working_dir=%s",

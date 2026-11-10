@@ -198,6 +198,16 @@ def get_notifications() -> list[dict[str, Any]]:
         )
 
     upd = app_update_status()
+    if upd.get("error"):
+        items.append(
+            {
+                "id": "app:update:check-error",
+                "kind": "app_update",
+                "severity": "medium",
+                "title": "App update check failed",
+                "message": str(upd.get("error"))[:300],
+            }
+        )
     if upd.get("update_available"):
         items.append(
             {

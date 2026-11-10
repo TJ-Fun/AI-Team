@@ -1,5 +1,11 @@
 # Version log
 
+## 0.66 — 2026-11-10
+
+- Added a version gate to `POST /api/settings/update`: `mode=update` (default) now compares the current app version with the remote repository version first. If the remote version is the same or older, the endpoint returns `{"up_to_date": true, "message": "Up to Date"}` without cloning or restarting. A new `mode=repair` skips the check and always performs the fresh clone + mirror sync + restart.
+- If the version check fails, the update is blocked with an error, the failure is logged and recorded as an `app_update_check_failed` event, and a notification is raised via `get_notifications()`.
+- Updated documentation to 0.66.
+
 ## 0.65 — 2026-11-10
 
 - Completed the `ait/http_handler.py` split: consolidated the per-route dispatch calls into one call per route module in each HTTP method, leaving `http_handler.py` as a thin dispatcher plus the chat routes (which share global state).
