@@ -1,5 +1,11 @@
 # Version log
 
+## 0.59 — 2026-11-10
+
+- Completed the `ait/providers.py` split: moved the remaining PM planning and escalation handling into the new `ait/pm_planning.py` module and deleted `ait/providers.py`.
+- The former monolith is now four focused modules: `pm_planning.py`, `qa_review.py`, `provider_calls.py`, and `provider_dispatch.py`, all registered in `ait/__init__.py`. The flat-namespace injection keeps all cross-module calls unchanged. No behavior change.
+- Updated documentation to 0.59.
+
 ## 0.58 — 2026-11-10
 
 - Continued splitting `ait/providers.py`: moved project milestones, phase gating, deterministic validation, QA review instructions/parsing, work-reply envelope handling, and repo-agent instructions into the new `ait/qa_review.py` module.

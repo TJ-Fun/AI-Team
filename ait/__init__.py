@@ -18,9 +18,9 @@ from ait import main  # noqa: F401
 from ait import notifications  # noqa: F401
 from ait import projects  # noqa: F401
 from ait import prompts  # noqa: F401
+from ait import pm_planning  # noqa: F401
 from ait import provider_calls  # noqa: F401
 from ait import provider_dispatch  # noqa: F401
-from ait import providers  # noqa: F401
 from ait import qa_review  # noqa: F401
 from ait import provider_registry  # noqa: F401
 from ait import secrets  # noqa: F401
@@ -36,7 +36,7 @@ _DOMAIN_MODULES = (
     notifications,
     provider_calls,
     provider_dispatch,
-    providers,
+    pm_planning,
     qa_review,
     chat,
     http_handler,

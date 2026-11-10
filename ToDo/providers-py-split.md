@@ -1,6 +1,6 @@
 # `ait/providers.py` split — refactoring tracker
 
-Status: **Batch 3 complete** (2026-11-10). Next: Batch 4 — `pm_planning.py` + delete `providers.py`.
+Status: **complete** (2026-11-10). All batches done; `ait/providers.py` deleted and replaced by `pm_planning.py`, `qa_review.py`, `provider_calls.py`, and `provider_dispatch.py`.
 Last updated: 2026-11-10
 
 ## Goal
@@ -88,5 +88,5 @@ node --check static/app.js   # frontend untouched, sanity only
 - [x] Batch 1 — `provider_calls.py` (moved `call_gemini_task`, `normalize_github_repo_url`, `call_openai_compatible_task`, `test_provider_connection`, `list_provider_models`, `test_provider_model`, `retry_after_time`; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot)
 - [x] Batch 2 — `provider_dispatch.py` (moved auto ordering/selection, claim, dispatch, worker loops, watchdog, CI poll, activity status + `AUTO_ORDER_CACHE`/`AUTO_ORDER_TTL_SECONDS`/`ACTIVE_PROVIDER_COUNTS`/`PROVIDER_WORKER_LOCK`/`CI_POLL_INTERVAL_SECONDS`; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot)
 - [x] Batch 3 — `qa_review.py` (moved milestones, phase gating, deterministic validation, QA review, work-reply envelope, repo-agent instructions; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot)
-- [ ] Batch 4 — `pm_planning.py` + delete `providers.py`
-- [ ] Batch 5 — docs & version
+- [x] Batch 4 — `pm_planning.py` + delete `providers.py` (moved remaining PM planning/escalation functions; deleted `providers.py`; registered `pm_planning` in `ait/__init__.py`; verified compileall + namespace resolution + server boot)
+- [x] Batch 5 — docs & version (0.59)
