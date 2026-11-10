@@ -1,6 +1,6 @@
 # Frontend `app.js` split — refactoring tracker
 
-Status: **Phase 4 complete** in version **0.51**. Next phase: **Phase 5 — task detail**.
+Status: **Phase 5 complete** in version **0.53**. Next phase: **Phase 6 — notifications, statistics, chat**.
 Last updated: 2026-11-10
 
 ## Goal
@@ -14,6 +14,7 @@ Split `static/app.js` into smaller ES modules without changing behavior. Work mu
 - `static/js/prompts.js`, `static/js/project-context.js`, and `static/js/repository-viewer.js` contain the Phase 2 dialog modules and export `initX()` functions used by `app.js`.
 - `static/js/header.js`, `static/js/providers.js`, and `static/js/project-settings.js` contain the Phase 3 header/provider/project-settings modules; `app.js` passes `refreshStatus()`/`refreshBoard()` callbacks into the provider/project-settings initializers.
 - `static/js/task-utils.js`, `static/js/project-selectors.js`, `static/js/task-board.js`, and `static/js/task-dialog.js` contain the Phase 4 task selector/board/dialog modules; `app.js` shares a `featureContext` for cross-module callbacks and passes `refreshBoard()` into providers/project-settings/task-dialog.
+- `static/js/task-detail.js` contains the Phase 5 task detail module; `app.js` initializes it with `refreshBoard`, `loadChat`, `populateProviderSelects`, and `openTaskDialog`, and exposes `openTaskDetail`/`renderTaskDetailContent` through `featureContext`.
 - `static/index.html` loads `app.js` with `type="module"`.
 - The Python server serves `/static/*` assets safely, including future files under `static/js/`.
 
@@ -109,16 +110,28 @@ Verification already run:
 - Exact-match verification against pre-Phase4 `app.js` for all new modules and the `app.js` transformation
 - Local HTTP smoke test for `/static/app.js` and all `static/js/*.js` modules
 
+## Phase 5 — completed
+
+What was done:
+
+- Extracted `static/js/task-detail.js` from `app.js`: task detail rendering, provider selector change handling, and the detail-actions click handler (status transitions, delete, local sync retry, merge approval, project overview save/approve).
+- `task-detail.js` exports `initTaskDetail({ refreshBoard, loadChat, populateProviderSelects, openTaskDialog })` and returns `openTaskDetail`/`renderTaskDetailContent`; `app.js` assigns both into `featureContext` for the task board and notifications.
+- Updated README/project documentation and bumped version to **0.53**.
+
+How it was done:
+
+- Moved the Task Detail Dialog section without changing behavior, API endpoints, or HTML IDs; the extracted body is byte-identical to the removed code.
+- Kept shared mutable state in `core.js`; modules mutate the same `state` object.
+
+Verification already run:
+
+- `node --check static/app.js`
+- `node --check static/js/*.js`
+- `git diff --check`
+- Exact-match verification of the extracted module body against the removed `app.js` section
+- Node smoke test evaluating `app.js` with DOM stubs (no ReferenceError)
+
 ## Remaining phases
-
-### Phase 5 — task detail
-
-Extract `task-detail.js` from the largest remaining section.
-
-How:
-
-- Move task detail rendering and actions as one module first.
-- Only split it further later if needed; do not combine this with unrelated changes.
 
 ### Phase 6 — notifications, statistics, chat
 
@@ -153,7 +166,7 @@ How:
 - [x] Phase 2 — prompts, project context, repository viewer
 - [x] Phase 3 — providers, header/status, project settings
 - [x] Phase 4 — project selectors, task board, task dialog
-- [ ] Phase 5 — task detail
+- [x] Phase 5 — task detail
 - [ ] Phase 6 — notifications, statistics, chat
 - [ ] Phase 7 — settings orchestration + final bootstrap/docs
 

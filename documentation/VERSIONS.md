@@ -1,5 +1,11 @@
 # Version log
 
+## 0.53 — 2026-11-10
+
+- Continued the frontend modularization: extracted the task detail dialog (rendering, provider selector, status/delete/sync/merge/overview actions) from `static/app.js` into `static/js/task-detail.js`.
+- `app.js` initializes the module with `refreshBoard`, `loadChat`, `populateProviderSelects`, and `openTaskDialog` via the shared `featureContext`; behavior, API endpoints, and HTML IDs are unchanged.
+- Updated documentation to 0.53.
+
 ## 0.52 — 2026-11-10
 
 - Reworked the app self-update: the configured checkout is now always replaced with a fresh `git clone` of the repository (local modifications and untracked files in the checkout can no longer block the update), and the working directory is synced as an exact mirror — files are overwritten unconditionally and stale files/directories are removed, while `data/`, `.env*`, logs, virtualenvs, caches, and `.git` are protected.
