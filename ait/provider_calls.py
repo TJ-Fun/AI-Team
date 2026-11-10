@@ -5,7 +5,7 @@ from __future__ import annotations
 from ait.common import *
 
 
-def call_gemini_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def call_gemini_task(task: dict[str, Any], extra_context: str = "") -> tuple[str, dict[str, Any]]:
     api_key = get_provider_key("gemini")
     if not api_key:
         raise ProviderFailure("Gemini", 401, "Gemini API key is not configured.")
@@ -26,6 +26,8 @@ def call_gemini_task(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         prompt += "\n\n" + contract
     if (task.get("validation") or {}).get("status") == "failed":
         prompt += "\n\nPrevious attempt failed validation checks:\n" + json.dumps(task["validation"].get("checks", []), indent=2)
+    if extra_context:
+        prompt += "\n\n" + extra_context
 
     sys_inst = combined_agent_prompt(role) + (("\n\n" + contract) if contract else "")
     model = provider_model("Gemini")
@@ -73,7 +75,7 @@ def normalize_github_repo_url(raw_repo: str) -> str:
     return cleaned
 
 
-def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[str, str, dict[str, Any]]:
+def call_openai_compatible_task(task: dict[str, Any], provider: str, extra_context: str = "") -> tuple[str, str, dict[str, Any]]:
     cfg = openai_compat_config(provider)
     if not cfg:
         raise ProviderFailure(provider, 400, f"Unsupported provider: {provider}")
@@ -100,6 +102,8 @@ def call_openai_compatible_task(task: dict[str, Any], provider: str) -> tuple[st
         prompt += "\n\n" + contract
     if (task.get("validation") or {}).get("status") == "failed":
         prompt += "\n\nPrevious attempt failed validation checks:\n" + json.dumps(task["validation"].get("checks", []), indent=2)
+    if extra_context:
+        prompt += "\n\n" + extra_context
 
     payload: dict[str, Any] = {
         "model": model,

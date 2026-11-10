@@ -1,5 +1,12 @@
 # Version log
 
+## 0.73 — 2026-11-10
+
+- Added the `info_requests` mechanism for task dispatch: any agent reply (work envelope, repo manifest, PM planning, escalation, or QA review JSON) may include `"info_requests": ["slug", ...]` to pull project documents on demand.
+- New `ait/info_requests.py`: `extract_info_requests` validates slugs against the project document registry (unknown slugs ignored, deduplicated, capped at `INFO_REQUEST_MAX_DOCS`), `requested_documents_text` formats the provided documents, and `call_task_provider` runs the provider call with bounded follow-ups — the initial call plus up to `INFO_REQUEST_MAX_ROUNDS` (2) continuation calls. Requested documents are cached per attempt so an agent cannot loop on the same document, and each request round is logged (`info_documents_requested` event + app log).
+- `call_gemini_task` and `call_openai_compatible_task` accept an optional `extra_context` appended to the prompt; `dispatch_one_for_provider` now routes through `call_task_provider`.
+- Updated documentation to 0.73.
+
 ## 0.72 — 2026-11-10
 
 - Started the on-demand project-context rework: agents no longer receive every project document on each call. `project_context_for_role` now injects only the role's auto documents plus a compact **Project documents** map (slug, title, size, auto/on-request flag, one-line description, and the `active_phase` pointer when set).

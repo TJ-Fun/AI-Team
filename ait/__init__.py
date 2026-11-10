@@ -17,6 +17,7 @@ from ait import git_github_api  # noqa: F401
 from ait import git_local_ops  # noqa: F401
 from ait import git_task_postprocess  # noqa: F401
 from ait import http_handler  # noqa: F401
+from ait import info_requests  # noqa: F401
 from ait import main  # noqa: F401
 from ait import notifications  # noqa: F401
 from ait import projects  # noqa: F401
@@ -55,6 +56,7 @@ _DOMAIN_MODULES = (
     routes_settings,
     routes_tasks,
     chat,
+    info_requests,
     http_handler,
     main,
 )

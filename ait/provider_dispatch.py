@@ -195,11 +195,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
     bump_provider_activity(provider, 1)
 
     try:
-        if provider_kind(provider) == "gemini":
-            reply, meta = call_gemini_task(task)
-            actual_model = provider_model(provider)
-        else:
-            reply, actual_model, meta = call_openai_compatible_task(task, provider)
+        reply, actual_model, meta = call_task_provider(task, provider)
 
         if needs_work_reply_envelope(task):
             try:
