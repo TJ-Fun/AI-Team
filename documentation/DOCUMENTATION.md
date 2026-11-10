@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.47 · Updated 2026-11-10
+Version 0.48 · Updated 2026-11-10
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -77,7 +77,7 @@ The app checks the configured app repository for a newer version (parsed from `d
 The **Settings → About** section contains application update controls:
 
 1. Configure the repository URL and a local checkout directory, then save the configuration.
-2. On first update, the app clones to the checkout; later updates require the checkout's Git origin to match the configured repository and use a fast-forward-only pull.
+2. On first update, the app clones to the checkout; later updates require the checkout's Git origin to match the configured repository and normally use a fast-forward-only pull. If that pull cannot fast-forward because the remote branch was force-updated or diverged, the updater fetches `origin` and hard-resets the dedicated checkout to its tracked remote branch before copying files.
 3. The updater copies repository files into the configured app working directory. For each file, the newer modification time wins. It skips `.git`, virtual environments, caches, and `node_modules`; it does not delete deployment-only files.
 4. After the update response is sent, the process exits and systemd restarts it. The browser waits for the service to answer before reloading.
 

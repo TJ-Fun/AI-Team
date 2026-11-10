@@ -1,5 +1,10 @@
 # Version log
 
+## 0.48 — 2026-11-10
+
+- Fixed app updates failing when the configured app checkout could not fast-forward after a remote force-update or divergence: the updater now fetches `origin` and hard-resets the dedicated checkout to its tracked remote branch before copying files, while leaving other pull failures unchanged.
+- Updated documentation to 0.48.
+
 ## 0.47 — 2026-11-10
 
 - Started the frontend modularization: `static/app.js` is now an ES module entry point and shared state, API, dialog, update-progress, and formatting helpers moved to `static/js/core.js`.

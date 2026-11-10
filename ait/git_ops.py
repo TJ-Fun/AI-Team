@@ -153,6 +153,57 @@ def update_app_checkout(repository_url: str, checkout_path: Path, token: str) ->
         staging_path = Path(tempfile.mkdtemp(prefix=f".{checkout_path.name}.clone-", dir=checkout_path.parent))
         command = ["git", "clone", "--progress", repository_url, str(staging_path)]
 
+    def git_output(res: subprocess.CompletedProcess) -> str:
+        return "\n".join(part.strip() for part in (res.stdout, res.stderr) if part and part.strip())
+
+    def run_git(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess:
+        return subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=git_env)
+
+    def recover_pull() -> tuple[subprocess.CompletedProcess | None, str]:
+        try:
+            fetch = run_git(["git", "-C", str(checkout_path), "fetch", "origin"], timeout=300)
+        except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError) as exc:
+            return None, f"git fetch failed: {exc}"
+        if fetch.returncode:
+            detail = git_output(fetch) or f"git exited with status {fetch.returncode}"
+            return None, redact_git_output(detail, token)
+        try:
+            target = ""
+            upstream = run_git(["git", "-C", str(checkout_path), "rev-parse", "--abbrev-ref", "@{u}"], timeout=15)
+            if upstream.returncode == 0 and upstream.stdout.strip():
+                target = upstream.stdout.strip()
+            if not target:
+                symbolic = run_git(
+                    ["git", "-C", str(checkout_path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+                    timeout=15,
+                )
+                if symbolic.returncode == 0 and symbolic.stdout.strip():
+                    target = symbolic.stdout.strip()
+            if not target:
+                branch = run_git(["git", "-C", str(checkout_path), "rev-parse", "--abbrev-ref", "HEAD"], timeout=15)
+                if branch.returncode == 0:
+                    name = branch.stdout.strip()
+                    if name and name != "HEAD":
+                        target = f"origin/{name}"
+            if not target:
+                target = "origin/HEAD"
+            verify = run_git(["git", "-C", str(checkout_path), "rev-parse", "--verify", "--quiet", target], timeout=15)
+            if verify.returncode != 0:
+                for fallback in ("origin/main", "origin/master", "origin/HEAD"):
+                    verify = run_git(["git", "-C", str(checkout_path), "rev-parse", "--verify", "--quiet", fallback], timeout=15)
+                    if verify.returncode == 0:
+                        target = fallback
+                        break
+                else:
+                    return None, f"could not find a remote branch to reset to (tried {target})"
+            reset = run_git(["git", "-C", str(checkout_path), "reset", "--hard", target], timeout=300)
+        except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError) as exc:
+            return None, f"git reset failed: {exc}"
+        if reset.returncode:
+            detail = git_output(reset) or f"git exited with status {reset.returncode}"
+            return None, redact_git_output(detail, token)
+        return reset, target
+
     try:
         result = subprocess.run(
             command, capture_output=True, text=True, timeout=300, env=git_env,
@@ -174,12 +225,35 @@ def update_app_checkout(repository_url: str, checkout_path: Path, token: str) ->
             shutil.rmtree(staging_path, ignore_errors=True)
         raise ValueError("Git is not installed or is not available to the application service.") from exc
 
-    output = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part and part.strip())
+    output = git_output(result)
+    recovery_detail = ""
+    if result.returncode and operation == "pull":
+        lowered = output.lower()
+        needs_reset = any(
+            marker in lowered
+            for marker in (
+                "not possible to fast-forward",
+                "can't be fast-forwarded",
+                "cannot fast-forward",
+                "non-fast-forward",
+                "forced update",
+            )
+        )
+        if needs_reset:
+            recovered, recovery_detail = recover_pull()
+            if recovered is not None:
+                operation = "reset"
+                result = recovered
+                output = f"Reset checkout to remote branch after pull could not fast-forward.\n{git_output(result)}"
+            else:
+                logger.warning("App repository pull recovery failed: %s", recovery_detail)
     output = redact_git_output(output, token)
     if result.returncode:
         if staging_path is not None:
             shutil.rmtree(staging_path, ignore_errors=True)
         detail = output or f"git exited with status {result.returncode}"
+        if recovery_detail:
+            detail = f"{detail}; automatic checkout reset failed: {recovery_detail}"
         logger.error("App repository %s failed (exit=%s): %s", operation, result.returncode, detail)
         raise ValueError(f"Git {operation} failed: {detail}")
     if staging_path is not None:
