@@ -1,5 +1,11 @@
 # Version log
 
+## 0.62 — 2026-11-10
+
+- Continued splitting `ait/http_handler.py`: moved all Git operation API routes (clone job status, repository status, pull, push, clone) into the new `ait/routes_git.py` module.
+- `http_handler.py` now dispatches git routes to `handle_git_get/post`. No behavior change.
+- Updated documentation to 0.62.
+
 ## 0.61 — 2026-11-10
 
 - Continued splitting `ait/http_handler.py`: moved all project and project-context API routes (project list, GitHub/local file browsing, context documents, context history, restores, project save) into the new `ait/routes_projects.py` module.

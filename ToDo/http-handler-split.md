@@ -1,6 +1,6 @@
 # `ait/http_handler.py` split — refactoring tracker
 
-Status: **Batch 2 complete** (2026-11-10). Next: Batch 3 — `routes_git.py`.
+Status: **Batch 3 complete** (2026-11-10). Next: Batch 4 — `routes_settings.py`.
 Last updated: 2026-11-10
 
 ## Goal
@@ -95,7 +95,7 @@ python -c "import ait; print(hasattr(ait.routes_tasks, 'handle_tasks_post'))"
 
 - [x] Batch 1 — `routes_tasks.py` (moved task + pm-requests routes for GET/POST/PUT/DELETE; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot; `/api/status`, `/api/tasks`, `/api/tasks/{id}/replies` smoke-tested)
 - [x] Batch 2 — `routes_projects.py` (moved project + context-document routes for GET/POST/PUT/DELETE; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot; `/api/projects` smoke-tested)
-- [ ] Batch 3 — `routes_git.py`
+- [x] Batch 3 — `routes_git.py` (moved git clone job/status GET and git status/pull/push/clone POST; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot; `/api/git/{id}/status` smoke-tested)
 - [ ] Batch 4 — `routes_settings.py`
 - [ ] Batch 5 — `routes_providers.py`
 - [ ] Batch 6 — docs & version
