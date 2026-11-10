@@ -1,6 +1,6 @@
 # Frontend `app.js` split — refactoring tracker
 
-Status: **Phase 5 complete** in version **0.53**. Next phase: **Phase 6 — notifications, statistics, chat**.
+Status: **Phase 6 complete** in version **0.54**. Next phase: **Phase 7 — settings orchestration + final bootstrap**.
 Last updated: 2026-11-10
 
 ## Goal
@@ -15,6 +15,7 @@ Split `static/app.js` into smaller ES modules without changing behavior. Work mu
 - `static/js/header.js`, `static/js/providers.js`, and `static/js/project-settings.js` contain the Phase 3 header/provider/project-settings modules; `app.js` passes `refreshStatus()`/`refreshBoard()` callbacks into the provider/project-settings initializers.
 - `static/js/task-utils.js`, `static/js/project-selectors.js`, `static/js/task-board.js`, and `static/js/task-dialog.js` contain the Phase 4 task selector/board/dialog modules; `app.js` shares a `featureContext` for cross-module callbacks and passes `refreshBoard()` into providers/project-settings/task-dialog.
 - `static/js/task-detail.js` contains the Phase 5 task detail module; `app.js` initializes it with `refreshBoard`, `loadChat`, `populateProviderSelects`, and `openTaskDialog`, and exposes `openTaskDetail`/`renderTaskDetailContent` through `featureContext`.
+- `static/js/notifications.js`, `static/js/statistics.js`, and `static/js/chat.js` contain the Phase 6 modules; `app.js` initializes them with `refreshBoard`/`openTaskDetail`/`loadChat` wired through `featureContext`.
 - `static/index.html` loads `app.js` with `type="module"`.
 - The Python server serves `/static/*` assets safely, including future files under `static/js/`.
 
@@ -131,20 +132,30 @@ Verification already run:
 - Exact-match verification of the extracted module body against the removed `app.js` section
 - Node smoke test evaluating `app.js` with DOM stubs (no ReferenceError)
 
+## Phase 6 — completed
+
+What was done:
+
+- Extracted `static/js/notifications.js` (notification rendering, dismiss/open-task actions, and the app-update flow), `static/js/statistics.js` (provider statistics/quality rendering and per-model reset), and `static/js/chat.js` (PM/PO chat rendering, send/plan/clear actions) from `app.js`.
+- `notifications.js` exports `initNotifications({ refreshBoard, openTaskDetail })`; `statistics.js` exports `initStatistics({ refreshBoard })`; `chat.js` exports `initChat({ refreshBoard })` and returns `loadChat`.
+- `app.js` initializes chat before task-detail so `loadChat` is available for the detail module, and assigns `renderNotifications`/`renderStatistics`/`loadChat` into `featureContext`.
+- Updated README/project documentation and bumped version to **0.54**.
+
+How it was done:
+
+- Moved the Notifications, Statistics Dialog, and PM/PO Chat sections without changing behavior, API endpoints, or HTML IDs; extracted bodies are byte-identical to the removed code.
+- Kept shared mutable state in `core.js`; modules mutate the same `state` object.
+- Trimmed now-unused imports from `app.js`.
+
+Verification already run:
+
+- `node --check static/app.js`
+- `node --check static/js/*.js`
+- `git diff --check`
+- Line-count and boundary verification of extracted module bodies against the removed `app.js` sections
+- Node smoke test evaluating `app.js` with DOM stubs (no ReferenceError)
+
 ## Remaining phases
-
-### Phase 6 — notifications, statistics, chat
-
-Extract:
-
-- `notifications.js`
-- `statistics.js`
-- `chat.js`
-
-How:
-
-- Wire `openTaskDetail()`, `refreshBoard()`, and update helpers through the shared context.
-- Keep notification update/app-update behavior unchanged.
 
 ### Phase 7 — settings orchestration + final bootstrap
 
@@ -167,7 +178,7 @@ How:
 - [x] Phase 3 — providers, header/status, project settings
 - [x] Phase 4 — project selectors, task board, task dialog
 - [x] Phase 5 — task detail
-- [ ] Phase 6 — notifications, statistics, chat
+- [x] Phase 6 — notifications, statistics, chat
 - [ ] Phase 7 — settings orchestration + final bootstrap/docs
 
 ## Resume after interruption

@@ -1,20 +1,11 @@
 import {
   $,
   escapeHtml,
-  state,
   api,
   appAlert,
   appConfirm,
-  appPrompt,
   waitForAppRestart,
   createUpdateProgress,
-  formatTime,
-  elapsedSeconds,
-  formatDuration,
-  slugify,
-  statusClass,
-  periodBucket,
-  matchesPeriod,
 } from "./js/core.js";
 import { initPrompts } from "./js/prompts.js";
 import { initProjectContext } from "./js/project-context.js";
@@ -22,20 +13,19 @@ import { initRepositoryViewer } from "./js/repository-viewer.js";
 import { loadConfig, refreshStatus } from "./js/header.js";
 import { initProviders } from "./js/providers.js";
 import { initProjectSettings } from "./js/project-settings.js";
-import { getAskedProvider } from "./js/task-utils.js";
 import { initProjectSelectors } from "./js/project-selectors.js";
 import { initTaskBoard } from "./js/task-board.js";
 import { initTaskDialog } from "./js/task-dialog.js";
 import { initTaskDetail } from "./js/task-detail.js";
+import { initNotifications } from "./js/notifications.js";
+import { initStatistics } from "./js/statistics.js";
+import { initChat } from "./js/chat.js";
 
 (() => {
   const { loadAgentPrompts } = initPrompts();
   initProjectContext();
   const { openRepositoryView, openDocumentationFile } = initRepositoryViewer();
   const featureContext = {
-    loadChat,
-    renderNotifications,
-    renderStatistics,
     openRepositoryView,
   };
   const projectSelectorsApi = initProjectSelectors(featureContext);
@@ -45,6 +35,9 @@ import { initTaskDetail } from "./js/task-detail.js";
   const { refreshBoard, renderTasks } = taskBoardApi;
   featureContext.refreshBoard = refreshBoard;
   featureContext.renderTasks = renderTasks;
+  const chatApi = initChat({ refreshBoard });
+  const { loadChat } = chatApi;
+  featureContext.loadChat = loadChat;
   const { openTaskDialog } = initTaskDialog({ refreshBoard });
   const providersApi = initProviders({ refreshStatus, refreshBoard });
   const { reloadSettingsData, setConnectionsSuccess, populateProviderSelects } = providersApi;
@@ -57,403 +50,10 @@ import { initTaskDetail } from "./js/task-detail.js";
   });
   featureContext.openTaskDetail = openTaskDetail;
   featureContext.renderTaskDetailContent = renderTaskDetailContent;
-
-  // --- Notifications ---
-  const notificationsDialog = $("#notifications-dialog");
-  let appUpdateInProgress = false;
-
-  function renderNotifications() {
-    const countEl = $("#notification-count");
-    const latestEl = $("#notification-latest-title");
-    const modalCountEl = $("#notification-modal-count");
-    const triggerEl = $("#open-notifications");
-    const listEl = $("#notification-list");
-    const items = state.notifications || [];
-    const updates = items.filter((i) => i.kind === "app_update").length;
-    const issues = items.length - updates;
-    const parts = [];
-    if (issues) parts.push(`${issues} ${issues === 1 ? "issue" : "issues"}`);
-    if (updates) parts.push(`${updates} ${updates === 1 ? "update" : "updates"}`);
-    const countLabel = parts.length ? parts.join(" · ") : "all clear";
-    const latestTitle = items[0]?.title || "All clear";
-
-    if (countEl) countEl.textContent = items.length ? String(items.length) : "All clear";
-    if (latestEl) latestEl.textContent = latestTitle;
-    if (modalCountEl) modalCountEl.textContent = `(${countLabel})`;
-    if (triggerEl) {
-      triggerEl.classList.toggle("has-issues", items.length > 0);
-      triggerEl.title = items.length > 0 ? `${latestTitle} — click to view all` : "No active issues";
-    }
-
-    if (!listEl) return;
-    if (appUpdateInProgress && listEl.querySelector(".update-progress")) return;
-    if (!items.length) {
-      listEl.innerHTML = `<p class="notification-empty">No current issues or provider suggestions.</p>`;
-      return;
-    }
-    listEl.innerHTML = items
-      .map(
-        (item) => `
-        <div class="notification notification-${escapeHtml(item.severity || "low")}">
-          <div>
-            <strong>${escapeHtml(item.title)}</strong>
-            <p>${escapeHtml(item.message)}</p>
-            ${item.action === "update" ? `<button type="button" class="notification-action" data-notification-action="update">Update now</button>` : ""}
-            ${item.task_id ? `<button type="button" class="notification-action" data-open-task="${escapeHtml(item.task_id)}">Open task</button>` : ""}
-          </div>
-          <button type="button" class="notification-dismiss" data-dismiss-notification="${escapeHtml(item.id)}" aria-label="Dismiss">×</button>
-        </div>`
-      )
-      .join("");
-  }
-
-  $("#open-notifications")?.addEventListener("click", () => {
-    renderNotifications();
-    if (notificationsDialog && !notificationsDialog.open) {
-      notificationsDialog.showModal();
-    }
-  });
-  $("#close-notifications")?.addEventListener("click", () => notificationsDialog?.close());
-  $("#close-notifications-footer")?.addEventListener("click", () => notificationsDialog?.close());
-
-  $("#notification-list")?.addEventListener("click", async (e) => {
-    const actionBtn = e.target.closest("[data-notification-action]");
-    if (actionBtn?.getAttribute("data-notification-action") === "update") {
-      await runAppUpdateFromNotification(actionBtn);
-      return;
-    }
-    const openBtn = e.target.closest("[data-open-task]");
-    if (openBtn) {
-      const taskId = openBtn.getAttribute("data-open-task");
-      notificationsDialog?.close();
-      void openTaskDetail(taskId);
-      return;
-    }
-    const btn = e.target.closest("[data-dismiss-notification]");
-    if (!btn) return;
-    const id = btn.getAttribute("data-dismiss-notification");
-    try {
-      await api(`/api/notifications/${encodeURIComponent(id)}`, { method: "DELETE" });
-      await refreshBoard();
-    } catch (err) {
-      appAlert(err.message);
-    }
-  });
-
-  async function runAppUpdateFromNotification(btn) {
-    btn.disabled = true;
-    const item = btn.closest(".notification");
-    let progressWrap = item ? item.querySelector(".update-progress") : null;
-    if (item && !progressWrap) {
-      progressWrap = document.createElement("div");
-      progressWrap.className = "update-progress";
-      progressWrap.innerHTML =
-        '<div class="update-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="update-progress-bar"></span></div>' +
-        '<p class="update-progress-label"></p>';
-      item.firstElementChild?.appendChild(progressWrap);
-    }
-    const progress = createUpdateProgress(
-      progressWrap?.querySelector(".update-progress-bar"),
-      progressWrap?.querySelector(".update-progress-label")
-    );
-    try {
-      const cfgRes = await api("/api/settings/config");
-      const cfg = cfgRes.config || {};
-      if (!cfg.app_repo || !cfg.app_clone_dir || !cfg.app_working_dir) {
-        appAlert("App update is not configured. Set the repository and directories in Settings → About first.", "Update unavailable");
-        return;
-      }
-      if (!(await appConfirm("Update the app to the latest version and restart?", { title: "Update app" }))) return;
-      appUpdateInProgress = true;
-      progress?.begin("Preparing update…");
-      const res = await api("/api/settings/update", {
-        method: "POST",
-        body: JSON.stringify({
-          app_repo: cfg.app_repo,
-          app_clone_dir: cfg.app_clone_dir,
-          app_working_dir: cfg.app_working_dir,
-        }),
-      });
-      progress?.copyingDone("Update files installed. Restarting the service…");
-      const statusShim = { textContent: "", className: "" };
-      await waitForAppRestart(statusShim, res.message || "Update complete.", "update-status", progress);
-    } catch (err) {
-      progress?.fail(`Update failed: ${err.message}`);
-      appAlert(`Update failed: ${err.message}`, "Update failed");
-    } finally {
-      appUpdateInProgress = false;
-      btn.disabled = false;
-    }
-  }
-
-  // --- Statistics Dialog ---
-  const statsDialog = $("#statistics-dialog");
-  const statPeriodSelect = $("#stat-period");
-
-  function renderStatistics() {
-    const period = statPeriodSelect?.value || "today";
-    const records = [];
-    for (const task of state.tasks) {
-      for (const att of task.attempts || []) {
-        if (att.provider) {
-          records.push({ ...att, requested_at: att.started_at || att.finished_at });
-        }
-      }
-    }
-    const bucket = periodBucket(period);
-    const applicableResets = (state.statResets || []).filter((r) => r.period === period && r.bucket === bucket);
-    const cutoff = new Map(applicableResets.map((r) => [`${r.provider}\0${r.model}`, r.reset_at]));
-    const metrics = new Map();
-    const ensure = (provider, model) => {
-      const k = `${provider}\0${model}`;
-      if (!metrics.has(k)) {
-        metrics.set(k, { provider, model, requests: 0, replies: 0, seconds: 0, timedReplies: 0 });
-      }
-      return metrics.get(k);
-    };
-
-    for (const r of records) if (r.provider) ensure(r.provider, r.model || "Model not recorded");
-    for (const r of applicableResets) ensure(r.provider, r.model);
-
-    for (const r of records) {
-      if (!r.provider || !matchesPeriod(r.requested_at, period)) continue;
-      const model = r.model || "Model not recorded";
-      const resetAt = cutoff.get(`${r.provider}\0${model}`);
-      if (resetAt && r.requested_at && Date.parse(r.requested_at) <= Date.parse(resetAt)) continue;
-      const m = ensure(r.provider, model);
-      m.requests += 1;
-      if (r.state === "succeeded") {
-        m.replies += 1;
-        const dur = typeof r.duration_seconds === "number" ? r.duration_seconds : elapsedSeconds(r);
-        if (dur != null) {
-          m.seconds += dur;
-          m.timedReplies += 1;
-        }
-      }
-    }
-
-    const rows = [...metrics.values()].sort(
-      (a, b) => a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model)
-    );
-    const total = rows.reduce(
-      (acc, item) => ({
-        requests: acc.requests + item.requests,
-        replies: acc.replies + item.replies,
-        seconds: acc.seconds + item.seconds,
-        timedReplies: acc.timedReplies + item.timedReplies,
-      }),
-      { requests: 0, replies: 0, seconds: 0, timedReplies: 0 }
-    );
-    $("#stats-total-requests").textContent = String(total.requests);
-    $("#stats-success-rate").textContent = total.requests
-      ? `${Math.round((total.replies / total.requests) * 100)}%`
-      : "—";
-    $("#stats-success-detail").textContent = total.requests
-      ? `${total.replies} successful ${total.replies === 1 ? "reply" : "replies"} of ${total.requests} requests`
-      : "No requests in this period";
-    $("#stats-average-time").textContent = formatDuration(
-      total.timedReplies ? total.seconds / total.timedReplies : null
-    );
-    const qRows = state.qualityRows || [];
-    const scoredOutcomes = qRows.reduce(
-      (acc, row) => {
-        const measured = Number(row.measured) || 0;
-        const rate = Number(row.qa_pass_rate);
-        if (measured > 0 && Number.isFinite(rate)) {
-          acc.measured += measured;
-          acc.passed += (rate / 100) * measured;
-        }
-        return acc;
-      },
-      { measured: 0, passed: 0 }
-    );
-    $("#stats-qa-pass-rate").textContent = scoredOutcomes.measured
-      ? `${Math.round((scoredOutcomes.passed / scoredOutcomes.measured) * 100)}%`
-      : "—";
-    $("#stats-qa-detail").textContent = scoredOutcomes.measured
-      ? `${scoredOutcomes.measured} scored deliverable checks · all time`
-      : "No scored deliverable checks yet";
-
-    const cells = (m) => `
-      <span>${m.requests} ${m.requests === 1 ? "request" : "requests"}</span>
-      <span>${m.replies} ${m.replies === 1 ? "reply" : "replies"}</span>
-      <span>avg ${escapeHtml(formatDuration(m.timedReplies ? m.seconds / m.timedReplies : null))}</span>`;
-
-    $("#provider-statistics").hidden = false;
-    $("#provider-stat-rows").innerHTML =
-      `<div class="provider-stat-row provider-stat-total"><strong>Total</strong>${cells(total)}<span></span></div>` +
-      rows
-        .map(
-          (m) => `
-          <div class="provider-stat-row">
-            <div class="provider-stat-model"><strong>${escapeHtml(m.provider)}</strong><small>${escapeHtml(
-              m.model
-            )}</small></div>
-            ${cells(m)}
-            <button type="button" class="stat-reset" data-reset-provider="${escapeHtml(
-              m.provider
-            )}" data-reset-model="${escapeHtml(m.model)}">Reset</button>
-          </div>`
-        )
-        .join("");
-
-    $("#provider-quality-rows").innerHTML = qRows.length
-      ? `<div class="quality-head"><span>Role / provider</span><span>Requests / replies</span><span>QA pass</span><span>Errors</span><span>Avg time</span></div>` +
-        qRows
-          .map(
-            (r) => `
-          <div class="quality-row">
-            <strong>${escapeHtml(r.role)}<small>${escapeHtml(r.provider)}</small></strong>
-            <span>${r.requests} / ${r.replies}</span>
-            <span>${r.qa_pass_rate == null ? `— (${r.measured} scored)` : `${r.qa_pass_rate}% (${r.measured})`}</span>
-            <span>${r.quota_or_service_errors}</span>
-            <span>${r.average_seconds == null ? "—" : escapeHtml(formatDuration(r.average_seconds))}</span>
-          </div>`
-          )
-          .join("")
-      : `<p class="notification-empty">No task outcomes recorded yet. Deliverable QA results will appear here.</p>`;
-  }
-
-  $("#open-statistics")?.addEventListener("click", () => {
-    renderStatistics();
-    if (!statsDialog.open) statsDialog.showModal();
-  });
-  $("#close-statistics")?.addEventListener("click", () => statsDialog.close());
-  statPeriodSelect?.addEventListener("change", () => renderStatistics());
-
-  $("#provider-stat-rows")?.addEventListener("click", async (e) => {
-    const btn = e.target.closest("[data-reset-provider]");
-    if (!btn) return;
-    const provider = btn.getAttribute("data-reset-provider");
-    const model = btn.getAttribute("data-reset-model");
-    const period = statPeriodSelect.value || "today";
-    if (!(await appConfirm(`Reset the displayed statistic for ${provider} · ${model}? Past usage history will be kept.`, { title: "Reset statistic", danger: true }))) {
-      return;
-    }
-    btn.disabled = true;
-    try {
-      await api("/api/llm-usage/reset", {
-        method: "POST",
-        body: JSON.stringify({ provider, model, period, bucket: periodBucket(period) }),
-      });
-      await refreshBoard();
-    } catch (err) {
-      appAlert(err.message);
-    } finally {
-      btn.disabled = false;
-    }
-  });
-
-  // --- PM/PO Chat ---
-  const messagesEl = $("#messages");
-  const chatForm = $("#chat-form");
-  const chatInput = $("#chat-input");
-
-  function renderChatMessages(messages, pendingLabel = "") {
-    if (!messages.length && !pendingLabel) {
-      messagesEl.innerHTML = `
-        <div class="welcome-message">
-          <div class="welcome-icon">✳</div>
-          <h3>Talk through the work</h3>
-          <p>Ask for help clarifying a request, planning acceptance checks, or understanding the board.</p>
-        </div>`;
-      return;
-    }
-    let html = messages
-      .map(
-        (m) => `
-        <div class="message ${m.role === "user" ? "user-message" : "assistant-message"}">
-          <div class="message-role">${m.role === "user" ? "You" : `PM/PO${m.provider ? ` · ${escapeHtml(m.provider)}` : ""}`}</div>
-          <div class="message-content">${escapeHtml(m.content)}</div>
-        </div>`
-      )
-      .join("");
-    if (pendingLabel) {
-      html += `<div class="message assistant-message pending-message">${escapeHtml(pendingLabel)}</div>`;
-    }
-    messagesEl.innerHTML = html;
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  let chatMessages = [];
-  async function loadChat() {
-    try {
-      const res = await api(`/api/chat?project_id=${encodeURIComponent(state.activeProjectId)}`);
-      chatMessages = res.messages || [];
-      renderChatMessages(chatMessages);
-    } catch (err) {
-      messagesEl.innerHTML = `<div class="inline-error">Could not load chat history: ${escapeHtml(err.message)}</div>`;
-    }
-  }
-
-  chatForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = chatInput.value.trim();
-    if (!text) return;
-    chatInput.value = "";
-    $("#send-button").disabled = true;
-    chatMessages = [...chatMessages, { role: "user", content: text }];
-    renderChatMessages(chatMessages, "PM/PO is thinking…");
-    try {
-      const res = await api("/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ message: text, project_id: state.activeProjectId }),
-      });
-      chatMessages = res.messages || chatMessages;
-      renderChatMessages(chatMessages);
-    } catch (err) {
-      chatMessages = [...chatMessages, { role: "assistant", content: err.message }];
-      renderChatMessages(chatMessages);
-    } finally {
-      $("#send-button").disabled = false;
-      chatInput.focus();
-    }
-  });
-
-  $("#plan-request")?.addEventListener("click", async () => {
-    const text = chatInput.value.trim();
-    if (!text) {
-      appAlert("Type a request to plan first.", "Nothing to plan");
-      chatInput.focus();
-      return;
-    }
-    const planBtn = $("#plan-request");
-    planBtn.disabled = true;
-    $("#send-button").disabled = true;
-    try {
-      await api("/api/pm-requests", {
-        method: "POST",
-        body: JSON.stringify({ request: text, project_id: state.activeProjectId }),
-      });
-      chatInput.value = "";
-      await Promise.all([loadChat(), refreshBoard()]);
-    } catch (err) {
-      appAlert(err.message);
-    } finally {
-      planBtn.disabled = false;
-      $("#send-button").disabled = false;
-      chatInput.focus();
-    }
-  });
-
-  chatInput?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      chatForm.requestSubmit();
-    }
-  });
-
-  $("#clear-chat")?.addEventListener("click", async () => {
-    if (!(await appConfirm("Clear the saved PM/PO conversation? This keeps all tasks and agent reply files.", { title: "Clear conversation" }))) {
-      return;
-    }
-    try {
-      await api(`/api/chat?project_id=${encodeURIComponent(state.activeProjectId)}`, { method: "DELETE" });
-      await loadChat();
-    } catch (err) {
-      appAlert(err.message);
-    }
-  });
+  const notificationsApi = initNotifications({ refreshBoard, openTaskDetail });
+  featureContext.renderNotifications = notificationsApi.renderNotifications;
+  const statisticsApi = initStatistics({ refreshBoard });
+  featureContext.renderStatistics = statisticsApi.renderStatistics;
 
   // --- Settings Dialog ---
   const settingsDialog = $("#settings-dialog");

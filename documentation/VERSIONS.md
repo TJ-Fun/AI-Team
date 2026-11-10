@@ -1,5 +1,11 @@
 # Version log
 
+## 0.54 — 2026-11-10
+
+- Continued the frontend modularization: extracted notifications (including the app-update action), provider statistics/quality rendering and reset, and the PM/PO chat from `static/app.js` into `static/js/notifications.js`, `static/js/statistics.js`, and `static/js/chat.js`.
+- `app.js` initializes the modules with `refreshBoard`, `openTaskDetail`, and `loadChat` wired through the shared `featureContext`; behavior, API endpoints, and HTML IDs are unchanged.
+- Updated documentation to 0.54.
+
 ## 0.53 — 2026-11-10
 
 - Continued the frontend modularization: extracted the task detail dialog (rendering, provider selector, status/delete/sync/merge/overview actions) from `static/app.js` into `static/js/task-detail.js`.
