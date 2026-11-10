@@ -1,6 +1,6 @@
 # `ait/providers.py` split — refactoring tracker
 
-Status: **Batch 1 complete** (2026-11-10). Next: Batch 2 — `provider_dispatch.py`.
+Status: **Batch 2 complete** (2026-11-10). Next: Batch 3 — `qa_review.py`.
 Last updated: 2026-11-10
 
 ## Goal
@@ -86,7 +86,7 @@ node --check static/app.js   # frontend untouched, sanity only
 ## Progress checklist
 
 - [x] Batch 1 — `provider_calls.py` (moved `call_gemini_task`, `normalize_github_repo_url`, `call_openai_compatible_task`, `test_provider_connection`, `list_provider_models`, `test_provider_model`, `retry_after_time`; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot)
-- [ ] Batch 2 — `provider_dispatch.py`
+- [x] Batch 2 — `provider_dispatch.py` (moved auto ordering/selection, claim, dispatch, worker loops, watchdog, CI poll, activity status + `AUTO_ORDER_CACHE`/`AUTO_ORDER_TTL_SECONDS`/`ACTIVE_PROVIDER_COUNTS`/`PROVIDER_WORKER_LOCK`/`CI_POLL_INTERVAL_SECONDS`; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot)
 - [ ] Batch 3 — `qa_review.py`
 - [ ] Batch 4 — `pm_planning.py` + delete `providers.py`
 - [ ] Batch 5 — docs & version

@@ -1,5 +1,11 @@
 # Version log
 
+## 0.57 — 2026-11-10
+
+- Continued splitting `ait/providers.py`: moved auto provider selection, task claiming/dispatch, provider worker loops, watchdog, CI polling, and activity status into the new `ait/provider_dispatch.py` module.
+- Registered the new module in `ait/__init__.py`; the flat-namespace injection keeps all cross-module calls unchanged. No behavior change.
+- Updated documentation to 0.57.
+
 ## 0.56 — 2026-11-10
 
 - Started splitting `ait/providers.py` into focused modules: moved provider HTTP calls and connection/model testing (`call_gemini_task`, `call_openai_compatible_task`, `test_provider_connection`, `list_provider_models`, `test_provider_model`, `retry_after_time`, `normalize_github_repo_url`) into the new `ait/provider_calls.py` module.

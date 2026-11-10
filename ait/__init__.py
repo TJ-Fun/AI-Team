@@ -19,6 +19,7 @@ from ait import notifications  # noqa: F401
 from ait import projects  # noqa: F401
 from ait import prompts  # noqa: F401
 from ait import provider_calls  # noqa: F401
+from ait import provider_dispatch  # noqa: F401
 from ait import providers  # noqa: F401
 from ait import provider_registry  # noqa: F401
 from ait import secrets  # noqa: F401
@@ -33,6 +34,7 @@ _DOMAIN_MODULES = (
     git_ops,
     notifications,
     provider_calls,
+    provider_dispatch,
     providers,
     chat,
     http_handler,
