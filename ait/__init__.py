@@ -19,6 +19,7 @@ from ait import notifications  # noqa: F401
 from ait import projects  # noqa: F401
 from ait import prompts  # noqa: F401
 from ait import routes_git  # noqa: F401
+from ait import routes_providers  # noqa: F401
 from ait import routes_settings  # noqa: F401
 from ait import routes_projects  # noqa: F401
 from ait import routes_tasks  # noqa: F401
@@ -43,6 +44,7 @@ _DOMAIN_MODULES = (
     pm_planning,
     qa_review,
     routes_git,
+    routes_providers,
     routes_projects,
     routes_settings,
     routes_tasks,

@@ -1,6 +1,6 @@
 # `ait/http_handler.py` split — refactoring tracker
 
-Status: **Batch 4 complete** (2026-11-10). Next: Batch 5 — `routes_providers.py`.
+Status: **Batch 5 complete** (2026-11-10). Next: Batch 6 — cleanup + final docs.
 Last updated: 2026-11-10
 
 ## Goal
@@ -97,5 +97,5 @@ python -c "import ait; print(hasattr(ait.routes_tasks, 'handle_tasks_post'))"
 - [x] Batch 2 — `routes_projects.py` (moved project + context-document routes for GET/POST/PUT/DELETE; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot; `/api/projects` smoke-tested)
 - [x] Batch 3 — `routes_git.py` (moved git clone job/status GET and git status/pull/push/clone POST; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot; `/api/git/{id}/status` smoke-tested)
 - [x] Batch 4 — `routes_settings.py` (moved settings config/logs/log-level/clear/restart/update, app-update check, notifications, prompts GET/PUT/reset, documentation-files; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot; settings/prompts/notifications smoke-tested)
-- [ ] Batch 5 — `routes_providers.py`
+- [x] Batch 5 — `routes_providers.py` (moved providers/connections/routing/llm-usage/provider-quality routes for GET/POST/PUT/DELETE; registered in `ait/__init__.py`; verified compileall + namespace resolution + server boot; connections/routing/llm-usage smoke-tested)
 - [ ] Batch 6 — docs & version
