@@ -1,5 +1,11 @@
 # Version log
 
+## 0.63 — 2026-11-10
+
+- Continued splitting `ait/http_handler.py`: moved settings, prompt, notification, and app-update API routes (settings config/logs/log-level/clear/restart/update, app-update check, notifications list/dismiss, prompts list/save/reset, documentation files) into the new `ait/routes_settings.py` module.
+- `http_handler.py` now dispatches these routes to `handle_settings_get/post/put/delete`. No behavior change.
+- Updated documentation to 0.63.
+
 ## 0.62 — 2026-11-10
 
 - Continued splitting `ait/http_handler.py`: moved all Git operation API routes (clone job status, repository status, pull, push, clone) into the new `ait/routes_git.py` module.
