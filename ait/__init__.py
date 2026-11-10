@@ -21,6 +21,7 @@ from ait import prompts  # noqa: F401
 from ait import provider_calls  # noqa: F401
 from ait import provider_dispatch  # noqa: F401
 from ait import providers  # noqa: F401
+from ait import qa_review  # noqa: F401
 from ait import provider_registry  # noqa: F401
 from ait import secrets  # noqa: F401
 from ait import settings  # noqa: F401
@@ -36,6 +37,7 @@ _DOMAIN_MODULES = (
     provider_calls,
     provider_dispatch,
     providers,
+    qa_review,
     chat,
     http_handler,
     main,
