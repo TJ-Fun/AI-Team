@@ -104,67 +104,18 @@ class Handler(BaseHTTPRequestHandler):
 
         if handle_providers_get(self, path, query):
             return
-
-        if handle_providers_get(self, path, query):
-            return
-
         if handle_projects_get(self, path, query):
             return
-
         if handle_git_get(self, path, query):
             return
-
-        if handle_git_get(self, path, query):
-            return
-
-        if handle_projects_get(self, path, query):
-            return
-
         if handle_settings_get(self, path, query):
             return
-
-        if handle_projects_get(self, path, query):
-            return
-
-        if handle_projects_get(self, path, query):
-            return
-
         if handle_tasks_get(self, path, query):
-            return
-
-        if handle_settings_get(self, path, query):
-            return
-
-        if handle_projects_get(self, path, query):
-            return
-
-        if handle_projects_get(self, path, query):
-            return
-
-        if handle_settings_get(self, path, query):
-            return
-
-        if handle_settings_get(self, path, query):
-            return
-
-        if handle_providers_get(self, path, query):
-            return
-
-        if handle_providers_get(self, path, query):
-            return
-
-        if handle_settings_get(self, path, query):
-            return
-
-        if handle_settings_get(self, path, query):
             return
 
         if path == "/api/chat":
             chat_pid = str((query.get("project_id") or ["default"])[0] or "default")
             return self.send_json({"messages": read_chat_history(chat_pid), "project_id": chat_pid})
-
-        if handle_providers_get(self, path, query):
-            return
 
         self.send_json({"error": "Not found."}, HTTPStatus.NOT_FOUND)
 
@@ -182,55 +133,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if handle_settings_post(self, path, body):
             return
-
         if handle_providers_post(self, path, body):
             return
-
-        if handle_providers_post(self, path, body):
-            return
-
-        if handle_providers_post(self, path, body):
-            return
-
-        if handle_providers_post(self, path, body):
-            return
-
-        if handle_providers_post(self, path, body):
-            return
-
-        if handle_providers_post(self, path, body):
-            return
-
-        if handle_providers_post(self, path, body):
-            return
-
         if handle_git_post(self, path, body):
             return
-
-        # Settings API endpoints
-        if handle_settings_post(self, path, body):
-            return
-
-        if handle_settings_post(self, path, body):
-            return
-
-        if handle_settings_post(self, path, body):
-            return
-
-        if handle_settings_post(self, path, body):
-            return
-
-        if handle_settings_post(self, path, body):
-            return
-
-        if handle_settings_post(self, path, body):
-            return
-
-        if handle_tasks_post(self, path, body):
-            return
-        if handle_projects_post(self, path, body):
-            return
-
         if handle_projects_post(self, path, body):
             return
 
@@ -294,19 +200,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if handle_settings_put(self, path, body):
             return
-
         if handle_providers_put(self, path, body):
             return
-
-        if handle_providers_put(self, path, body):
-            return
-
         if handle_projects_put(self, path, body):
             return
-
         if handle_tasks_put(self, path, body):
-            return
-        if handle_projects_put(self, path, body):
             return
 
         self.send_json({"error": "Not found."}, HTTPStatus.NOT_FOUND)
@@ -318,16 +216,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if handle_providers_delete(self, path):
             return
-
-        if handle_providers_delete(self, path):
-            return
-
         if handle_projects_delete(self, path):
             return
-
-        if handle_projects_delete(self, path):
-            return
-
         if handle_settings_delete(self, path):
             return
 

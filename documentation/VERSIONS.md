@@ -1,5 +1,11 @@
 # Version log
 
+## 0.65 — 2026-11-10
+
+- Completed the `ait/http_handler.py` split: consolidated the per-route dispatch calls into one call per route module in each HTTP method, leaving `http_handler.py` as a thin dispatcher plus the chat routes (which share global state).
+- Final structure: `routes_tasks.py`, `routes_projects.py`, `routes_git.py`, `routes_settings.py`, `routes_providers.py`, all registered in `ait/__init__.py`. No behavior change.
+- Updated documentation to 0.65.
+
 ## 0.64 — 2026-11-10
 
 - Continued splitting `ait/http_handler.py`: moved provider, connection, routing, and usage API routes (connections list/test/save/clear, GitHub repositories, providers add/remove/reorder/model update/test, routing get/save, llm-usage get/reset, provider-quality) into the new `ait/routes_providers.py` module.
