@@ -132,6 +132,75 @@ def handle_tasks_post(handler, path, body) -> bool:
         handler.send_json({"task": task}, HTTPStatus.CREATED)
         return True
 
+    if path == "/api/doc-updates":
+        kind = str(body.get("kind", "")).strip()
+        pid = str(body.get("project_id") or "default")
+        proj = next((p for p in read_projects() if p.get("id") == pid), None)
+        if not proj:
+            handler.send_json({"error": "Choose a valid project."}, HTTPStatus.BAD_REQUEST)
+            return True
+        specs = {
+            "docs": (
+                "doc_update",
+                "Update project documentation",
+                "Review the project's current documents and task board, then propose updated versions of all four "
+                "project documents (project_brief, technical_overview, decisions, outcomes). Request any "
+                "on-request documents you need via info_requests before answering. Keep confirmed facts, mark "
+                "assumptions, and keep each document under 20,000 characters.",
+            ),
+            "roadmap": (
+                "roadmap_update",
+                "Update roadmap",
+                "Review the project's master plan, phase plans, and task board, then propose an updated "
+                "master_plan, any changed phase plans (phase_1 through phase_9), and the current active_phase. "
+                "Request any on-request documents you need via info_requests before answering. Keep each "
+                "document under 20,000 characters.",
+            ),
+        }
+        spec = specs.get(kind)
+        if not spec:
+            handler.send_json({"error": "kind must be 'docs' or 'roadmap'."}, HTTPStatus.BAD_REQUEST)
+            return True
+        task_type, title, request = spec
+        tid = next_task_id()
+        ts = now_iso()
+        task = {
+            "id": tid,
+            "task_type": task_type,
+            "title": f"{title}: {proj.get('name', pid)}",
+            "request": request,
+            "project_id": pid,
+            "module_id": "",
+            "assigned_role": "PM/PO",
+            "provider": "Automatic",
+            "status": "Ready",
+            "produces_deliverable": False,
+            "acceptance_checks": [],
+            "attempts": [],
+            "validation": None,
+            "created_at": ts,
+            "updated_at": ts,
+            "dispatch_note": "Update request queued for the PM/PO agent.",
+            "activity": [{"at": ts, "type": "created", "message": f"{title} requested by user."}],
+        }
+        write_task(task)
+        DISPATCH_EVENT.set()
+        handler.send_json({"task": task}, HTTPStatus.CREATED)
+        return True
+
+    m_doc_decision = re.fullmatch(r"/api/tasks/(T-\d{4,})/doc-update-decision", path)
+    if m_doc_decision:
+        try:
+            task = decide_doc_update(m_doc_decision.group(1), str(body.get("decision", "")))
+        except KeyError:
+            handler.send_json({"error": "Update task not found."}, HTTPStatus.NOT_FOUND)
+            return True
+        except ValueError as exc:
+            handler.send_json({"error": str(exc)}, HTTPStatus.CONFLICT)
+            return True
+        handler.send_json({"task": task})
+        return True
+
 
     m_status = re.fullmatch(r"/api/tasks/(T-\d{4,})/status", path)
     if m_status:

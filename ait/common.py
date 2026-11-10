@@ -232,6 +232,26 @@ WORK_REPLY_CONTRACT = (
     "Keep details complete but concise. Do not include file contents or diffs."
 )
 
+DOC_UPDATE_CONTRACT = (
+    "For a project-document update request, return ONLY one valid JSON object, no markdown: "
+    '{"type":"doc_update","summary":"brief summary","documents":{"project_brief":"complete Markdown brief",'
+    '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log",'
+    '"outcomes":"complete Markdown confirmed outcomes"}}. '
+    "Return the full updated text of all four documents, preserving confirmed facts, marking assumptions, "
+    "and reflecting the current task board. Each document must be non-empty and under 20,000 characters. "
+    "Request any on-request project documents you need via info_requests before answering."
+)
+
+ROADMAP_UPDATE_CONTRACT = (
+    "For a roadmap update request, return ONLY one valid JSON object, no markdown: "
+    '{"type":"roadmap_update","summary":"brief summary","master_plan":"complete Markdown big plan / roadmap",'
+    '"phases":{"phase_1":"complete Markdown phase plan"},"active_phase":1}. '
+    "master_plan is required and describes the whole plan; phases may contain phase_1 through phase_9 entries "
+    "with the complete plan for each phase (omitted phase documents stay unchanged); active_phase is the current "
+    "phase number or null. Each document must be non-empty and under 20,000 characters. "
+    "Request any on-request project documents you need via info_requests before answering."
+)
+
 STATE_LOCK = threading.RLock()
 DISPATCH_EVENT = threading.Event()
 

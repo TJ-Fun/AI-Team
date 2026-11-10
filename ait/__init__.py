@@ -12,6 +12,7 @@ from pathlib import Path as _Path
 
 from ait import common  # noqa: F401
 from ait import chat  # noqa: F401
+from ait import doc_updates  # noqa: F401
 from ait import git_app_sync  # noqa: F401
 from ait import git_github_api  # noqa: F401
 from ait import git_local_ops  # noqa: F401
@@ -56,6 +57,7 @@ _DOMAIN_MODULES = (
     routes_settings,
     routes_tasks,
     chat,
+    doc_updates,
     info_requests,
     http_handler,
     main,

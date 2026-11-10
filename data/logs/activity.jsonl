@@ -1,0 +1,2 @@
+{"at": "2026-11-10T18:39:45Z", "type": "task_created", "task_id": "T-0001", "status": "Ready", "project_id": "default", "task_type": "doc_update"}
+{"at": "2026-11-10T18:39:49Z", "type": "task_status_changed", "task_id": "T-0001", "from": "Ready", "to": "Canceled", "project_id": "default"}

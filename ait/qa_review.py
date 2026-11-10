@@ -202,11 +202,15 @@ def planning_contract_for_task(task: dict[str, Any]) -> str:
         return PM_PLANNING_CONTRACT
     if tt == "pm_escalation":
         return ESCALATION_CONTRACT
+    if tt == "doc_update":
+        return DOC_UPDATE_CONTRACT
+    if tt == "roadmap_update":
+        return ROADMAP_UPDATE_CONTRACT
     return ""
 
 
 def needs_work_reply_envelope(task: dict[str, Any]) -> bool:
-    if task.get("task_type") in ("pm_planning", "pm_escalation") or task.get("qa_attempt_active"):
+    if task.get("task_type") in ("pm_planning", "pm_escalation", "doc_update", "roadmap_update") or task.get("qa_attempt_active"):
         return False
     role = str(task.get("assigned_role") or "")
     if role in ("Frontend developer", "Backend developer", "Documentation"):

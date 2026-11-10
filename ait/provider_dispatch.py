@@ -335,6 +335,10 @@ def dispatch_one_for_provider(provider: str) -> bool:
                     next_status, msg = finish_pm_planning_task(fresh, reply, provider)
                 elif fresh.get("task_type") == "pm_escalation":
                     next_status, msg = finish_pm_escalation_task(fresh, reply, provider)
+                elif fresh.get("task_type") == "doc_update":
+                    next_status, msg = finish_doc_update_task(fresh, reply, provider)
+                elif fresh.get("task_type") == "roadmap_update":
+                    next_status, msg = finish_roadmap_update_task(fresh, reply, provider)
                 elif fresh.get("produces_deliverable"):
                     val = deterministic_validation(fresh.get("acceptance_checks") or [], reply)
                     fresh["validation"] = val

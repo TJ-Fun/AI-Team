@@ -1,5 +1,13 @@
 # Version log
 
+## 0.75 — 2026-11-10
+
+- Added two approval-gated PM/PO update task types: **Update project documentation** (`doc_update`) and **Update roadmap** (`roadmap_update`), created via `POST /api/doc-updates` with `kind` = `docs` or `roadmap`.
+- New `ait/doc_updates.py`: strict reply parsers (`type: doc_update` returns all four project documents; `type: roadmap_update` returns `master_plan`, optional `phase_1`–`phase_9` plans, and `active_phase`), finish handlers that park the proposal on the task as `Needs approval`, and `apply_doc_update`/`decide_doc_update` which write approved content through the existing versioned context-document storage (and set the project's `active_phase`).
+- New endpoint `POST /api/tasks/{id}/doc-update-decision` approves (applies + Done) or rejects (Canceled, documents unchanged) a pending update; every document write keeps its history snapshot.
+- `DOC_UPDATE_CONTRACT`/`ROADMAP_UPDATE_CONTRACT` reply contracts added; both task types are exempt from the work-reply envelope and routed through the dispatch finish branches. PM can pull current on-request documents via `info_requests` before proposing updates.
+- Updated documentation to 0.75.
+
 ## 0.74 — 2026-11-10
 
 - Extended `info_requests` to the PM/PO chat: when the PM replies with only a JSON object like `{"info_requests":["slug"]}`, the app loads the requested project documents, appends them to the conversation, and calls the provider again (same `INFO_REQUEST_MAX_ROUNDS` bound and per-conversation cache as task dispatch). Requests are logged as `chat_info_documents_requested` events.
