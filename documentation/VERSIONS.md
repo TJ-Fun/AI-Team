@@ -1,5 +1,10 @@
 # Version log
 
+## 0.83 — 2026-11-13
+
+- Refactored `static/js/task-detail.js` (583 lines) into `task-detail.js` (render/orchestrator) and `task-detail-actions.js` (action buttons + handlers). No behavior change; prerequisite for env-setup task UI.
+- Updated documentation to 0.83.
+
 ## 0.82 — 2026-11-13
 
 - Refactored `ait/pm_planning.py` (559 lines) into focused modules: `pm_planning_parse.py`, `pm_planning_finish.py`, and `pm_planning_escalation.py`, with `pm_planning.py` kept as a facade. No behavior change; prerequisite for manual env-setup task support.
