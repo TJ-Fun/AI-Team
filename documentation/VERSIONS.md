@@ -1,5 +1,10 @@
 # Version log
 
+## 0.84 — 2026-11-13
+
+- Refactored `static/js/project-settings.js` (398 lines) by moving project editor rendering into `static/js/project-editor.js`; the orchestrator keeps selector state, listeners, load/save, and git/danger actions. No behavior change; prerequisite for the services manifest UI.
+- Updated documentation to 0.84.
+
 ## 0.83 — 2026-11-13
 
 - Refactored `static/js/task-detail.js` (583 lines) into `task-detail.js` (render/orchestrator) and `task-detail-actions.js` (action buttons + handlers). No behavior change; prerequisite for env-setup task UI.
