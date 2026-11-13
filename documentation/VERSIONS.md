@@ -1,5 +1,11 @@
 # Version log
 
+## 0.91 — 2026-11-13
+
+- Replaced the header chat chip with a clickable agent-health status (`Agents X/Y`) plus the current app version; health refreshes through `GET /api/providers/health` and opens Settings → Connections on click.
+- Removed the per-provider connection sentence from the Project board.
+- Updated documentation to 0.91.
+
 ## 0.90 — 2026-11-13
 
 - Added cached AI-provider health checks (`ait/provider_health.py`) using the existing lightweight connection tests, exposed `GET /api/providers/health`, and added `app_version` plus cached `agents` summary to `/api/status`.

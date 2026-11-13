@@ -13,7 +13,11 @@
       <h1>AI Team</h1>
     </div>
     <div class="header-tools">
-      <div class="model-chip"><span class="status-dot" id="model-dot"></span><span id="model-name">AI chat</span></div>
+      <button class="agent-status-chip" id="agent-status-chip" type="button" title="AI provider health">
+        <span class="status-dot" id="agent-status-dot"></span>
+        <span id="agent-status-text">Agents …</span>
+        <span class="agent-version" id="app-version">v—</span>
+      </button>
       <div class="cpu-meter" title="Overall CPU utilization across the VM">
         <span class="cpu-label">VM CPU</span>
         <div class="cpu-track" role="progressbar" aria-label="VM CPU utilization" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="cpu-bar"></span></div>
@@ -47,7 +51,6 @@
       <div class="summary" id="task-summary"></div>
       <div class="project-progress" id="project-progress" hidden><div class="progress-heading"><strong>Planned work</strong><span id="progress-label"></span></div><progress id="progress-bar" max="100" value="0" aria-label="Planned task completion"></progress><div class="progress-note">Counts PM-planned work tasks marked Done; it does not yet measure code integration.</div></div>
       <div class="board-updated" id="board-updated">Board updates automatically every 5 seconds.</div>
-      <div class="agent-status" id="agent-status">Gemini connector status loading…</div>
       <div class="watchdog-info" id="watchdog-info">Watchdog starting…</div>
       <div class="task-list" id="task-list" aria-live="polite"></div>
       <div class="empty-state" id="empty-state" hidden>
