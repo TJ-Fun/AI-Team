@@ -1,5 +1,11 @@
 # Version log
 
+## 0.78 — 2026-11-13
+
+- Added the per-project **Clear tasks** backend: `POST /api/projects/{id}/clear-tasks` deletes only that project's tasks, task replies, and activity-log entries while keeping chat history, project context documents, project config, modules, and the local clone.
+- The endpoint blocks with `409 Conflict` while the project has `In progress` tasks or a running Git clone, and requires `{"confirm": true}`.
+- Settings → Projects buttons for this action land in the next batch. Updated documentation to 0.78.
+
 ## 0.77 — 2026-11-10
 
 - Refactored `ait/routes_tasks.py` (858 lines) into a thin dispatcher plus three focused modules: `routes_tasks_core.py` (task list/replies, create, edit, delete), `routes_tasks_pm.py` (PM planning requests, doc/roadmap updates, clarification answers, overview and design-review approvals), and `routes_tasks_ops.py` (status, provider, validation, local sync, merge approval).

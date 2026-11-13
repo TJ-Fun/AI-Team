@@ -75,6 +75,19 @@ def handle_projects_get(handler, path, query) -> bool:
 
 
 def handle_projects_post(handler, path, body) -> bool:
+    m_clear_tasks = re.fullmatch(r"/api/projects/([a-z0-9-]+)/clear-tasks", path)
+    if m_clear_tasks:
+        if body.get("confirm") is not True:
+            handler.send_json({"error": "Confirmation required."}, HTTPStatus.BAD_REQUEST)
+            return True
+        try:
+            handler.send_json(clear_project_tasks(m_clear_tasks.group(1)))
+        except ProjectBusyError as exc:
+            handler.send_json({"error": str(exc)}, HTTPStatus.CONFLICT)
+        except ValueError as exc:
+            handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        return True
+
     m_ctx_res = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/restore", path)
     if m_ctx_res:
         pid, slug = m_ctx_res.groups()
