@@ -54,7 +54,12 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         return None
     model = provider_model(provider)
     with STATE_LOCK:
-        summaries = reversed(read_tasks())
+        all_tasks = [
+            item
+            for item in read_tasks()
+            if str(item.get("project_id") or "default") not in PROJECT_MAINTENANCE
+        ]
+        summaries = reversed(all_tasks)
         qa_candidates = [
             item for item in summaries
             if item.get("produces_deliverable")
@@ -63,7 +68,6 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
                 or (item.get("status") == "Ready" and item.get("workflow_phase") == "qa")
             )
         ]
-        all_tasks = read_tasks()
         for summary in qa_candidates:
             task = read_task(str(summary.get("id", "")))
             if not task:

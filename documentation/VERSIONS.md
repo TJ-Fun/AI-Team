@@ -1,5 +1,11 @@
 # Version log
 
+## 0.79 — 2026-11-13
+
+- Added the per-project **Wipe GitHub contents** backend: `POST /api/projects/{id}/wipe-github` resets the repository's default branch to a single empty commit, deletes all other branches, tags, and releases, then deletes the configured local clone while keeping the repository object, project `repository`/`local_path`, tasks, chat, and context docs.
+- Safety gates: requires typing `owner/repo` (`confirm_text`), refuses shared repositories, `In progress` tasks, running clones, and dirty/ahead local clones; provider dispatch skips projects under maintenance during the wipe.
+- Settings → Projects buttons for both destructive actions land in the next batch. Updated documentation to 0.79.
+
 ## 0.78 — 2026-11-13
 
 - Added the per-project **Clear tasks** backend: `POST /api/projects/{id}/clear-tasks` deletes only that project's tasks, task replies, and activity-log entries while keeping chat history, project context documents, project config, modules, and the local clone.

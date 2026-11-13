@@ -88,6 +88,16 @@ def handle_projects_post(handler, path, body) -> bool:
             handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         return True
 
+    m_wipe_github = re.fullmatch(r"/api/projects/([a-z0-9-]+)/wipe-github", path)
+    if m_wipe_github:
+        try:
+            handler.send_json(wipe_project_github(m_wipe_github.group(1), str(body.get("confirm_text") or "")))
+        except ProjectBusyError as exc:
+            handler.send_json({"error": str(exc)}, HTTPStatus.CONFLICT)
+        except ValueError as exc:
+            handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        return True
+
     m_ctx_res = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/restore", path)
     if m_ctx_res:
         pid, slug = m_ctx_res.groups()

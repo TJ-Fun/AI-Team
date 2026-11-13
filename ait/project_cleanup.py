@@ -5,6 +5,9 @@ from __future__ import annotations
 from ait.common import *
 
 
+PROJECT_MAINTENANCE: set[str] = set()
+
+
 class ProjectBusyError(ValueError):
     """Raised when a project has active work that must finish first."""
 
@@ -110,3 +113,119 @@ def clear_project_tasks(project_id: str) -> dict[str, Any]:
             }
         )
     return {"project_id": pid, "deleted_tasks": deleted_tasks, "deleted_replies": deleted_replies}
+
+
+def _safe_local_clone_path(project: dict[str, Any]) -> Path | None:
+    local_path = str(project.get("local_path") or "").strip()
+    if not local_path:
+        return None
+    try:
+        path = Path(local_path).expanduser().resolve()
+    except Exception as exc:
+        raise ValueError(f"Invalid local path: {exc}") from exc
+    if path == path.parent:
+        raise ValueError("Refusing to delete the filesystem root.")
+    if path == Path.home().resolve():
+        raise ValueError("Refusing to delete the home directory.")
+    for protected in (ROOT, DATA):
+        if path == protected or protected in path.parents or path in protected.parents:
+            raise ValueError("Refusing to delete a protected application path.")
+    return path
+
+
+def _local_clone_ready(project: dict[str, Any]) -> Path | None:
+    path = _safe_local_clone_path(project)
+    if path is None or not path.exists():
+        return None
+    if not (path / ".git").exists():
+        raise ValueError("Configured local path is not a git clone; refusing to delete it.")
+    return path
+
+
+def _assert_local_clone_clean(project: dict[str, Any]) -> None:
+    if _local_clone_ready(project) is None:
+        return
+    status = git_status(str(project.get("id") or ""))
+    if int(status.get("modified") or 0) or bool(status.get("ahead")):
+        raise ProjectBusyError(
+            "Local clone has uncommitted changes or unpushed commits. Commit, push, or clean it before wiping."
+        )
+
+
+def _delete_local_clone(project: dict[str, Any]) -> dict[str, Any]:
+    path = _local_clone_ready(project)
+    if path is None:
+        return {"deleted": False, "path": ""}
+    shutil.rmtree(path, ignore_errors=True)
+    return {"deleted": True, "path": str(path)}
+
+
+def _same_repository(a: str, b: str) -> bool:
+    try:
+        return canonical_github_repository(a) == canonical_github_repository(b)
+    except Exception:
+        return False
+
+
+def assert_unique_project_repository(project: dict[str, Any]) -> None:
+    pid = str(project.get("id") or "")
+    repository = str(project.get("repository") or "").strip()
+    if not repository:
+        raise ValueError("Project does not have a GitHub repository configured.")
+    for other in read_projects():
+        if str(other.get("id") or "") == pid:
+            continue
+        other_repo = str(other.get("repository") or "").strip()
+        if other_repo and _same_repository(repository, other_repo):
+            raise ValueError("Another project uses this GitHub repository; refusing to wipe it.")
+
+
+def wipe_project_github(project_id: str, confirm_text: str) -> dict[str, Any]:
+    project = project_or_raise(project_id)
+    pid = str(project["id"])
+    repository = str(project.get("repository") or "").strip()
+    if not repository:
+        raise ValueError("Project does not have a GitHub repository configured.")
+    owner, repo = canonical_github_repository(repository)
+    expected = f"{owner}/{repo}"
+    if str(confirm_text or "").strip().casefold() != expected.casefold():
+        raise ValueError(f"Type {expected} to confirm the GitHub wipe.")
+    assert_unique_project_repository(project)
+    _assert_local_clone_clean(project)
+
+    with STATE_LOCK:
+        PROJECT_MAINTENANCE.add(pid)
+    try:
+        with STATE_LOCK:
+            assert_no_active_project_work(pid)
+        remote = github_wipe_repository_contents(repository)
+        if remote.get("errors"):
+            details = "; ".join(str(item) for item in remote["errors"][:5])
+            raise ValueError(f"GitHub wipe incomplete; local clone was not deleted. {details}")
+        local = _delete_local_clone(project)
+        append_event(
+            {
+                "at": now_iso(),
+                "type": "project_github_wiped",
+                "project_id": pid,
+                "repository": f"{owner}/{repo}",
+                "commit": remote.get("commit"),
+                "deleted_releases": remote.get("deleted_releases", 0),
+                "deleted_branches": remote.get("deleted_branches", 0),
+                "deleted_tags": remote.get("deleted_tags", 0),
+                "local_clone_deleted": bool(local.get("deleted")),
+            }
+        )
+    finally:
+        with STATE_LOCK:
+            PROJECT_MAINTENANCE.discard(pid)
+    return {
+        "project_id": pid,
+        "repository": f"{owner}/{repo}",
+        "default_branch": remote.get("default_branch"),
+        "commit": remote.get("commit"),
+        "deleted_releases": remote.get("deleted_releases", 0),
+        "deleted_branches": remote.get("deleted_branches", 0),
+        "deleted_tags": remote.get("deleted_tags", 0),
+        "local_clone": local,
+    }
