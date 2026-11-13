@@ -1,5 +1,10 @@
 # Version log
 
+## 0.92 — 2026-11-13
+
+- Updated `documentation/DOCUMENTATION.md` for the header agent-health chip, `GET /api/providers/health`, `/api/status` `app_version`/`agents` fields, and the removed board provider-status line.
+- Updated documentation to 0.92.
+
 ## 0.91 — 2026-11-13
 
 - Replaced the header chat chip with a clickable agent-health status (`Agents X/Y`) plus the current app version; health refreshes through `GET /api/providers/health` and opens Settings → Connections on click.
