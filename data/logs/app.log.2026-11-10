@@ -1,0 +1,649 @@
+2026-11-10 09:44:23 | INFO     | personal_ai_team | ============================================================
+2026-11-10 09:44:23 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 09:44:23 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 09:44:23 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 09:44:23 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 09:44:23 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 09:44:23 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:19:41 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:19:41 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 10:19:41 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 10:19:41 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 10:19:41 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 10:19:41 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 10:19:41 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:19:46 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:19:46 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 10:19:46 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 10:19:46 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 10:19:46 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 10:19:46 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 10:19:46 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:21:34 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:21:34 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 10:21:34 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 10:21:34 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 10:21:34 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 10:21:34 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 10:21:34 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:21:34 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET / HTTP/1.1" 200 -
+2026-11-10 10:21:34 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/app.js HTTP/1.1" 200 -
+2026-11-10 10:21:34 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/core.js HTTP/1.1" 200 -
+2026-11-10 10:21:34 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/style.css HTTP/1.1" 200 -
+2026-11-10 10:21:34 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/missing.js HTTP/1.1" 404 -
+2026-11-10 10:21:34 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /static/../secret.js HTTP/1.1" 404 -
+2026-11-10 10:21:34 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /static/%2e%2e%2fsecret.js HTTP/1.1" 404 -
+2026-11-10 10:21:34 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /static/%00.js HTTP/1.1" 404 -
+2026-11-10 10:49:18 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:49:18 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 10:49:18 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 10:49:18 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 10:49:18 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 10:49:18 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 10:49:18 | INFO     | personal_ai_team | ============================================================
+2026-11-10 10:49:19 | INFO     | personal_ai_team | App repository reset completed (checkout=C:\Users\Fun\AppData\Local\Temp\app-update-recovery-test-mqyfjybf\checkout): Reset checkout to remote branch after pull could not fast-forward.
+HEAD is now at 6a6fd8e B unrelated
+2026-11-10 10:49:19 | INFO     | personal_ai_team | App repository pull completed (checkout=C:\Users\Fun\AppData\Local\Temp\app-update-recovery-test-mqyfjybf\checkout): Updating 6a6fd8e..8e928b8
+Fast-forward
+ c.txt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+From file:///C:/Users/Fun/AppData/Local/Temp/app-update-recovery-test-mqyfjybf/remote
+   6a6fd8e..8e928b8  main       -> origin/main
+2026-11-10 11:01:27 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:01:27 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 11:01:27 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 11:01:27 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 11:01:27 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 11:01:27 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 11:01:27 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:01:27 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/app.js HTTP/1.1" 200 -
+2026-11-10 11:01:27 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/core.js HTTP/1.1" 200 -
+2026-11-10 11:01:27 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/prompts.js HTTP/1.1" 200 -
+2026-11-10 11:01:27 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-context.js HTTP/1.1" 200 -
+2026-11-10 11:01:27 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/repository-viewer.js HTTP/1.1" 200 -
+2026-11-10 11:14:12 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:14:12 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 11:14:12 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 11:14:12 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 11:14:12 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 11:14:12 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 11:14:12 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:14:12 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/app.js HTTP/1.1" 200 -
+2026-11-10 11:14:12 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/core.js HTTP/1.1" 200 -
+2026-11-10 11:14:12 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/prompts.js HTTP/1.1" 200 -
+2026-11-10 11:14:12 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-context.js HTTP/1.1" 200 -
+2026-11-10 11:14:12 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/repository-viewer.js HTTP/1.1" 200 -
+2026-11-10 11:21:09 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:21:09 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 11:21:09 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 11:21:09 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 11:21:09 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 11:21:09 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 11:21:09 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:21:09 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/app.js HTTP/1.1" 200 -
+2026-11-10 11:21:09 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/core.js HTTP/1.1" 200 -
+2026-11-10 11:21:09 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/prompts.js HTTP/1.1" 200 -
+2026-11-10 11:21:09 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-context.js HTTP/1.1" 200 -
+2026-11-10 11:21:09 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/repository-viewer.js HTTP/1.1" 200 -
+2026-11-10 11:21:09 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/header.js HTTP/1.1" 200 -
+2026-11-10 11:21:09 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/providers.js HTTP/1.1" 200 -
+2026-11-10 11:21:09 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-settings.js HTTP/1.1" 200 -
+2026-11-10 11:24:53 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:24:53 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 11:24:53 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 11:24:53 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 11:24:53 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 11:24:53 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 11:24:53 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:24:53 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/app.js HTTP/1.1" 200 -
+2026-11-10 11:24:53 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/core.js HTTP/1.1" 200 -
+2026-11-10 11:24:53 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/prompts.js HTTP/1.1" 200 -
+2026-11-10 11:24:53 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-context.js HTTP/1.1" 200 -
+2026-11-10 11:24:53 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/repository-viewer.js HTTP/1.1" 200 -
+2026-11-10 11:24:53 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/header.js HTTP/1.1" 200 -
+2026-11-10 11:24:53 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/providers.js HTTP/1.1" 200 -
+2026-11-10 11:24:53 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-settings.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:38:31 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 11:38:31 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 11:38:31 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 11:38:31 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 11:38:31 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 11:38:31 | INFO     | personal_ai_team | ============================================================
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/app.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/core.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/prompts.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-context.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/repository-viewer.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/header.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/providers.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-settings.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-utils.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-selectors.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-board.js HTTP/1.1" 200 -
+2026-11-10 11:38:31 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-dialog.js HTTP/1.1" 200 -
+2026-11-10 12:40:43 | INFO     | personal_ai_team | ============================================================
+2026-11-10 12:40:43 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 12:40:43 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 12:40:43 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 12:40:43 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 12:40:43 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 12:40:43 | INFO     | personal_ai_team | ============================================================
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET / HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/app.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/core.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/prompts.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-context.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/repository-viewer.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/header.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/providers.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-settings.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-utils.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/project-selectors.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-board.js HTTP/1.1" 200 -
+2026-11-10 12:40:52 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-dialog.js HTTP/1.1" 200 -
+2026-11-10 12:40:56 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/tasks HTTP/1.1" 200 -
+2026-11-10 12:40:56 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/projects HTTP/1.1" 200 -
+2026-11-10 12:40:56 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/notifications HTTP/1.1" 200 -
+2026-11-10 12:40:56 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/llm-usage HTTP/1.1" 200 -
+2026-11-10 12:40:56 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/provider-quality HTTP/1.1" 200 -
+2026-11-10 12:40:56 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/settings/config HTTP/1.1" 200 -
+2026-11-10 13:10:13 | INFO     | personal_ai_team | ============================================================
+2026-11-10 13:10:13 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 13:10:13 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 13:10:13 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 13:10:13 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 13:10:13 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 13:10:13 | INFO     | personal_ai_team | ============================================================
+2026-11-10 13:10:25 | INFO     | personal_ai_team | ============================================================
+2026-11-10 13:10:25 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 13:10:25 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 13:10:25 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 13:10:25 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 13:10:25 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 13:10:25 | INFO     | personal_ai_team | ============================================================
+2026-11-10 13:19:04 | INFO     | personal_ai_team | ============================================================
+2026-11-10 13:19:04 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 13:19:04 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 13:19:04 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 13:19:04 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 13:19:04 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 13:19:04 | INFO     | personal_ai_team | ============================================================
+2026-11-10 13:19:07 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-detail.js HTTP/1.1" 200 -
+2026-11-10 13:38:21 | INFO     | personal_ai_team | ============================================================
+2026-11-10 13:38:21 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 13:38:21 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 13:38:21 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 13:38:21 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 13:38:21 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 13:38:21 | INFO     | personal_ai_team | ============================================================
+2026-11-10 13:38:24 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/settings.js HTTP/1.1" 200 -
+2026-11-10 14:26:20 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:26:20 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:26:20 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:26:20 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:26:20 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:26:20 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:26:20 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:26:35 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:26:35 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:26:35 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:26:35 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:26:35 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:26:35 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:26:35 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:26:39 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/status HTTP/1.1" 200 -
+2026-11-10 14:26:39 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /api/providers HTTP/1.1" 404 -
+2026-11-10 14:31:56 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:31:56 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:31:56 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:31:56 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:31:56 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:31:56 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:31:56 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:32:09 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:32:09 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:32:09 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:32:09 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:32:09 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:32:09 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:32:09 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:32:16 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:32:16 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:32:16 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:32:16 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:32:16 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:32:16 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:32:16 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:32:20 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/status HTTP/1.1" 200 -
+2026-11-10 14:32:20 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/provider-quality HTTP/1.1" 200 -
+2026-11-10 14:38:02 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:38:02 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:38:02 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:38:02 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:38:02 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:38:02 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:38:02 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:38:09 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:38:09 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:38:09 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:38:09 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:38:09 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:38:09 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:38:09 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:38:20 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:38:20 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:38:20 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:38:20 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:38:20 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:38:20 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:38:20 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:38:24 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/status HTTP/1.1" 200 -
+2026-11-10 14:46:22 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:46:22 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:46:22 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:46:22 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:46:22 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:46:22 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:46:22 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:46:28 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:46:28 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 14:46:28 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 14:46:28 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 14:46:28 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 14:46:28 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 14:46:28 | INFO     | personal_ai_team | ============================================================
+2026-11-10 14:46:32 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/status HTTP/1.1" 200 -
+2026-11-10 14:46:32 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/provider-quality HTTP/1.1" 200 -
+2026-11-10 15:46:14 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:46:14 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:46:14 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:46:14 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:46:14 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:46:14 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:46:14 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:46:21 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:46:21 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:46:21 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:46:21 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:46:21 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:46:21 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:46:21 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:46:30 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:46:30 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:46:30 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:46:30 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:46:30 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:46:30 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:46:30 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:48:57 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:48:57 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:48:57 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:48:57 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:48:57 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:48:57 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:48:57 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:48:57 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:48:57 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:48:57 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:48:57 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:48:57 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:48:57 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:48:57 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:49:37 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:49:37 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:49:37 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:49:37 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:49:37 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:49:37 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:49:37 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:49:37 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:49:37 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:49:37 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:49:37 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:49:37 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:49:37 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:49:37 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:49:45 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:49:45 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:49:45 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:49:45 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:49:45 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:49:45 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:49:45 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:50:44 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:50:44 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:50:44 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:50:44 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:50:44 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:50:44 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:50:44 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:50:44 | INFO     | personal_ai_team | ============================================================
+2026-11-10 15:50:44 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 15:50:44 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 15:50:44 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 15:50:44 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 15:50:44 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 15:50:44 | INFO     | personal_ai_team | ============================================================
+2026-11-10 16:04:06 | INFO     | personal_ai_team | ============================================================
+2026-11-10 16:04:06 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 16:04:06 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 16:04:06 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 16:04:06 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 16:04:06 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 16:04:06 | INFO     | personal_ai_team | ============================================================
+2026-11-10 16:04:06 | INFO     | personal_ai_team | ============================================================
+2026-11-10 16:04:06 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 16:04:06 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 16:04:06 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 16:04:06 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 16:04:06 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 16:04:06 | INFO     | personal_ai_team | ============================================================
+2026-11-10 16:09:57 | INFO     | personal_ai_team | ============================================================
+2026-11-10 16:09:57 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 16:09:57 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 16:09:57 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 16:09:57 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 16:09:57 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 16:09:57 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:41:22 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:41:22 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 18:41:22 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 18:41:22 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 18:41:22 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 18:41:22 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 18:41:22 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:41:34 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:41:34 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 18:41:34 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 18:41:34 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 18:41:34 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 18:41:34 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 18:41:34 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:45:03 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:45:03 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 18:45:03 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 18:45:03 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 18:45:03 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 18:45:03 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 18:45:03 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:45:17 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:45:17 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 18:45:17 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 18:45:17 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 18:45:17 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 18:45:17 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 18:45:17 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:45:51 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:45:51 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 18:45:51 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 18:45:51 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 18:45:51 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 18:45:51 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 18:45:51 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:45:54 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET / HTTP/1.1" 200 -
+2026-11-10 18:45:54 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/settings.js HTTP/1.1" 200 -
+2026-11-10 18:45:54 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/notifications.js HTTP/1.1" 200 -
+2026-11-10 18:46:01 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:46:01 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 18:46:01 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 18:46:01 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 18:46:01 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 18:46:01 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 18:46:01 | INFO     | personal_ai_team | ============================================================
+2026-11-10 18:46:04 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/settings/update
+2026-11-10 18:46:04 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/settings/update HTTP/1.1" 400 -
+2026-11-10 19:02:02 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:02:02 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:02:02 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:02:02 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:02:02 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:02:02 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:02:02 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:02:02 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:02:02 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:02:02 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:02:02 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:02:02 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:02:02 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:02:02 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:02:05 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /api/git/ai-team/status HTTP/1.1" 404 -
+2026-11-10 19:02:13 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:02:13 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:02:13 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:02:13 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:02:13 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:02:13 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:02:13 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:02:16 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/projects HTTP/1.1" 200 -
+2026-11-10 19:02:16 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/git/default/status HTTP/1.1" 200 -
+2026-11-10 19:02:16 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /api/projects/default/files?path= HTTP/1.1" 404 -
+2026-11-10 19:02:34 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:02:34 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:02:34 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:02:34 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:02:34 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:02:34 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:02:34 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:02:37 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /api/projects/default/github-files HTTP/1.1" 400 -
+2026-11-10 19:11:34 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:11:34 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:11:34 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:11:34 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:11:34 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:11:34 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:11:34 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:11:40 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:11:40 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:11:40 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:11:40 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:11:40 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:11:40 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:11:40 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:12:15 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:12:15 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:12:15 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:12:15 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:12:15 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:12:15 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:12:15 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:17:36 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/git/default/status HTTP/1.1" 200 -
+2026-11-10 19:17:36 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /api/git/default/clone/00000000000000000000000000000000 HTTP/1.1" 404 -
+2026-11-10 19:19:46 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:19:46 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:19:46 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:19:46 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:19:46 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:19:46 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:19:46 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:19:51 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:19:51 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:19:51 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:19:51 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:19:51 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:19:51 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:19:51 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:20:02 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/git/default/status HTTP/1.1" 200 -
+2026-11-10 19:20:02 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/app-update/check HTTP/1.1" 200 -
+2026-11-10 19:22:03 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:22:03 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:22:03 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:22:03 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:22:03 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:22:03 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:22:03 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:22:11 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:22:11 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 19:22:11 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 19:22:11 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 19:22:11 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 19:22:11 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 19:22:11 | INFO     | personal_ai_team | ============================================================
+2026-11-10 19:22:42 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/git/default/status HTTP/1.1" 200 -
+2026-11-10 19:22:42 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/documentation-files HTTP/1.1" 200 -
+2026-11-10 19:22:42 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/settings/config HTTP/1.1" 200 -
+2026-11-10 19:22:42 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "GET /api/projects/default/local-files HTTP/1.1" 400 -
+2026-11-10 20:33:01 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:01 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:33:01 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:33:01 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:33:01 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:33:01 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:33:01 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:03 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:03 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:33:03 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:33:03 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:33:03 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:33:03 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:33:03 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:05 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:05 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:33:05 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:33:05 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:33:05 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:33:05 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:33:05 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:16 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:16 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:33:16 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:33:16 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:33:16 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:33:16 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:33:16 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:21 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:21 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:33:21 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:33:21 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:33:21 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:33:21 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:33:21 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:33:32 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/projects/default/context-documents HTTP/1.1" 200 -
+2026-11-10 20:33:32 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/status HTTP/1.1" 200 -
+2026-11-10 20:35:47 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:35:47 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:35:47 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:35:47 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:35:47 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:35:47 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:35:47 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:35:49 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:35:49 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:35:49 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:35:49 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:35:49 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:35:49 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:35:49 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:36:06 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/status HTTP/1.1" 200 -
+2026-11-10 20:36:06 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/projects/default/context-documents HTTP/1.1" 200 -
+2026-11-10 20:37:29 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:37:29 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:37:29 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:37:29 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:37:29 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:37:29 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:37:29 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:37:31 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:37:31 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:37:31 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:37:31 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:37:31 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:37:31 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:37:31 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:37:43 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/status HTTP/1.1" 200 -
+2026-11-10 20:37:43 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/chat?project_id=default HTTP/1.1" 200 -
+2026-11-10 20:39:23 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:39:23 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:39:23 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:39:23 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:39:23 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:39:23 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:39:23 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:39:26 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:39:26 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:39:26 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:39:26 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:39:26 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:39:26 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:39:26 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:39:38 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/doc-updates
+2026-11-10 20:39:38 | WARNING  | personal_ai_team | Invalid POST body for /api/doc-updates: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 20:39:38 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/doc-updates HTTP/1.1" 400 -
+2026-11-10 20:39:38 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/doc-updates
+2026-11-10 20:39:38 | WARNING  | personal_ai_team | Invalid POST body for /api/doc-updates: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 20:39:38 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/doc-updates HTTP/1.1" 400 -
+2026-11-10 20:39:38 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/tasks/T-9999/doc-update-decision
+2026-11-10 20:39:38 | WARNING  | personal_ai_team | Invalid POST body for /api/tasks/T-9999/doc-update-decision: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 20:39:38 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/tasks/T-9999/doc-update-decision HTTP/1.1" 400 -
+2026-11-10 20:39:42 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/doc-updates
+2026-11-10 20:39:42 | WARNING  | personal_ai_team | Invalid POST body for /api/doc-updates: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 20:39:42 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/doc-updates HTTP/1.1" 400 -
+2026-11-10 20:39:42 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/doc-updates
+2026-11-10 20:39:42 | WARNING  | personal_ai_team | Invalid POST body for /api/doc-updates: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 20:39:42 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/doc-updates HTTP/1.1" 400 -
+2026-11-10 20:39:42 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/tasks/T-9999/doc-update-decision
+2026-11-10 20:39:42 | WARNING  | personal_ai_team | Invalid POST body for /api/tasks/T-9999/doc-update-decision: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 20:39:42 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/tasks/T-9999/doc-update-decision HTTP/1.1" 400 -
+2026-11-10 20:39:45 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/doc-updates
+2026-11-10 20:39:45 | INFO     | personal_ai_team | Task created task_id=T-0001 status=Ready project_id=default
+2026-11-10 20:39:45 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "POST /api/doc-updates HTTP/1.1" 201 -
+2026-11-10 20:39:45 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/doc-updates
+2026-11-10 20:39:45 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/doc-updates HTTP/1.1" 400 -
+2026-11-10 20:39:45 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/tasks/T-9999/doc-update-decision
+2026-11-10 20:39:45 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/tasks/T-9999/doc-update-decision HTTP/1.1" 404 -
+2026-11-10 20:39:49 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/tasks/T-0001/status
+2026-11-10 20:39:49 | INFO     | personal_ai_team | Task status changed task_id=T-0001 from=Ready to=Canceled project_id=default
+2026-11-10 20:39:49 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "POST /api/tasks/T-0001/status HTTP/1.1" 200 -
+2026-11-10 20:40:51 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:40:51 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 20:40:51 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 20:40:51 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 20:40:51 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 20:40:51 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 20:40:51 | INFO     | personal_ai_team | ============================================================
+2026-11-10 20:41:03 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET / HTTP/1.1" 200 -
+2026-11-10 20:41:03 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-detail.js HTTP/1.1" 200 -
+2026-11-10 20:41:03 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /static/js/task-board.js HTTP/1.1" 200 -
+2026-11-10 20:41:03 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/status HTTP/1.1" 200 -
+2026-11-10 21:12:53 | INFO     | personal_ai_team | ============================================================
+2026-11-10 21:12:53 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 21:12:53 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 21:12:53 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 21:12:53 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 21:12:53 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 21:12:53 | INFO     | personal_ai_team | ============================================================
+2026-11-10 21:12:54 | INFO     | personal_ai_team | ============================================================
+2026-11-10 21:12:54 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 21:12:54 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 21:12:54 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 21:12:54 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 21:12:54 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 21:12:54 | INFO     | personal_ai_team | ============================================================
+2026-11-10 21:12:56 | INFO     | personal_ai_team | ============================================================
+2026-11-10 21:12:56 | INFO     | personal_ai_team | Personal AI Team server starting
+2026-11-10 21:12:56 | INFO     | personal_ai_team | ROOT: D:\Projects\AI-Team
+2026-11-10 21:12:56 | INFO     | personal_ai_team | DATA: D:\Projects\AI-Team\data
+2026-11-10 21:12:56 | INFO     | personal_ai_team | LOG_DIR: D:\Projects\AI-Team\data\logs
+2026-11-10 21:12:56 | INFO     | personal_ai_team | LOG_FILE: D:\Projects\AI-Team\data\logs\app.log
+2026-11-10 21:12:56 | INFO     | personal_ai_team | ============================================================
+2026-11-10 21:13:08 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/tasks HTTP/1.1" 200 -
+2026-11-10 21:13:08 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/tasks
+2026-11-10 21:13:08 | WARNING  | personal_ai_team | Invalid POST body for /api/tasks: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 21:13:08 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/tasks HTTP/1.1" 400 -
+2026-11-10 21:13:08 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/doc-updates
+2026-11-10 21:13:08 | WARNING  | personal_ai_team | Invalid POST body for /api/doc-updates: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 21:13:08 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/doc-updates HTTP/1.1" 400 -
+2026-11-10 21:13:08 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/tasks/T-9999/status
+2026-11-10 21:13:08 | WARNING  | personal_ai_team | Invalid POST body for /api/tasks/T-9999/status: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+2026-11-10 21:13:08 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/tasks/T-9999/status HTTP/1.1" 400 -
+2026-11-10 21:13:11 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/tasks
+2026-11-10 21:13:11 | INFO     | personal_ai_team | Creating task: title='smoke', role=PM/PO, provider=Automatic
+2026-11-10 21:13:11 | INFO     | personal_ai_team | Task created task_id=T-0002 status=Draft project_id=default
+2026-11-10 21:13:11 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "POST /api/tasks HTTP/1.1" 201 -
+2026-11-10 21:13:11 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/doc-updates
+2026-11-10 21:13:11 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/doc-updates HTTP/1.1" 400 -
+2026-11-10 21:13:11 | INFO     | personal_ai_team | HTTP request started method=POST client=127.0.0.1 path=/api/tasks/T-9999/status
+2026-11-10 21:13:11 | WARNING  | personal_ai_team | HTTP client=127.0.0.1 "POST /api/tasks/T-9999/status HTTP/1.1" 404 -
+2026-11-10 21:13:13 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "GET /api/tasks HTTP/1.1" 200 -
+2026-11-10 21:13:13 | INFO     | personal_ai_team | HTTP client=127.0.0.1 "DELETE /api/tasks/T-0002 HTTP/1.1" 200 -

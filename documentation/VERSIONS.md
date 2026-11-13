@@ -1,5 +1,11 @@
 # Version log
 
+## 0.93 — 2026-11-13
+
+- Added `ait/provider_stream.py`: provider task calls now stream SSE responses (Gemini `streamGenerateContent?alt=sse`, OpenAI-compatible `chat/completions` `stream: true`) with a 15-minute idle timeout that resets on every chunk; stalled streams fail as retryable 503 and non-SSE endpoints fall back to blocking calls.
+- Moved `call_gemini_task`/`call_openai_compatible_task` out of `ait/provider_calls.py` (now connection/model testing only) and added `STREAM_IDLE_TIMEOUT_SECONDS` to `ait/common.py`.
+- Updated documentation to 0.93.
+
 ## 0.92 — 2026-11-13
 
 - Updated `documentation/DOCUMENTATION.md` for the header agent-health chip, `GET /api/providers/health`, `/api/status` `app_version`/`agents` fields, and the removed board provider-status line.
