@@ -42,6 +42,7 @@ from ait import pm_planning_finish  # noqa: F401
 from ait import pm_planning_escalation  # noqa: F401
 from ait import pm_planning  # noqa: F401
 from ait import provider_calls  # noqa: F401
+from ait import provider_health  # noqa: F401
 from ait import provider_dispatch  # noqa: F401
 from ait import qa_review  # noqa: F401
 from ait import provider_registry  # noqa: F401
@@ -65,6 +66,7 @@ _DOMAIN_MODULES = (
     github_checks,
     notifications,
     provider_calls,
+    provider_health,
     provider_dispatch,
     pm_planning_parse,
     pm_planning_finish,

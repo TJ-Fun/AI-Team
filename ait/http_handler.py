@@ -98,6 +98,8 @@ class Handler(BaseHTTPRequestHandler):
                     "chat_working": ACTIVE_CHAT_COUNT > 0,
                     "providers": providers_status,
                     "github_configured": bool(get_provider_key("github")),
+                    "app_version": current_app_version(),
+                    "agents": provider_health_status(),
                     "watchdog": WATCHDOG_STATUS,
                 }
             )

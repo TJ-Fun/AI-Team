@@ -1,5 +1,10 @@
 # Version log
 
+## 0.90 — 2026-11-13
+
+- Added cached AI-provider health checks (`ait/provider_health.py`) using the existing lightweight connection tests, exposed `GET /api/providers/health`, and added `app_version` plus cached `agents` summary to `/api/status`.
+- Updated documentation to 0.90.
+
 ## 0.89 — 2026-11-13
 
 - Updated `documentation/DOCUMENTATION.md` with the env_setup workflow, project services manifest, and GitHub Actions QA evidence; refreshed the repository map for the new backend/frontend modules.

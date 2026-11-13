@@ -73,6 +73,10 @@ def handle_providers_get(handler, path, query) -> bool:
             handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return True
 
+    if path == "/api/providers/health":
+        handler.send_json({"agents": provider_health_status(refresh=True)})
+        return True
+
     return False
 
 
