@@ -32,6 +32,21 @@ def handle_git_get(handler, path, query) -> bool:
             handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return True
 
+    m_checks = re.fullmatch(r"/api/git/([a-z0-9-]+)/checks", path)
+    if m_checks:
+        pid = m_checks.group(1)
+        ref = str((query.get("ref") or [""])[0] or "").strip()
+        if not ref:
+            handler.send_json({"error": "Choose a git ref or commit SHA."}, HTTPStatus.BAD_REQUEST)
+            return True
+        try:
+            checks = github_check_runs(pid, ref)
+            handler.send_json({"available": True, "ref": ref, "checks": checks, "summary": github_checks_summary(checks)})
+            return True
+        except ValueError as exc:
+            handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
+
     return False
 
 

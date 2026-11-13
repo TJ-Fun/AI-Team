@@ -131,6 +131,11 @@ def build_qa_review_instructions(task: dict[str, Any]) -> str:
             f"Pull request branch: {branch}\nReviewed commit: {head_sha}\n"
             + github_task_context(task, head_sha, max_files=32, max_bytes=48000)
         )
+        try:
+            checks = github_check_runs(str(task.get("project_id") or "default"), head_sha)
+            repository_context += "\n\n" + github_checks_summary_text(checks, head_sha)
+        except Exception as exc:
+            repository_context += f"\n\nGitHub check runs unavailable: {exc}"
     elif repository_required:
         repository_context = "No GitHub pull request is linked to this repository-changing task yet."
 

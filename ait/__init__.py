@@ -18,6 +18,7 @@ from ait import git_github_api  # noqa: F401
 from ait import github_repo_wipe  # noqa: F401
 from ait import git_local_ops  # noqa: F401
 from ait import git_task_postprocess  # noqa: F401
+from ait import github_checks  # noqa: F401
 from ait import http_handler  # noqa: F401
 from ait import info_requests  # noqa: F401
 from ait import main  # noqa: F401
@@ -61,6 +62,7 @@ _DOMAIN_MODULES = (
     github_repo_wipe,
     git_local_ops,
     git_task_postprocess,
+    github_checks,
     notifications,
     provider_calls,
     provider_dispatch,

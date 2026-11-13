@@ -1,5 +1,10 @@
 # Version log
 
+## 0.88 — 2026-11-13
+
+- Added read-only GitHub Actions check-run evidence: `GET /api/git/{project}/checks?ref=...`, normalized check summaries, and automatic inclusion of CI results in QA review instructions for pull-request tasks.
+- Updated documentation to 0.88.
+
 ## 0.87 — 2026-11-13
 
 - Added a per-project **Services & hosting** manifest (web host, API runtime, database, auth, media, bot protection, preview/staging/prod URLs, health path) stored on the project and editable in Settings → Projects.
