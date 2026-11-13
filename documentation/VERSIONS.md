@@ -1,5 +1,10 @@
 # Version log
 
+## 0.95 — 2026-11-13
+
+- Updated `documentation/DOCUMENTATION.md` for streamed provider task calls, the 15-minute chunk-reset idle timeout, and the non-SSE fallback; refreshed the repository map with `ait/provider_stream.py`.
+- Updated documentation to 0.95.
+
 ## 0.94 — 2026-11-13
 
 - Verified streamed reply metadata (`streamed`, `usage`, `finish_reason`) is stored with each agent reply and that SSE parsing skips keep-alives, blanks, and `[DONE]` correctly; stream stalls surface as retryable provider errors.
