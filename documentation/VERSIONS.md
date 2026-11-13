@@ -1,5 +1,10 @@
 # Version log
 
+## 0.82 — 2026-11-13
+
+- Refactored `ait/pm_planning.py` (559 lines) into focused modules: `pm_planning_parse.py`, `pm_planning_finish.py`, and `pm_planning_escalation.py`, with `pm_planning.py` kept as a facade. No behavior change; prerequisite for manual env-setup task support.
+- Updated documentation to 0.82.
+
 ## 0.81 — 2026-11-13
 
 - Added a **Project** dropdown at the top of Settings → Projects so only one project editor is visible at a time; Save still submits all project drafts.
