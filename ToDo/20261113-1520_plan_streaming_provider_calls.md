@@ -1,6 +1,6 @@
 # Plan: streaming provider calls with 15-min idle timeout
 
-Status: **Approved — executing**
+Status: **Completed (v0.93–v0.95, 2026-11-13)**
 
 ## Goal
 
