@@ -1,5 +1,11 @@
 # Version log
 
+## 0.87 — 2026-11-13
+
+- Added a per-project **Services & hosting** manifest (web host, API runtime, database, auth, media, bot protection, preview/staging/prod URLs, health path) stored on the project and editable in Settings → Projects.
+- The manifest is summarized into PM/PO project context so planning accounts for external services.
+- Updated documentation to 0.87.
+
 ## 0.86 — 2026-11-13
 
 - Added the env_setup task UI: board ENV badge, detail section with ordered steps, expected output, pasted-output textarea, Confirm/Skip/Problem/Change actions, blocked-issue panel, and Ask PM/PO to troubleshoot.

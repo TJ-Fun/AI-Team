@@ -276,6 +276,11 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
                     "context": str(mod.get("context", ""))[:10000],
                 }
             )
+        raw_services = raw.get("services")
+        if raw_services is None:
+            services = clean_project_services((existing_map.get(pid, {}) or {}).get("services") or {})
+        else:
+            services = clean_project_services(raw_services)
         seen.add(pid)
         context = str(raw.get("context", ""))[:20000]
         old_ctx = str(existing_map.get(pid, {}).get("context", ""))
@@ -306,6 +311,7 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
                 "local_path": local_path,
                 "context": context,
                 "modules": clean_modules,
+                "services": services,
                 "version": version,
                 "completed_phases": completed_phases,
                 "milestones": milestones,
@@ -520,10 +526,12 @@ def project_context_for_role(role: str, task: dict[str, Any] | None = None) -> s
         )
 
     if project:
+        svc_summary = project_services_summary(project)
+        svc_text = f"\n\nServices & hosting:\n{svc_summary}" if svc_summary else ""
         sections.append(
             (
                 "Project",
-                f"Name: {project.get('name', '')}\nRepository: {project.get('repository', '')}\n\n{project.get('context', '')}",
+                f"Name: {project.get('name', '')}\nRepository: {project.get('repository', '')}\n\n{project.get('context', '')}{svc_text}",
             )
         )
         mid = str((task or {}).get("module_id") or "")

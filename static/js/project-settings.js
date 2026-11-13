@@ -5,6 +5,20 @@ export function initProjectSettings({ refreshBoard } = {}) {
   // --- Projects & Sub-projects Dialog ---
   const projectsForm = $("#projects-form");
   const PROJECTS_STORAGE_KEY = "ai_team_settings_project_id";
+  const SERVICE_FIELDS = [
+    "svc_web_host", "svc_api_runtime", "svc_database", "svc_auth", "svc_media", "svc_bot_protection",
+    "svc_preview_url", "svc_staging_url", "svc_production_url", "svc_health_path",
+  ];
+  function servicesToDraft(services = {}) {
+    const out = {};
+    for (const f of SERVICE_FIELDS) out[f] = services[f.slice(4)] || "";
+    return out;
+  }
+  function draftToServices(d) {
+    const out = {};
+    for (const f of SERVICE_FIELDS) out[f.slice(4)] = d[f] || "";
+    return out;
+  }
   let projectDrafts = [];
   let selectedProjectIndex = 0;
 
@@ -233,6 +247,7 @@ export function initProjectSettings({ refreshBoard } = {}) {
             .join("\n"),
           history: hist,
           selectedVersion: hist[0]?.id || "",
+          ...servicesToDraft(p.services),
         };
       })
     );
@@ -251,6 +266,7 @@ export function initProjectSettings({ refreshBoard } = {}) {
       modulesText: "",
       history: [],
       selectedVersion: "",
+      ...servicesToDraft({}),
     });
     selectedProjectIndex = projectDrafts.length - 1;
     renderProjectEditors();
@@ -282,6 +298,7 @@ export function initProjectSettings({ refreshBoard } = {}) {
           local_path: d.local_path.trim(),
           context: d.context.trim(),
           modules,
+          services: draftToServices(d),
         };
       });
       await api("/api/projects", {

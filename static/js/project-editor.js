@@ -1,5 +1,19 @@
 import { $, escapeHtml, api, formatTime } from "./core.js";
 
+function servicesHtml(d) {
+  const sel = (field, label, opts) => `<label>${label}<select data-proj-field="${field}">${opts
+    .map((o) => `<option value="${escapeHtml(o)}" ${(d[field] || "") === o ? "selected" : ""}>${escapeHtml(o || "Not set")}</option>`)
+    .join("")}</select></label>`;
+  const txt = (field, label, ph) => `<label>${label}<input data-proj-field="${field}" value="${escapeHtml(d[field] || "")}" placeholder="${escapeHtml(ph)}" maxlength="500"></label>`;
+  return `<div class="project-services"><h4>Services &amp; hosting</h4>
+    <div class="two-columns">${sel("svc_web_host", "Web host", ["", "vercel", "netlify", "github-pages", "oci", "other"])}${sel("svc_api_runtime", "API runtime", ["", "oci", "vercel", "netlify", "other"])}</div>
+    <div class="two-columns">${sel("svc_database", "Database", ["", "supabase", "firebase", "oci-postgres", "other"])}${sel("svc_auth", "Auth", ["", "supabase", "firebase", "clerk", "other"])}</div>
+    <div class="two-columns">${sel("svc_media", "Media", ["", "cloudinary", "imagekit", "other"])}${sel("svc_bot_protection", "Bot protection", ["", "cloudflare-turnstile", "other"])}</div>
+    <div class="two-columns">${txt("svc_preview_url", "Preview URL", "https://preview.example.com")}${txt("svc_staging_url", "Staging URL", "https://staging.example.com")}</div>
+    <div class="two-columns">${txt("svc_production_url", "Production URL", "https://app.example.com")}${txt("svc_health_path", "Health path", "/health")}</div>
+  </div>`;
+}
+
 export function renderProjectEditors(projectDrafts, selectedProjectIndex, storageKey) {
     const selector = $("#project-selector");
     if (selector) {
@@ -70,6 +84,7 @@ export function renderProjectEditors(projectDrafts, selectedProjectIndex, storag
               d.modulesText
             )}</textarea>
           </label>
+          ${servicesHtml(d)}
           <button type="button" class="danger" data-proj-remove="${idx}">Remove project</button>
         </section>` : ""
       )

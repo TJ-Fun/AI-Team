@@ -416,6 +416,8 @@ dialog::backdrop{background:#000000aa}
 .add-provider-row{display:flex;gap:8px;align-items:flex-end}
 .add-provider-row .route-order{flex:1;min-width:0;margin-top:0;grid-template-columns:repeat(3,minmax(0,1fr))}
 .add-provider-row>.secondary{height:42px;flex-shrink:0;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.project-services{border-top:1px solid #2c332e;margin-top:10px;padding-top:10px}
+.project-services h4{margin:0 0 8px;font-size:12px;color:#9aa396}
 .env-step{border:1px solid #2c332e;border-radius:8px;padding:10px;margin:8px 0;background:#1a201c}
 .env-step.env-current{border-color:#3f5a3d}
 .env-step.env-issue{border-color:#4a2f2f;background:#241a18}
