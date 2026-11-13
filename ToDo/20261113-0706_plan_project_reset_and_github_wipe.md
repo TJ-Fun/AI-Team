@@ -1,6 +1,6 @@
 # Plan: per-project task reset + GitHub contents wipe
 
-Status: **Pending approval**
+Status: **Complete** (v0.80, 2026-11-13)
 
 ## Goal
 

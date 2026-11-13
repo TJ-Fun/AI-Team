@@ -1,4 +1,4 @@
-import { $, escapeHtml, api, appAlert, appConfirm, formatTime, slugify } from "./core.js";
+import { $, escapeHtml, api, appAlert, appConfirm, appPrompt, formatTime, slugify } from "./core.js";
 
 export function initProjectSettings({ refreshBoard } = {}) {
   // --- Projects & Sub-projects Dialog ---
@@ -39,6 +39,12 @@ export function initProjectSettings({ refreshBoard } = {}) {
             <button type="button" class="secondary" data-proj-push="${idx}">↑ Push to GitHub</button>
             <button type="button" class="secondary" data-proj-clone="${idx}">Clone repository</button>
             <span class="git-status" data-proj-status="${idx}">Checking status…</span>
+          </div>
+          ` : ''}
+          ${d.id ? `
+          <div class="git-controls project-danger-actions">
+            <button type="button" class="danger" data-proj-clear-tasks="${idx}">Clear tasks</button>
+            <button type="button" class="danger" data-proj-wipe-github="${idx}">Wipe GitHub contents</button>
           </div>
           ` : ''}
           <label>Project background notes
@@ -193,6 +199,50 @@ export function initProjectSettings({ refreshBoard } = {}) {
       } catch (err) {
         appAlert(`Clone failed: ${err.message}`, "Git clone failed");
         if (statusEl) statusEl.textContent = "Clone failed";
+      }
+      return;
+    }
+
+    const clearTasksBtn = e.target.closest("[data-proj-clear-tasks]");
+    if (clearTasksBtn) {
+      const d = projectDrafts[Number(clearTasksBtn.getAttribute("data-proj-clear-tasks"))];
+      if (!d?.id) return;
+      const ok = await appConfirm(`Delete all tasks for "${d.name || d.id}"? This removes task replies and activity entries. Chat history and project context stay.`, { title: "Clear project tasks", danger: true });
+      if (!ok) return;
+      try {
+        const res = await api(`/api/projects/${encodeURIComponent(d.id)}/clear-tasks`, { method: "POST", body: JSON.stringify({ confirm: true }) });
+        appAlert(`Cleared ${res.deleted_tasks} task(s) and ${res.deleted_replies} reply folder(s) for ${d.name || d.id}.`, "Tasks cleared");
+        if (refreshBoard) await refreshBoard();
+      } catch (err) {
+        appAlert(err.message, "Clear tasks failed");
+      }
+      return;
+    }
+
+    const wipeGithubBtn = e.target.closest("[data-proj-wipe-github]");
+    if (wipeGithubBtn) {
+      const d = projectDrafts[Number(wipeGithubBtn.getAttribute("data-proj-wipe-github"))];
+      if (!d?.id) return;
+      const repoMatch = String(d.repository || "").trim().match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/i);
+      const repoName = repoMatch ? `${repoMatch[1]}/${repoMatch[2]}` : String(d.repository || "").trim();
+      if (!repoName) {
+        appAlert("Project has no GitHub repository configured.", "GitHub wipe");
+        return;
+      }
+      const answer = await appPrompt(`This empties the GitHub repository contents and deletes the local clone for ${d.name || d.id}. Type ${repoName} to confirm.`, repoName, "Wipe GitHub contents");
+      if (!answer.confirmed) return;
+      if (String(answer.value || "").trim().casefold() !== repoName.casefold()) {
+        appAlert("Repository name did not match; wipe cancelled.", "Wipe cancelled");
+        return;
+      }
+      try {
+        const res = await api(`/api/projects/${encodeURIComponent(d.id)}/wipe-github`, { method: "POST", body: JSON.stringify({ confirm_text: answer.value }) });
+        const localNote = res.local_clone && res.local_clone.deleted ? " Local clone deleted." : "";
+        appAlert(`GitHub contents wiped for ${res.repository}: ${res.deleted_branches} branch(es), ${res.deleted_tags} tag(s), ${res.deleted_releases} release(s).${localNote}`, "GitHub wiped");
+        renderProjectEditors();
+        if (refreshBoard) await refreshBoard();
+      } catch (err) {
+        appAlert(err.message, "GitHub wipe failed");
       }
       return;
     }

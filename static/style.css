@@ -98,6 +98,7 @@
 .git-status{font-size:10px;color:#6f786d;margin-left:auto;padding:4px 8px;border-radius:6px;background:#f4f5f2}
 .git-status-clean{color:#286b39;background:#e3f3e6}
 .git-status-dirty{color:#8b5c13;background:#fff4e5}
+.project-danger-actions .danger{margin-left:0}
 
 /* Settings dialog styling */
 .settings-section{border:1px solid #e9ece6;border-radius:8px;padding:14px;margin:12px 0;background:#fafbf9}

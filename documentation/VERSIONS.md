@@ -1,5 +1,11 @@
 # Version log
 
+## 0.80 — 2026-11-13
+
+- Exposed the per-project destructive actions in Settings → Projects: **Clear tasks** uses a danger confirmation, and **Wipe GitHub contents** requires typing the exact `owner/repo` name before calling the backend.
+- Both buttons call the v0.78/v0.79 endpoints, refresh the board on success, and keep chat history and project context documents intact.
+- Added `.project-danger-actions` styling so the two danger buttons align. Updated documentation to 0.80.
+
 ## 0.79 — 2026-11-13
 
 - Added the per-project **Wipe GitHub contents** backend: `POST /api/projects/{id}/wipe-github` resets the repository's default branch to a single empty commit, deletes all other branches, tags, and releases, then deletes the configured local clone while keeping the repository object, project `repository`/`local_path`, tasks, chat, and context docs.
