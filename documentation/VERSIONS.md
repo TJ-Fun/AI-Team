@@ -1,5 +1,10 @@
 # Version log
 
+## 0.94 — 2026-11-13
+
+- Verified streamed reply metadata (`streamed`, `usage`, `finish_reason`) is stored with each agent reply and that SSE parsing skips keep-alives, blanks, and `[DONE]` correctly; stream stalls surface as retryable provider errors.
+- Updated documentation to 0.94.
+
 ## 0.93 — 2026-11-13
 
 - Added `ait/provider_stream.py`: provider task calls now stream SSE responses (Gemini `streamGenerateContent?alt=sse`, OpenAI-compatible `chat/completions` `stream: true`) with a 15-minute idle timeout that resets on every chunk; stalled streams fail as retryable 503 and non-SSE endpoints fall back to blocking calls.
