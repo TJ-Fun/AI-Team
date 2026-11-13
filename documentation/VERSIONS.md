@@ -1,5 +1,10 @@
 # Version log
 
+## 0.89 — 2026-11-13
+
+- Updated `documentation/DOCUMENTATION.md` with the env_setup workflow, project services manifest, and GitHub Actions QA evidence; refreshed the repository map for the new backend/frontend modules.
+- Updated documentation to 0.89.
+
 ## 0.88 — 2026-11-13
 
 - Added read-only GitHub Actions check-run evidence: `GET /api/git/{project}/checks?ref=...`, normalized check summaries, and automatic inclusion of CI results in QA review instructions for pull-request tasks.

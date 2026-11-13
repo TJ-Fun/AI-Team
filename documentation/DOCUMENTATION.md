@@ -15,10 +15,10 @@ The application is intended for a trusted, single-user environment. The default 
 | Path | Purpose |
 |---|---|
 | `server.py` | Thin entry point; delegates to the `ait` package. Kept for the systemd unit and existing deployment commands. |
-| `ait/` | Application package split from the former monolithic `server.py`. `common.py` holds constants, logging, locks, and shared helpers; `settings.py`, `provider_registry.py`, `secrets.py`, `prompts.py`, `projects.py`, `git_app_sync.py`, `git_github_api.py`, `git_local_ops.py`, `git_task_postprocess.py`, `notifications.py`, `providers.py`, `chat.py`, and `http_handler.py` hold the domain logic; `main.py` starts background workers and the HTTP server. The package shares one flat namespace across modules, mirroring the original single-file layout. |
+| `ait/` | Application package split from the former monolithic `server.py`. `common.py` holds constants, logging, locks, and shared helpers; `settings.py`, `provider_registry.py`, `secrets.py`, `prompts.py`, `projects.py`, `git_app_sync.py`, `git_github_api.py`, `git_local_ops.py`, `git_task_postprocess.py`, `github_checks.py`, `env_tasks.py`, `project_services.py`, `notifications.py`, `providers.py`, `chat.py`, and `http_handler.py` hold the domain logic; `main.py` starts background workers and the HTTP server. The package shares one flat namespace across modules, mirroring the original single-file layout. |
 | `static/index.html` | Application layout, dialogs, forms, and tab structure. |
 | `static/app.js` | ES module entry point for browser behavior, API calls, rendering, polling, form submissions, and dialogs. |
-| `static/js/` | Shared frontend modules; `core.js` holds state, API, dialog, update-progress, and formatting helpers, and feature modules such as `prompts.js`, `project-context.js`, `repository-viewer.js`, `header.js`, `providers.js`, `project-settings.js`, `task-utils.js`, `project-selectors.js`, `task-board.js`, and `task-dialog.js` are initialized by `app.js`. |
+| `static/js/` | Shared frontend modules; `core.js` holds state, API, dialog, update-progress, and formatting helpers, and feature modules such as `prompts.js`, `project-context.js`, `repository-viewer.js`, `header.js`, `providers.js`, `project-settings.js`, `task-utils.js`, `project-selectors.js`, `task-board.js`, `task-detail.js`, `task-detail-actions.js`, `task-env.js`, `project-editor.js`, and `task-dialog.js` are initialized by `app.js`. |
 | `static/style.css` | Application styling and responsive layouts. |
 | `personal-ai-team.service` | Example systemd unit for the `ubuntu` service account. |
 | `prompts/` | Built-in shared and role-specific agent prompts. |
@@ -90,6 +90,14 @@ The service must have both systemd write permission (`ReadWritePaths`) and Unix 
 The Settings dialog uses Projects, Connections, Routing, Logs, and About tabs. A shared Close button remains at the bottom of the dialog. Long log and documentation lines wrap within their viewers to avoid horizontal scrolling.
 
 **Statistics** is available directly from the header. Its period selector filters provider request, successful reply, and average response-time summaries. Deliverable QA pass rates are shown from recorded provider quality results, with QA attempts attributed to the QA role. Usage reset changes a display baseline for the selected provider/model and period; it does not delete historical records. Board polling refreshes the open task detail only when that task changes and restores focus and scroll position after the update.
+
+### 4.7 Environment setup tasks, services manifest, and CI evidence
+
+PM/PO plans can propose manual **env_setup** tasks for host/account preparation. Each task contains 1–10 ordered steps with instructions and expected output; users start the task, paste command output, and mark each step confirmed, skipped, problem, or change. Problems block the task and can be escalated to PM/PO for revised instructions. Env tasks are never dispatched to providers and do not create repository pull requests.
+
+Each project also stores a **Services & hosting** manifest (web host, API runtime, database, auth, media, bot protection, preview/staging/production URLs, and health path). The manifest is editable in **Settings → Projects** and summarized into PM/PO project context so planning accounts for external services.
+
+For repository tasks with a pull request, QA review instructions include read-only GitHub Actions check-run evidence for the reviewed commit. Check runs are also available through `GET /api/git/{project}/checks?ref=<sha-or-branch>`.
 
 ## 5. Installation and deployment (Ubuntu/Oracle Cloud)
 
