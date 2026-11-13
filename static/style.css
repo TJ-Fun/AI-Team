@@ -416,5 +416,13 @@ dialog::backdrop{background:#000000aa}
 .add-provider-row{display:flex;gap:8px;align-items:flex-end}
 .add-provider-row .route-order{flex:1;min-width:0;margin-top:0;grid-template-columns:repeat(3,minmax(0,1fr))}
 .add-provider-row>.secondary{height:42px;flex-shrink:0;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.env-step{border:1px solid #2c332e;border-radius:8px;padding:10px;margin:8px 0;background:#1a201c}
+.env-step.env-current{border-color:#3f5a3d}
+.env-step.env-issue{border-color:#4a2f2f;background:#241a18}
+.env-step-head{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.env-step-status{font-size:10px;padding:2px 6px;border-radius:999px;background:#222a24;color:#9aa396}
+.env-instructions,.env-output{white-space:pre-wrap;background:#1e2420;padding:8px;border-radius:6px;font-size:11px;color:#b9c2ba}
+.env-step textarea{width:100%;margin-top:6px}
+.env-step-actions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 @media(max-width:520px){.app-dialog{padding:18px}.chat-tools{align-items:flex-end;flex-direction:column}.chat-provider-menu{max-width:100%}.add-provider-row{flex-direction:column;align-items:stretch}.add-provider-row>.secondary{align-self:flex-start}}
 

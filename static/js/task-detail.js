@@ -3,6 +3,7 @@ import {
 } from "./core.js";
 import { getAskedProvider } from "./task-utils.js";
 import { renderTaskDetailActions, bindTaskDetailActions } from "./task-detail-actions.js";
+import { renderEnvSection, bindEnvSection } from "./task-env.js";
 
 export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects, openTaskDialog } = {}) {
   // --- Task Detail Dialog ---
@@ -251,6 +252,8 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
       updSec.hidden = true;
     }
 
+    renderEnvSection(task);
+
     // Acceptance checks
     const checks = task.acceptance_checks || [];
     $("#detail-checks").innerHTML = checks.length
@@ -350,5 +353,6 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
   }
 
   bindTaskDetailActions({ detailDialog, refreshBoard, openTaskDialog });
+  bindEnvSection({ refreshBoard });
   return { openTaskDetail, renderTaskDetailContent };
 }

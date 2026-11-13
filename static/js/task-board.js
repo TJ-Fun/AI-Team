@@ -69,6 +69,7 @@ export function initTaskBoard(context = {}) {
         <article class="task-card" data-task-id="${escapeHtml(task.id)}">
           <div class="task-topline">
             <span class="${escapeHtml(statusClass(task.status))}">${escapeHtml(task.status)}</span>
+            ${task.task_type === "env_setup" ? `<span class="state state-done">ENV</span>` : ""}
             <span class="task-id">${escapeHtml(task.id)}</span>
             <time>${escapeHtml(formatTime(task.created_at))}</time>
           </div>

@@ -1,5 +1,10 @@
 # Version log
 
+## 0.86 — 2026-11-13
+
+- Added the env_setup task UI: board ENV badge, detail section with ordered steps, expected output, pasted-output textarea, Confirm/Skip/Problem/Change actions, blocked-issue panel, and Ask PM/PO to troubleshoot.
+- Updated documentation to 0.86.
+
 ## 0.85 — 2026-11-13
 
 - Added manual **env_setup** tasks: PM/PO plans can propose `kind:"env_setup"` tasks with 1–10 detailed steps, and users can create them via `POST /api/env-tasks`.
