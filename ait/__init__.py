@@ -24,6 +24,7 @@ from ait import main  # noqa: F401
 from ait import notifications  # noqa: F401
 from ait import projects  # noqa: F401
 from ait import project_cleanup  # noqa: F401
+from ait import env_tasks  # noqa: F401
 from ait import prompts  # noqa: F401
 from ait import routes_git  # noqa: F401
 from ait import routes_providers  # noqa: F401
@@ -33,6 +34,7 @@ from ait import routes_tasks  # noqa: F401
 from ait import routes_tasks_core  # noqa: F401
 from ait import routes_tasks_ops  # noqa: F401
 from ait import routes_tasks_pm  # noqa: F401
+from ait import routes_env_tasks  # noqa: F401
 from ait import pm_planning_parse  # noqa: F401
 from ait import pm_planning_finish  # noqa: F401
 from ait import pm_planning_escalation  # noqa: F401
@@ -51,6 +53,7 @@ _DOMAIN_MODULES = (
     prompts,
     projects,
     project_cleanup,
+    env_tasks,
     git_app_sync,
     git_github_api,
     github_repo_wipe,
@@ -72,6 +75,7 @@ _DOMAIN_MODULES = (
     routes_tasks_core,
     routes_tasks_ops,
     routes_tasks_pm,
+    routes_env_tasks,
     chat,
     doc_updates,
     info_requests,

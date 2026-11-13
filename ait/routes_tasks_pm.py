@@ -283,7 +283,7 @@ def handle_tasks_pm_post(handler, path, body) -> bool:
             if plan_id:
                 for wt in read_tasks():
                     if (
-                        wt.get("task_type") == "work"
+                        wt.get("task_type") in ("work", "env_setup")
                         and wt.get("status") == "Draft"
                         and not wt.get("pending_design_review")
                         and str(wt.get("source_plan_task_id") or "") == plan_id

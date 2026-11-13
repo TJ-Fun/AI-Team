@@ -202,6 +202,7 @@ PM_PLANNING_CONTRACT = (
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log"},'
     '"tasks":[{"title":"task title","request":"bounded implementation request",'
     '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1}]}. '
+    "To ask the user to perform host/account setup, include a task with \"kind\":\"env_setup\", \"title\", \"request\", and \"steps\":[{\"title\":\"short step\",\"instructions\":\"exact step-by-step commands/checks\",\"expected\":\"expected output\"}]; env tasks are manual, use role \"User\", and are not dispatched to providers. "
     "Use only these work roles: PM/PO, Frontend developer, Backend developer, QA, UI designer, Documentation. "
     "Use only sub-project IDs listed in the project context; use an empty module_id for the whole project. "
     "Propose 1 to 12 small tasks. Assign each task a phase number (1 = first milestone, 2 = next, and so on); "

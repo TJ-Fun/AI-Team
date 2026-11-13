@@ -79,6 +79,29 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
                 raise ValueError("Each proposed task needs a non-empty title.")
             if not req:
                 raise ValueError(f"Proposed task '{title}' needs a non-empty request.")
+            is_env = str(t.get("kind") or t.get("audience") or t.get("task_type") or "").lower() in ("env_setup", "user", "manual")
+            if is_env:
+                if mid and mid not in valid_mods:
+                    mid = ""
+                try:
+                    env_phase = int(t.get("phase") or 1)
+                except (TypeError, ValueError):
+                    env_phase = 1
+                env_phase = min(max(env_phase, 1), 9)
+                norm_t.append(
+                    {
+                        "title": title,
+                        "request": req,
+                        "role": "User",
+                        "kind": "env_setup",
+                        "module_id": mid,
+                        "acceptance_checks": [],
+                        "produces_deliverable": False,
+                        "phase": env_phase,
+                        "steps": clean_env_steps(t.get("steps")),
+                    }
+                )
+                continue
             if role not in WORK_ROLES:
                 raise ValueError(f"Proposed task '{title}' has an invalid work role: {role or '(empty)'}.")
             if not isinstance(checks, list):

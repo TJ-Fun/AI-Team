@@ -653,7 +653,7 @@ def has_untried_alternate(task: dict[str, Any], failed_provider: str) -> bool:
 
 
 def task_repository_key(task: dict[str, Any]) -> str:
-    if task.get("task_type") in ("pm_planning", "pm_escalation", "project_overview", "clarification_question", "design_review"):
+    if task.get("task_type") in ("pm_planning", "pm_escalation", "project_overview", "clarification_question", "design_review", "env_setup"):
         return ""
     role = str(task.get("assigned_role") or "")
     if role == "QA":

@@ -1,5 +1,11 @@
 # Version log
 
+## 0.85 — 2026-11-13
+
+- Added manual **env_setup** tasks: PM/PO plans can propose `kind:"env_setup"` tasks with 1–10 detailed steps, and users can create them via `POST /api/env-tasks`.
+- Env tasks are never dispatched to providers; they support Start, per-step Confirm/Problem/Change/Skip feedback with pasted output, auto-complete to Done, Block on problems, and escalate to PM/PO via `env-escalate`.
+- Updated documentation to 0.85.
+
 ## 0.84 — 2026-11-13
 
 - Refactored `static/js/project-settings.js` (398 lines) by moving project editor rendering into `static/js/project-editor.js`; the orchestrator keeps selector state, listeners, load/save, and git/danger actions. No behavior change; prerequisite for the services manifest UI.

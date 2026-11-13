@@ -19,7 +19,9 @@ def handle_tasks_post(handler, path, body) -> bool:
         return True
     if handle_tasks_pm_post(handler, path, body):
         return True
-    return handle_tasks_ops_post(handler, path, body)
+    if handle_tasks_ops_post(handler, path, body):
+        return True
+    return handle_env_tasks_post(handler, path, body)
 
 
 def handle_tasks_put(handler, path, body) -> bool:

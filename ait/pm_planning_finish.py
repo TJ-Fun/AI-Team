@@ -80,6 +80,20 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
             wid = next_task_id()
             ids.append(wid)
             work_ids.append(wid)
+            if item.get("kind") == "env_setup":
+                create_env_task(
+                    task_id=wid,
+                    title=item["title"],
+                    request=item["request"],
+                    project_id=task.get("project_id") or "default",
+                    module_id=item["module_id"],
+                    steps=item.get("steps"),
+                    status=plan_status,
+                    source_plan_task_id=task["id"],
+                    planning_root_id=task.get("planning_root_id"),
+                    phase=item.get("phase"),
+                )
+                continue
             write_task(
                 {
                     "id": wid,

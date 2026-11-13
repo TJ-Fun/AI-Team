@@ -58,6 +58,7 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
             item
             for item in read_tasks()
             if str(item.get("project_id") or "default") not in PROJECT_MAINTENANCE
+            and item.get("task_type") != "env_setup"
         ]
         summaries = reversed(all_tasks)
         qa_candidates = [
