@@ -3,7 +3,9 @@ import { $, escapeHtml, api, appAlert, appConfirm, appPrompt, formatTime, slugif
 export function initProjectSettings({ refreshBoard } = {}) {
   // --- Projects & Sub-projects Dialog ---
   const projectsForm = $("#projects-form");
+  const PROJECTS_STORAGE_KEY = "ai_team_settings_project_id";
   let projectDrafts = [];
+  let selectedProjectIndex = 0;
 
   async function fetchProjectHistory(projectId) {
     if (!projectId) return [];
@@ -16,9 +18,15 @@ export function initProjectSettings({ refreshBoard } = {}) {
   }
 
   function renderProjectEditors() {
+    const selector = $("#project-selector");
+    if (selector) {
+      selector.innerHTML = projectDrafts.map((d, idx) => `<option value="${idx}">${escapeHtml(d.name || `Project ${idx + 1}`)}</option>`).join("");
+      selector.value = String(selectedProjectIndex);
+      try { localStorage.setItem(PROJECTS_STORAGE_KEY, projectDrafts[selectedProjectIndex]?.id || ""); } catch {}
+    }
     $("#project-editors").innerHTML = projectDrafts
       .map(
-        (d, idx) => `
+        (d, idx) => idx === selectedProjectIndex ? `
         <section class="project-editor" data-proj-idx="${idx}">
           <div class="two-columns">
             <label>Project name
@@ -80,12 +88,13 @@ export function initProjectSettings({ refreshBoard } = {}) {
             )}</textarea>
           </label>
           <button type="button" class="danger" data-proj-remove="${idx}">Remove project</button>
-        </section>`
+        </section>` : ""
       )
       .join("");
     
     // Load git status for projects with local paths
     projectDrafts.forEach(async (d, idx) => {
+      if (idx !== selectedProjectIndex) return;
       if (d.repository && d.local_path && d.id) {
         try {
           const res = await api(`/api/git/${encodeURIComponent(d.id)}/status`);
@@ -113,6 +122,11 @@ export function initProjectSettings({ refreshBoard } = {}) {
     });
   }
 
+  $("#project-selector")?.addEventListener("change", (e) => {
+    selectedProjectIndex = Number(e.target.value) || 0;
+    renderProjectEditors();
+  });
+
   $("#project-editors")?.addEventListener("input", (e) => {
     const sec = e.target.closest("[data-proj-idx]");
     const field = e.target.getAttribute("data-proj-field");
@@ -137,6 +151,7 @@ export function initProjectSettings({ refreshBoard } = {}) {
         return;
       }
       projectDrafts.splice(Number(rmBtn.getAttribute("data-proj-remove")), 1);
+      selectedProjectIndex = Math.min(selectedProjectIndex, projectDrafts.length - 1);
       renderProjectEditors();
       return;
     }
@@ -320,6 +335,9 @@ export function initProjectSettings({ refreshBoard } = {}) {
         };
       })
     );
+    let savedId = "";
+    try { savedId = localStorage.getItem(PROJECTS_STORAGE_KEY) || ""; } catch {}
+    selectedProjectIndex = Math.max(0, projectDrafts.findIndex((d) => d.id && d.id === savedId));
     renderProjectEditors();
   }
 
@@ -333,6 +351,7 @@ export function initProjectSettings({ refreshBoard } = {}) {
       history: [],
       selectedVersion: "",
     });
+    selectedProjectIndex = projectDrafts.length - 1;
     renderProjectEditors();
   });
 

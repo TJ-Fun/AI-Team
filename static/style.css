@@ -46,6 +46,8 @@
 .project-history-controls select,.project-history-controls button{height:32px;min-height:32px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;margin:0!important;font-size:10px;line-height:1.2}
 .project-history-controls select{padding:0 8px}
 .project-history-controls button{padding:0 8px}
+.project-selector-label{display:flex;flex-direction:column;gap:4px;margin:10px 0 6px;font:600 11px system-ui,sans-serif;color:#9aa396}
+#project-selector{border:1px solid #3a423c;border-radius:7px;padding:7px;background:#1e2420;color:var(--ink);font:11px system-ui,sans-serif}
 .chat-actions .plan-button{height:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;padding:0 10px}
 .chat-actions .send-button{height:36px;min-height:36px;width:36px}
 .header-notifications{width:min(320px,30vw);max-height:112px}

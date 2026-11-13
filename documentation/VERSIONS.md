@@ -1,5 +1,11 @@
 # Version log
 
+## 0.81 — 2026-11-13
+
+- Added a **Project** dropdown at the top of Settings → Projects so only one project editor is visible at a time; Save still submits all project drafts.
+- Selection is persisted by project id in `localStorage`, restored on load, and kept valid across Add/Remove project. Git-status loading now runs only for the visible project.
+- Updated documentation to 0.81.
+
 ## 0.80 — 2026-11-13
 
 - Exposed the per-project destructive actions in Settings → Projects: **Clear tasks** uses a danger confirmation, and **Wipe GitHub contents** requires typing the exact `owner/repo` name before calling the backend.
