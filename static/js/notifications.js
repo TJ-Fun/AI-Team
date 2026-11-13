@@ -85,20 +85,6 @@ export function initNotifications({ refreshBoard, openTaskDetail } = {}) {
 
   async function runAppUpdateFromNotification(btn) {
     btn.disabled = true;
-    const item = btn.closest(".notification");
-    let progressWrap = item ? item.querySelector(".update-progress") : null;
-    if (item && !progressWrap) {
-      progressWrap = document.createElement("div");
-      progressWrap.className = "update-progress";
-      progressWrap.innerHTML =
-        '<div class="update-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="update-progress-bar"></span></div>' +
-        '<p class="update-progress-label"></p>';
-      item.firstElementChild?.appendChild(progressWrap);
-    }
-    const progress = createUpdateProgress(
-      progressWrap?.querySelector(".update-progress-bar"),
-      progressWrap?.querySelector(".update-progress-label")
-    );
     try {
       const cfgRes = await api("/api/settings/config");
       const cfg = cfgRes.config || {};
@@ -108,6 +94,20 @@ export function initNotifications({ refreshBoard, openTaskDetail } = {}) {
       }
       if (!(await appConfirm("Update the app to the latest version and restart?", { title: "Update app" }))) return;
       appUpdateInProgress = true;
+      const item = btn.closest(".notification");
+      let progressWrap = item ? item.querySelector(".update-progress") : null;
+      if (item && !progressWrap) {
+        progressWrap = document.createElement("div");
+        progressWrap.className = "update-progress";
+        progressWrap.innerHTML =
+          '<div class="update-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="update-progress-bar"></span></div>' +
+          '<p class="update-progress-label"></p>';
+        item.firstElementChild?.appendChild(progressWrap);
+      }
+      const progress = createUpdateProgress(
+        progressWrap?.querySelector(".update-progress-bar"),
+        progressWrap?.querySelector(".update-progress-label")
+      );
       progress?.begin("Preparing update…");
       const res = await api("/api/settings/update", {
         method: "POST",

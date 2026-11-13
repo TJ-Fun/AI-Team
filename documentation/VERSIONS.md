@@ -1,5 +1,10 @@
 # Version log
 
+## 0.96 — 2026-11-13
+
+- Fixed the app-update progress bar not appearing when the update is started from the notification center: the progress element is now created only after the confirmation and in-progress flag, so board polling can no longer wipe it mid-update.
+- Updated documentation to 0.96.
+
 ## 0.95 — 2026-11-13
 
 - Updated `documentation/DOCUMENTATION.md` for streamed provider task calls, the 15-minute chunk-reset idle timeout, and the non-SSE fallback; refreshed the repository map with `ait/provider_stream.py`.
