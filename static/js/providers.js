@@ -144,33 +144,122 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
         </div>`
         : "");
 
-    const maxPreferred = state.maxPreferred || 4;
+    renderRoutingRoles();
+    refreshProviderModels();
+  }
+
+  function defaultRouteProvider() {
+    return state.routingProviders.find((p) => isProviderConnected(p)) || "Auto";
+  }
+
+  function defaultRouteRows() {
+    return [0, 1, 2].map(() => ({ provider: defaultRouteProvider(), model: "auto" }));
+  }
+
+  function routeRowsFor(role) {
+    if (!Array.isArray(state.routing[role]) || !state.routing[role].length) {
+      state.routing[role] = defaultRouteRows();
+    }
+    return state.routing[role];
+  }
+
+  function ensureRouteModelCache(provider) {
+    if (!provider || provider === "Auto") return;
+    const cache = (state.routeModelCache ||= {});
+    if (cache[provider]) return;
+    const rec = state.connections.find((c) => c.is_provider !== false && c.name === provider);
+    if (!rec) {
+      cache[provider] = { status: "unavailable", models: [], current: "" };
+      return;
+    }
+    cache[provider] = { status: "loading", models: [], current: "" };
+    api(`/api/providers/${encodeURIComponent(rec.id)}/models`)
+      .then((res) => {
+        cache[provider] = {
+          status: res.selectable && (res.models || []).length ? "ready" : "unavailable",
+          models: res.models || [],
+          current: String(res.current || ""),
+        };
+      })
+      .catch(() => {
+        cache[provider] = { status: "error", models: [], current: "" };
+      })
+      .finally(() => renderRoutingRoles());
+  }
+
+  function routeModelOptionsHtml(entry) {
+    const cache = state.routeModelCache?.[entry.provider];
+    const current = cache?.current && cache.current !== "auto" ? cache.current : "";
+    const options = [
+      `<option value="auto"${!entry.model || entry.model === "auto" ? " selected" : ""}>Auto${
+        current ? ` · ${escapeHtml(current)}` : ""
+      }</option>`,
+    ];
+    if (cache?.status === "ready") {
+      for (const m of cache.models) {
+        options.push(`<option value="${escapeHtml(m)}"${m === entry.model ? " selected" : ""}>${escapeHtml(m)}</option>`);
+      }
+    }
+    if (entry.model && entry.model !== "auto" && !(cache?.models || []).includes(entry.model)) {
+      options.push(`<option value="${escapeHtml(entry.model)}" selected>${escapeHtml(entry.model)}</option>`);
+    }
+    if (cache?.status === "loading") {
+      options.push(`<option disabled>Loading models…</option>`);
+    }
+    return options.join("");
+  }
+
+  function renderRoutingRoles() {
+    const maxRoutes = state.maxRoutes || 25;
     $("#routing-roles").innerHTML =
       state.routingRoles
         .map((role) => {
-          const preferred = state.routing[role] || [];
-          const selects = Array.from({ length: maxPreferred }, (_, idx) => {
-            const val = preferred[idx] || "Auto";
-            return `
-            <label>${idx + 1}
-              <select data-route-role="${escapeHtml(role)}" data-route-idx="${idx}">
-                <option value="Auto"${val === "Auto" ? " selected" : ""}>Auto</option>
-                ${state.routingProviders
-                  .map(
-                    (opt) =>
-                      `<option value="${escapeHtml(opt)}"${opt === val ? " selected" : ""}>${escapeHtml(opt)}${
-                        !isProviderConnected(opt) ? " · not connected" : ""
-                      }</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>`;
-          }).join("");
-          return `<section class="route-role"><strong>${escapeHtml(role)}</strong><div class="route-order">${selects}</div></section>`;
+          const rows = routeRowsFor(role);
+          const autoIdx = rows.findIndex((e) => e.provider === "Auto");
+          const body = rows
+            .map((entry, idx) => {
+              const inactive = autoIdx >= 0 && idx > autoIdx;
+              const provOpts = ["Auto", ...state.routingProviders]
+                .map(
+                  (opt) =>
+                    `<option value="${escapeHtml(opt)}"${opt === entry.provider ? " selected" : ""}>${escapeHtml(opt)}${
+                      opt !== "Auto" && !isProviderConnected(opt) ? " · not connected" : ""
+                    }</option>`
+                )
+                .join("");
+              const modelDisabled = inactive || state.routeModelCache?.[entry.provider]?.status === "loading";
+              return `
+            <div class="route-row${inactive ? " route-row--inactive" : ""}">
+              <span class="route-rank">${idx + 1}</span>
+              <select class="route-provider" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
+                inactive ? "disabled" : ""
+              }>${provOpts}</select>
+              <select class="route-model" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
+                modelDisabled ? "disabled" : ""
+              }>${routeModelOptionsHtml(entry)}</select>
+              <span class="route-row-actions">
+                <button type="button" class="secondary route-move" data-route-move="up" data-route-role="${escapeHtml(
+                  role
+                )}" data-route-idx="${idx}" ${idx === 0 || inactive ? "disabled" : ""} aria-label="Move route up">↑</button>
+                <button type="button" class="secondary route-move" data-route-move="down" data-route-role="${escapeHtml(
+                  role
+                )}" data-route-idx="${idx}" ${idx === rows.length - 1 || inactive ? "disabled" : ""} aria-label="Move route down">↓</button>
+                <button type="button" class="secondary route-remove" data-route-remove="${escapeHtml(
+                  role
+                )}" data-route-idx="${idx}" ${rows.length <= 1 || inactive ? "disabled" : ""} aria-label="Remove route">✕</button>
+              </span>
+            </div>`;
+            })
+            .join("");
+          return `<section class="route-role route-card"><strong>${escapeHtml(role)}</strong><div class="route-list">${body}</div><button type="button" class="secondary route-add" data-route-add="${escapeHtml(
+            role
+          )}" ${rows.length >= maxRoutes ? "disabled" : ""}>+ Add provider/model</button></section>`;
         })
         .join("") +
-      `<p class="draft-note">Up to ${maxPreferred} preferred providers per role. Auto expands to every provider ordered by audit score, breaking ties by the Connections order. After the preferred providers are exhausted, the same Auto order continues as fallback.</p>`;
-    refreshProviderModels();
+      `<p class="draft-note">Each role routes through an ordered list of provider/model pairs; model Auto uses the provider's configured default. Provider Auto expands to every provider ordered by audit score, and rows below an Auto provider are inactive. The same provider may appear multiple times with different models. Unavailable connections are skipped automatically.</p>`;
+    for (const role of state.routingRoles) {
+      for (const entry of routeRowsFor(role)) ensureRouteModelCache(entry.provider);
+    }
   }
 
   async function refreshProviderModels() {
@@ -315,7 +404,8 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
     state.encryptionAvailable = connRes.encryption_available !== false;
     state.routingRoles = routeRes.roles || [];
     state.routingProviders = routeRes.providers || [];
-    state.maxPreferred = routeRes.max_preferred || 4;
+    state.maxRoutes = routeRes.max_routes || 25;
+    state.routeModelCache = {};
     state.routing = routeRes.routing || {};
     state.chatProvider = routeRes.chat_provider || "Auto";
     state.autonomy = routeRes.autonomy || {};
@@ -490,25 +580,60 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
   });
 
   $("#routing-roles")?.addEventListener("change", (e) => {
-    const sel = e.target.closest("[data-route-role]");
+    const provSel = e.target.closest("select.route-provider");
+    const modelSel = e.target.closest("select.route-model");
+    const sel = provSel || modelSel;
     if (!sel) return;
     const role = sel.getAttribute("data-route-role");
     const idx = Number(sel.getAttribute("data-route-idx"));
-    const nextProv = sel.value;
-    const maxPreferred = state.maxPreferred || 4;
-    const current = [...(state.routing[role] || [])];
-    while (current.length < maxPreferred) current.push("Auto");
-    const existingIdx =
-      nextProv === "Auto" ? -1 : current.findIndex((p, i) => i !== idx && p && p === nextProv);
-    if (existingIdx >= 0) {
-      const tmp = current[idx];
-      current[idx] = nextProv;
-      current[existingIdx] = tmp;
+    const rows = routeRowsFor(role);
+    const entry = rows[idx];
+    if (!entry || Number.isNaN(idx)) return;
+    if (provSel) {
+      entry.provider = provSel.value;
+      entry.model = "auto";
+      ensureRouteModelCache(entry.provider);
     } else {
-      current[idx] = nextProv;
+      entry.model = modelSel.value === "auto" ? "auto" : modelSel.value;
     }
-    state.routing[role] = current.slice(0, maxPreferred);
-    renderConnectionsAndRouting();
+    renderRoutingRoles();
+  });
+
+  $("#routing-roles")?.addEventListener("click", (e) => {
+    const addBtn = e.target.closest("[data-route-add]");
+    if (addBtn) {
+      const role = addBtn.getAttribute("data-route-add");
+      const rows = routeRowsFor(role);
+      if (rows.length >= (state.maxRoutes || 25)) return;
+      const autoIdx = rows.findIndex((en) => en.provider === "Auto");
+      const at = autoIdx >= 0 ? autoIdx : rows.length;
+      rows.splice(at, 0, { provider: defaultRouteProvider(), model: "auto" });
+      renderRoutingRoles();
+      return;
+    }
+    const moveBtn = e.target.closest("[data-route-move]");
+    if (moveBtn) {
+      const role = moveBtn.getAttribute("data-route-role");
+      const idx = Number(moveBtn.getAttribute("data-route-idx"));
+      const dir = moveBtn.getAttribute("data-route-move");
+      const rows = routeRowsFor(role);
+      const swap = dir === "up" ? idx - 1 : idx + 1;
+      if (idx >= 0 && swap >= 0 && swap < rows.length) {
+        [rows[idx], rows[swap]] = [rows[swap], rows[idx]];
+        renderRoutingRoles();
+      }
+      return;
+    }
+    const removeBtn = e.target.closest("[data-route-remove]");
+    if (removeBtn) {
+      const role = removeBtn.getAttribute("data-route-remove");
+      const idx = Number(removeBtn.getAttribute("data-route-idx"));
+      const rows = routeRowsFor(role);
+      if (rows.length > 1) {
+        rows.splice(idx, 1);
+        renderRoutingRoles();
+      }
+    }
   });
 
   $("#connection-list")?.addEventListener("change", async (e) => {

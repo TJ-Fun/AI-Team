@@ -28,7 +28,7 @@ def _routing_entries(raw: Any, active: set[str]) -> list[dict[str, str]]:
         elif provider not in active:
             continue
         entries.append({"provider": provider, "model": model})
-        if len(entries) >= MAX_ROUTE_ENTRIES:
+        if provider == "Auto" or len(entries) >= MAX_ROUTE_ENTRIES:
             break
     return entries
 

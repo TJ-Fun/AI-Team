@@ -290,7 +290,7 @@
       <section class="settings-tab-panel" id="settings-panel-routing" role="tabpanel" aria-labelledby="settings-tab-routing" hidden>
         <form id="routing-form" class="task-form settings-inner-form">
           <div class="dialog-heading"><div><p class="eyebrow">PROVIDER PRIORITY</p><h2>Routing</h2></div></div>
-          <p class="draft-note">Set up to 4 preferred providers per role. Unavailable connections are skipped automatically; changing a rank swaps the providers so each one appears once. After the preferred providers are exhausted, Auto selects by audit score, breaking ties by the Connections order.</p>
+          <p class="draft-note">Each role routes through an ordered list of provider/model pairs (3 rows by default; add or remove rows as needed). Model Auto uses the provider's configured default. Provider Auto expands to every provider ordered by audit score and makes all rows below it inactive. The same provider may appear multiple times with different models. Unavailable connections are skipped automatically; changing a rank swaps the entries.</p>
           <div id="routing-roles"></div>
           <section class="route-role"><strong>Chat window</strong><div class="route-order"><label>Provider
             <select id="chat-provider-select"></select>

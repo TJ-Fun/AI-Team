@@ -4,7 +4,10 @@
 
 - Routing data model reworked: `routing.json` now stores per-role route entries `{"provider", "model"}` (up to `MAX_ROUTE_ENTRIES` = 25) instead of plain provider-name lists; legacy string entries are migrated on read and duplicate providers are allowed.
 - Provider selection now resolves full route entries (`route_entries_for_role`, `route_entry_for_role`, `task_route_entry`); dispatch records `route_model` on each attempt and "tried" tracking keys on provider+model so the same provider can appear multiple times with different models.
-- `/api/routing` now returns `max_routes` instead of `max_preferred`; the Routing settings UI update lands in the next batch.
+- `/api/routing` now returns `max_routes` instead of `max_preferred`.
+- Per-route model overrides now flow through dispatch into the Gemini and OpenAI-compatible call paths (`provider_model`/`openai_compat_config` accept an override; `call_task_provider` reads the stashed `_route_model`).
+- Provider model lists (`GET /api/providers/{id}/models`) now hide non-chat models (embeddings, image/audio generation, TTS, moderation, rerankers, guard models) via `is_non_chat_model`.
+- Settings → Routing UI reworked: each role shows configurable provider/model route rows (default 3, add/remove up to 25, min 1) with per-row model dropdowns fed by the provider model cache, Auto-provider rows deactivate everything below them, and duplicate providers are allowed.
 - Updated documentation to 0.97.
 
 ## 0.96 — 2026-11-13
