@@ -240,33 +240,31 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
               const timeoutMin = Math.round((entry.timeout_seconds ?? 900) / 60);
               const delayMin = Math.round((entry.retry_delay_seconds ?? 300) / 60);
               return `
-            <div class="route-entry${inactive ? " route-row--inactive" : ""}">
-              <div class="route-row">
-                <span class="route-rank">${idx + 1}</span>
-                <select class="route-provider" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
-                  inactive ? "disabled" : ""
-                }>${provOpts}</select>
-                <select class="route-model" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
-                  modelDisabled ? "disabled" : ""
-                }>${routeModelOptionsHtml(entry)}</select>
-                <span class="route-row-actions">
-                  <button type="button" class="secondary route-move" data-route-move="up" data-route-role="${escapeHtml(
-                    role
-                  )}" data-route-idx="${idx}" ${idx === 0 || inactive ? "disabled" : ""} aria-label="Move route up">↑</button>
-                  <button type="button" class="secondary route-move" data-route-move="down" data-route-role="${escapeHtml(
-                    role
-                  )}" data-route-idx="${idx}" ${idx === rows.length - 1 || inactive ? "disabled" : ""} aria-label="Move route down">↓</button>
-                  <button type="button" class="secondary route-remove" data-route-remove="${escapeHtml(
-                    role
-                  )}" data-route-idx="${idx}" ${rows.length <= 1 || inactive ? "disabled" : ""} aria-label="Remove route">✕</button>
-                </span>
-              </div>
+            <div class="route-row${inactive ? " route-row--inactive" : ""}">
+              <span class="route-rank">${idx + 1}</span>
+              <select class="route-provider" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
+                inactive ? "disabled" : ""
+              }>${provOpts}</select>
+              <select class="route-model" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
+                modelDisabled ? "disabled" : ""
+              }>${routeModelOptionsHtml(entry)}</select>
               <div class="route-settings">
                 <label>Timeout <input type="number" class="route-num" min="1" max="1440" step="1" value="${timeoutMin}" data-route-setting="timeout" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}> min</label>
                 <label>Retries <input type="number" class="route-num" min="0" max="10" step="1" value="${entry.retries ?? 2}" data-route-setting="retries" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}></label>
                 <label>Retry delay <input type="number" class="route-num" min="0" max="1440" step="1" value="${delayMin}" data-route-setting="delay" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}> min</label>
                 <label class="route-stream-check"><input type="checkbox" data-route-setting="stream" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${entry.stream !== false ? "checked" : ""} ${inactive ? "disabled" : ""}> Stream</label>
               </div>
+              <span class="route-row-actions">
+                <button type="button" class="secondary route-move" data-route-move="up" data-route-role="${escapeHtml(
+                  role
+                )}" data-route-idx="${idx}" ${idx === 0 || inactive ? "disabled" : ""} aria-label="Move route up">↑</button>
+                <button type="button" class="secondary route-move" data-route-move="down" data-route-role="${escapeHtml(
+                  role
+                )}" data-route-idx="${idx}" ${idx === rows.length - 1 || inactive ? "disabled" : ""} aria-label="Move route down">↓</button>
+                <button type="button" class="secondary route-remove" data-route-remove="${escapeHtml(
+                  role
+                )}" data-route-idx="${idx}" ${rows.length <= 1 || inactive ? "disabled" : ""} aria-label="Remove route">✕</button>
+              </span>
             </div>`;
             })
             .join("");
