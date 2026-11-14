@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.4 — 2026-11-14
+
+- Added a daily background worker (`ait/model_refresh.py`) that refreshes every connected provider's model list once per day (and once at startup), with up to 3 retries and backoff; results are cached in `data/settings/model_cache.json`, keeping the last good list on failure. All refresh outcomes are logged to `data/logs/activity.jsonl` and `app.log`.
+- Updated documentation to 0.99.4.
+
 ## 0.99.3 — 2026-11-14
 
 - Routing route-row settings now center **only the field** (number input / Stream checkbox) on the row's center line; the Timeout/Retries/Retry delay/Stream labels and `min` units are absolutely positioned above/below their field, so they no longer affect field alignment regardless of label length.

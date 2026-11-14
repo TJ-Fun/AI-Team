@@ -9,6 +9,7 @@ def start_background_workers() -> None:
     reconcile_provider_workers()
     threading.Thread(target=watchdog_worker_loop, daemon=True).start()
     threading.Thread(target=ci_poll_worker_loop, daemon=True).start()
+    threading.Thread(target=model_refresh_worker_loop, daemon=True).start()
 
 
 def main() -> None:

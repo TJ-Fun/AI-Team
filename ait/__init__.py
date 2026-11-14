@@ -22,6 +22,7 @@ from ait import github_checks  # noqa: F401
 from ait import http_handler  # noqa: F401
 from ait import info_requests  # noqa: F401
 from ait import main  # noqa: F401
+from ait import model_refresh  # noqa: F401
 from ait import notifications  # noqa: F401
 from ait import projects  # noqa: F401
 from ait import project_cleanup  # noqa: F401
@@ -67,6 +68,7 @@ _DOMAIN_MODULES = (
     git_task_postprocess,
     github_checks,
     notifications,
+    model_refresh,
     provider_calls,
     provider_stream,
     provider_health,
