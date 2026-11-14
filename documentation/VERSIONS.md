@@ -1,5 +1,15 @@
 # Version log
 
+## 0.98 — 2026-11-14
+
+- Settings → Routing role cards are now collapsible accordions (collapsed by default, header shows role + route count).
+- Each provider/model route row gained per-combo settings: **Timeout** (per-attempt limit, default 15 min), **Retries** (same-combo retries after any failure, default 2), **Retry delay** (wait between retries, default 5 min), and **Stream** (default on).
+- Stream on = SSE streaming where every received chunk resets the idle timer; Stream off = blocking call with a hard deadline (no answer within Timeout = failed attempt).
+- Retry model reworked: the global `MAX_AUTOMATIC_RETRIES` cap and multi-hour backoffs were replaced by the per-combo chain — every failure (timeout, provider error, malformed reply) consumes the combo's retries, an exhausted combo moves to the next route immediately, and the task is Blocked + escalated only after the last combo is exhausted. Provider `Retry-After` headers are honored as a minimum on top of Retry delay.
+- Route entries in `routing.json` now store `timeout_seconds`, `retries`, `retry_delay_seconds`, and `stream` (legacy entries migrate to defaults on read); attempts snapshot these settings and the watchdog hard cap is `timeout × 8` when streaming (≈ previous 2 h cap at 15 min) or `timeout` when not.
+- Watchdog logic moved from `provider_dispatch.py` to `ait/provider_watchdog.py`; added a blocking (non-SSE) Gemini task call for Stream-off routes.
+- Updated documentation to 0.98.
+
 ## 0.97 — 2026-11-14
 
 - Routing data model reworked: `routing.json` now stores per-role route entries `{"provider", "model"}` (up to `MAX_ROUTE_ENTRIES` = 25) instead of plain provider-name lists; legacy string entries are migrated on read and duplicate providers are allowed.
