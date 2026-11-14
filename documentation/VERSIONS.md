@@ -1,5 +1,11 @@
 # Version log
 
+## 0.99.7 — 2026-11-14
+
+- Settings → Routing rows now have a **Test** button (after the Model dropdown, before Timeout/Retry settings) that sends "Hi" to the row's provider/model via `POST /api/providers/{id}/test-model` and shows the reply in a dialog. Rows whose model is flagged unavailable render the Model dropdown with a red border/text (`route-model--missing`); changing the provider or model clears the local flag.
+- Provider connection cards have a new **Refresh models** button (after "Test model") that calls `POST /api/providers/{id}/refresh-models`, updates the cached list, and reloads the model dropdowns.
+- Updated documentation to 0.99.7.
+
 ## 0.99.6 — 2026-11-14
 
 - `GET /api/providers/{id}/models` now serves the cached model list (with `fetched_at`/`stale` fields) and falls back to a live fetch when no cache exists. New `POST /api/providers/{id}/refresh-models` endpoint refreshes one provider on demand (with retries) and re-checks routing availability. `POST /api/providers/{id}/test-model` already existed for connection cards.

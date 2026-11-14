@@ -92,6 +92,9 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
               <button type="button" class="secondary provider-test-model" data-test-model="${escapeHtml(p.id)}" ${
                 p.configured ? "" : "disabled"
               }>Test model</button>
+              <button type="button" class="secondary provider-refresh-models" data-refresh-models="${escapeHtml(p.id)}" ${
+                p.configured ? "" : "disabled"
+              } title="Fetch the latest model list from this provider">Refresh models</button>
             </div>
             <div class="connection-controls">
               ${
@@ -237,6 +240,7 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
                 )
                 .join("");
               const modelDisabled = inactive || state.routeModelCache?.[entry.provider]?.status === "loading";
+              const modelMissing = !!entry.model_unavailable;
               const timeoutMin = Math.round((entry.timeout_seconds ?? 900) / 60);
               const delayMin = Math.round((entry.retry_delay_seconds ?? 300) / 60);
               return `
@@ -245,9 +249,12 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
               <select class="route-provider" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
                 inactive ? "disabled" : ""
               }>${provOpts}</select>
-              <select class="route-model" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
+              <select class="route-model${modelMissing ? " route-model--missing" : ""}" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
                 modelDisabled ? "disabled" : ""
-              }>${routeModelOptionsHtml(entry)}</select>
+              } title="${modelMissing ? "This model is no longer listed by the provider." : ""}">${routeModelOptionsHtml(entry)}</select>
+              <button type="button" class="secondary route-test" data-route-test="${escapeHtml(
+                role
+              )}" data-route-idx="${idx}" ${inactive ? "disabled" : ""} title="Send 'Hi' to this provider/model and show the reply">Test</button>
               <div class="route-settings">
                 <label><span class="route-lbl">Timeout</span><input type="number" class="route-num" min="1" max="1440" step="1" value="${timeoutMin}" data-route-setting="timeout" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}><span class="route-unit">min</span></label>
                 <label><span class="route-lbl">Retries</span><input type="number" class="route-num" min="0" max="10" step="1" value="${entry.retries ?? 2}" data-route-setting="retries" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}></label>
@@ -560,6 +567,37 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
       return;
     }
 
+    const refreshModelsBtn = e.target.closest("[data-refresh-models]");
+    if (refreshModelsBtn) {
+      const pid = refreshModelsBtn.getAttribute("data-refresh-models");
+      const rec = state.connections.find((c) => c.id === pid);
+      const origLabel = refreshModelsBtn.textContent;
+      refreshModelsBtn.disabled = true;
+      refreshModelsBtn.textContent = "Refreshing…";
+      $("#connections-error").textContent = "";
+      setConnectionsSuccess("");
+      try {
+        const res = await api(`/api/providers/${encodeURIComponent(pid)}/refresh-models`, { method: "POST", body: "{}" });
+        const count = (res.models || []).length;
+        if (res.selectable && count) {
+          setConnectionsSuccess(`${res.provider}: ${count} models refreshed.`);
+        } else {
+          setConnectionsSuccess(`${res.provider}: refresh failed — ${res.error || "no models listed"}.`);
+        }
+        if (rec) {
+          delete state.routeModelCache?.[rec.name];
+          ensureRouteModelCache(rec.name);
+        }
+        await refreshProviderModels();
+      } catch (err) {
+        appAlert(err.message, "Model list refresh failed");
+      } finally {
+        refreshModelsBtn.disabled = false;
+        refreshModelsBtn.textContent = origLabel || "Refresh models";
+      }
+      return;
+    }
+
     const testModelBtn = e.target.closest("[data-test-model]");
     if (testModelBtn) {
       const pid = testModelBtn.getAttribute("data-test-model");
@@ -640,14 +678,16 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
     if (provSel) {
       entry.provider = provSel.value;
       entry.model = "auto";
+      delete entry.model_unavailable;
       ensureRouteModelCache(entry.provider);
     } else {
       entry.model = modelSel.value === "auto" ? "auto" : modelSel.value;
+      delete entry.model_unavailable;
     }
     renderRoutingRoles();
   });
 
-  $("#routing-roles")?.addEventListener("click", (e) => {
+  $("#routing-roles")?.addEventListener("click", async (e) => {
     const toggleBtn = e.target.closest("[data-route-toggle]");
     if (toggleBtn) {
       const tRole = toggleBtn.getAttribute("data-route-toggle");
@@ -684,6 +724,39 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
       if (idx >= 0 && swap >= 0 && swap < rows.length) {
         [rows[idx], rows[swap]] = [rows[swap], rows[idx]];
         renderRoutingRoles();
+      }
+      return;
+    }
+    const testRouteBtn = e.target.closest("[data-route-test]");
+    if (testRouteBtn) {
+      const tRole = testRouteBtn.getAttribute("data-route-test");
+      const tIdx = Number(testRouteBtn.getAttribute("data-route-idx"));
+      const tEntry = routeRowsFor(tRole)[tIdx];
+      if (!tEntry) return;
+      const tRec = state.connections.find((c) => c.is_provider !== false && c.name === tEntry.provider);
+      if (!tRec) {
+        appAlert(`Provider "${tEntry.provider}" is not available.`, "Route test failed");
+        return;
+      }
+      const tModel = tEntry.model && tEntry.model !== "auto" ? tEntry.model : "";
+      const origLabel = testRouteBtn.textContent;
+      testRouteBtn.disabled = true;
+      testRouteBtn.textContent = "Testing…";
+      try {
+        const res = await api(`/api/providers/${encodeURIComponent(tRec.id)}/test-model`, {
+          method: "POST",
+          body: JSON.stringify({ model: tModel }),
+        });
+        const reply = String(res.reply || "").trim();
+        appAlert(
+          reply ? `“${reply.slice(0, 500)}${reply.length > 500 ? "…" : ""}”` : "The model returned an empty reply.",
+          `Route test — ${res.provider} · ${res.model}`
+        );
+      } catch (err) {
+        appAlert(err.message, "Route test failed");
+      } finally {
+        testRouteBtn.disabled = false;
+        testRouteBtn.textContent = origLabel || "Test";
       }
       return;
     }
