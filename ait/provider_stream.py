@@ -70,14 +70,14 @@ def _task_prompt(task: dict[str, Any], provider: str, extra_context: str) -> tup
     return role, prompt, contract
 
 
-def call_gemini_task(task: dict[str, Any], extra_context: str = "") -> tuple[str, dict[str, Any]]:
+def call_gemini_task(task: dict[str, Any], extra_context: str = "", model_override: str = "") -> tuple[str, dict[str, Any]]:
     api_key = get_provider_key("gemini")
     if not api_key:
         raise ProviderFailure("Gemini", 401, "Gemini API key is not configured.")
     role, prompt, contract = _task_prompt(task, "Gemini", extra_context)
 
     sys_inst = combined_agent_prompt(role) + (("\n\n" + contract) if contract else "")
-    model = provider_model("Gemini")
+    model = provider_model("Gemini", model_override)
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model, safe='')}"
         f":streamGenerateContent?alt=sse&key={urllib.parse.quote(api_key, safe='')}"
@@ -248,8 +248,8 @@ def _blocking_openai_compat(provider: str, endpoint: str, headers: dict[str, str
     }
 
 
-def call_openai_compatible_task(task: dict[str, Any], provider: str, extra_context: str = "") -> tuple[str, str, dict[str, Any]]:
-    cfg = openai_compat_config(provider)
+def call_openai_compatible_task(task: dict[str, Any], provider: str, extra_context: str = "", model_override: str = "") -> tuple[str, str, dict[str, Any]]:
+    cfg = openai_compat_config(provider, model_override)
     if not cfg:
         raise ProviderFailure(provider, 400, f"Unsupported provider: {provider}")
     conn_id = cfg["conn_id"]

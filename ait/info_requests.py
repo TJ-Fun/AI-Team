@@ -45,6 +45,7 @@ def call_task_provider(task: dict[str, Any], provider: str) -> tuple[str, str, d
     follow-up calls are made.
     """
     pid = str(task.get("project_id") or "default")
+    route_model = str(task.get("_route_model") or "auto")
     cache: dict[str, str] = {}
     extra_context = ""
     reply = ""
@@ -52,10 +53,10 @@ def call_task_provider(task: dict[str, Any], provider: str) -> tuple[str, str, d
     meta: dict[str, Any] = {}
     for round_no in range(INFO_REQUEST_MAX_ROUNDS + 1):
         if provider_kind(provider) == "gemini":
-            reply, meta = call_gemini_task(task, extra_context)
-            actual_model = provider_model(provider)
+            reply, meta = call_gemini_task(task, extra_context, route_model)
+            actual_model = provider_model(provider, route_model)
         else:
-            reply, actual_model, meta = call_openai_compatible_task(task, provider, extra_context)
+            reply, actual_model, meta = call_openai_compatible_task(task, provider, extra_context, route_model)
         if round_no >= INFO_REQUEST_MAX_ROUNDS:
             break
         new_slugs = [s for s in extract_info_requests(reply) if s not in cache]

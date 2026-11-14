@@ -161,7 +161,10 @@ def is_active_provider(name: str) -> bool:
     return provider_record(name) is not None
 
 
-def provider_model(name: str) -> str:
+def provider_model(name: str, override: str = "") -> str:
+    clean = str(override or "").strip()
+    if clean and clean.lower() != "auto":
+        return clean[:160]
     record = provider_record(name)
     if record and str(record.get("model", "")).strip():
         return str(record["model"]).strip()
@@ -173,7 +176,7 @@ def provider_kind(name: str) -> str:
     return str(record.get("kind", "")) if record else ""
 
 
-def openai_compat_config(name: str) -> dict[str, Any] | None:
+def openai_compat_config(name: str, model_override: str = "") -> dict[str, Any] | None:
     record = provider_record(name)
     if not record or record.get("kind") != "openai_compat":
         return None
@@ -181,9 +184,11 @@ def openai_compat_config(name: str) -> dict[str, Any] | None:
     if not base_url:
         return None
     preset = PROVIDER_PRESETS.get(str(record.get("id", "")), {})
+    override = str(model_override or "").strip()
+    model = override[:160] if override and override.lower() != "auto" else str(record.get("model", "")).strip()
     return {
         "conn_id": str(record.get("id", "")),
-        "model": str(record.get("model", "")).strip(),
+        "model": model,
         "endpoint": f"{base_url}/chat/completions",
         "max_tokens_key": str(preset.get("max_tokens_key", "max_tokens")),
         "fixed_max_tokens": preset.get("fixed_max_tokens"),

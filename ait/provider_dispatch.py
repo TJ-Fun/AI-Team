@@ -52,7 +52,6 @@ def select_auto_provider(tried: set[str] | None = None) -> str:
 def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
     if provider not in configured_providers():
         return None
-    model = provider_model(provider)
     with STATE_LOCK:
         all_tasks = [
             item
@@ -144,6 +143,7 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         attempt_num = max((int(a.get("number", 0)) for a in attempts), default=0) + 1
         ts = now_iso()
         route_model = str(task.get("_route_model") or "auto")
+        model = provider_model(provider, route_model)
         attempts.append(
             {
                 "number": attempt_num,
