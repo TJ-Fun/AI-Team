@@ -153,7 +153,14 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
   }
 
   function defaultRouteRows() {
-    return [0, 1, 2].map(() => ({ provider: defaultRouteProvider(), model: "auto" }));
+    return [0, 1, 2].map(() => ({
+      provider: defaultRouteProvider(),
+      model: "auto",
+      timeout_seconds: 900,
+      retries: 2,
+      retry_delay_seconds: 300,
+      stream: true,
+    }));
   }
 
   function routeRowsFor(role) {
@@ -211,10 +218,12 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
 
   function renderRoutingRoles() {
     const maxRoutes = state.maxRoutes || 25;
+    state.routingOpen ||= {};
     $("#routing-roles").innerHTML =
       state.routingRoles
         .map((role) => {
           const rows = routeRowsFor(role);
+          const open = !!state.routingOpen[role];
           const autoIdx = rows.findIndex((e) => e.provider === "Auto");
           const body = rows
             .map((entry, idx) => {
@@ -228,35 +237,56 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
                 )
                 .join("");
               const modelDisabled = inactive || state.routeModelCache?.[entry.provider]?.status === "loading";
+              const timeoutMin = Math.round((entry.timeout_seconds ?? 900) / 60);
+              const delayMin = Math.round((entry.retry_delay_seconds ?? 300) / 60);
               return `
-            <div class="route-row${inactive ? " route-row--inactive" : ""}">
-              <span class="route-rank">${idx + 1}</span>
-              <select class="route-provider" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
-                inactive ? "disabled" : ""
-              }>${provOpts}</select>
-              <select class="route-model" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
-                modelDisabled ? "disabled" : ""
-              }>${routeModelOptionsHtml(entry)}</select>
-              <span class="route-row-actions">
-                <button type="button" class="secondary route-move" data-route-move="up" data-route-role="${escapeHtml(
-                  role
-                )}" data-route-idx="${idx}" ${idx === 0 || inactive ? "disabled" : ""} aria-label="Move route up">↑</button>
-                <button type="button" class="secondary route-move" data-route-move="down" data-route-role="${escapeHtml(
-                  role
-                )}" data-route-idx="${idx}" ${idx === rows.length - 1 || inactive ? "disabled" : ""} aria-label="Move route down">↓</button>
-                <button type="button" class="secondary route-remove" data-route-remove="${escapeHtml(
-                  role
-                )}" data-route-idx="${idx}" ${rows.length <= 1 || inactive ? "disabled" : ""} aria-label="Remove route">✕</button>
-              </span>
+            <div class="route-entry${inactive ? " route-row--inactive" : ""}">
+              <div class="route-row">
+                <span class="route-rank">${idx + 1}</span>
+                <select class="route-provider" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
+                  inactive ? "disabled" : ""
+                }>${provOpts}</select>
+                <select class="route-model" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${
+                  modelDisabled ? "disabled" : ""
+                }>${routeModelOptionsHtml(entry)}</select>
+                <span class="route-row-actions">
+                  <button type="button" class="secondary route-move" data-route-move="up" data-route-role="${escapeHtml(
+                    role
+                  )}" data-route-idx="${idx}" ${idx === 0 || inactive ? "disabled" : ""} aria-label="Move route up">↑</button>
+                  <button type="button" class="secondary route-move" data-route-move="down" data-route-role="${escapeHtml(
+                    role
+                  )}" data-route-idx="${idx}" ${idx === rows.length - 1 || inactive ? "disabled" : ""} aria-label="Move route down">↓</button>
+                  <button type="button" class="secondary route-remove" data-route-remove="${escapeHtml(
+                    role
+                  )}" data-route-idx="${idx}" ${rows.length <= 1 || inactive ? "disabled" : ""} aria-label="Remove route">✕</button>
+                </span>
+              </div>
+              <div class="route-settings">
+                <label>Timeout <input type="number" class="route-num" min="1" max="1440" step="1" value="${timeoutMin}" data-route-setting="timeout" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}> min</label>
+                <label>Retries <input type="number" class="route-num" min="0" max="10" step="1" value="${entry.retries ?? 2}" data-route-setting="retries" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}></label>
+                <label>Retry delay <input type="number" class="route-num" min="0" max="1440" step="1" value="${delayMin}" data-route-setting="delay" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}> min</label>
+                <label class="route-stream-check"><input type="checkbox" data-route-setting="stream" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${entry.stream !== false ? "checked" : ""} ${inactive ? "disabled" : ""}> Stream</label>
+              </div>
             </div>`;
             })
             .join("");
-          return `<section class="route-role route-card"><strong>${escapeHtml(role)}</strong><div class="route-list">${body}</div><button type="button" class="secondary route-add" data-route-add="${escapeHtml(
-            role
-          )}" ${rows.length >= maxRoutes ? "disabled" : ""}>+ Add provider/model</button></section>`;
+          return `<section class="route-role route-card route-accordion">
+            <button type="button" class="route-accordion-head" data-route-toggle="${escapeHtml(role)}" aria-expanded="${open}">
+              <span class="route-accordion-chevron">${open ? "▾" : "▸"}</span>
+              <strong>${escapeHtml(role)}</strong>
+              <span class="route-accordion-count">${rows.length} route${rows.length === 1 ? "" : "s"}</span>
+            </button>
+            ${
+              open
+                ? `<div class="route-accordion-body"><div class="route-list">${body}</div><button type="button" class="secondary route-add" data-route-add="${escapeHtml(
+                    role
+                  )}" ${rows.length >= maxRoutes ? "disabled" : ""}>+ Add provider/model</button></div>`
+                : ""
+            }
+          </section>`;
         })
         .join("") +
-      `<p class="draft-note">Each role routes through an ordered list of provider/model pairs; model Auto uses the provider's configured default. Provider Auto expands to every provider ordered by audit score, and rows below an Auto provider are inactive. The same provider may appear multiple times with different models. Unavailable connections are skipped automatically.</p>`;
+      `<p class="draft-note">Each role routes through an ordered list of provider/model pairs; model Auto uses the provider's configured default. Provider Auto expands to every provider ordered by audit score, and rows below an Auto provider are inactive. The same provider may appear multiple times with different models. Per route: Timeout is the per-attempt limit, Retries is how many times the same combo is retried after any failure, Retry delay is the wait between those retries, and Stream toggles SSE streaming (timer resets per chunk) vs a blocking call with a hard deadline. Unavailable connections are skipped automatically.</p>`;
     for (const role of state.routingRoles) {
       for (const entry of routeRowsFor(role)) ensureRouteModelCache(entry.provider);
     }
@@ -580,6 +610,26 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
   });
 
   $("#routing-roles")?.addEventListener("change", (e) => {
+    const settingInput = e.target.closest("[data-route-setting]");
+    if (settingInput) {
+      const sRole = settingInput.getAttribute("data-route-role");
+      const sIdx = Number(settingInput.getAttribute("data-route-idx"));
+      const sRows = routeRowsFor(sRole);
+      const sEntry = sRows[sIdx];
+      if (!sEntry) return;
+      const kind = settingInput.getAttribute("data-route-setting");
+      if (kind === "timeout") {
+        sEntry.timeout_seconds = Math.max(60, Math.min(86400, Math.round((Number(settingInput.value) || 15) * 60)));
+      } else if (kind === "retries") {
+        sEntry.retries = Math.max(0, Math.min(10, Math.round(Number(settingInput.value) || 0)));
+      } else if (kind === "delay") {
+        sEntry.retry_delay_seconds = Math.max(0, Math.min(86400, Math.round((Number(settingInput.value) || 0) * 60)));
+      } else if (kind === "stream") {
+        sEntry.stream = settingInput.checked;
+      }
+      renderRoutingRoles();
+      return;
+    }
     const provSel = e.target.closest("select.route-provider");
     const modelSel = e.target.closest("select.route-model");
     const sel = provSel || modelSel;
@@ -600,6 +650,14 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
   });
 
   $("#routing-roles")?.addEventListener("click", (e) => {
+    const toggleBtn = e.target.closest("[data-route-toggle]");
+    if (toggleBtn) {
+      const tRole = toggleBtn.getAttribute("data-route-toggle");
+      state.routingOpen ||= {};
+      state.routingOpen[tRole] = !state.routingOpen[tRole];
+      renderRoutingRoles();
+      return;
+    }
     const addBtn = e.target.closest("[data-route-add]");
     if (addBtn) {
       const role = addBtn.getAttribute("data-route-add");
@@ -607,7 +665,14 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
       if (rows.length >= (state.maxRoutes || 25)) return;
       const autoIdx = rows.findIndex((en) => en.provider === "Auto");
       const at = autoIdx >= 0 ? autoIdx : rows.length;
-      rows.splice(at, 0, { provider: defaultRouteProvider(), model: "auto" });
+      rows.splice(at, 0, {
+        provider: defaultRouteProvider(),
+        model: "auto",
+        timeout_seconds: 900,
+        retries: 2,
+        retry_delay_seconds: 300,
+        stream: true,
+      });
       renderRoutingRoles();
       return;
     }

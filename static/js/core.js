@@ -31,6 +31,7 @@ export const state = {
   providerPresets: [],
   maxRoutes: 25,
   routeModelCache: {},
+  routingOpen: {},
   autonomy: {},
   chatModelOverride: "",
   repoMode: "files",

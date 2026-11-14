@@ -290,7 +290,7 @@
       <section class="settings-tab-panel" id="settings-panel-routing" role="tabpanel" aria-labelledby="settings-tab-routing" hidden>
         <form id="routing-form" class="task-form settings-inner-form">
           <div class="dialog-heading"><div><p class="eyebrow">PROVIDER PRIORITY</p><h2>Routing</h2></div></div>
-          <p class="draft-note">Each role routes through an ordered list of provider/model pairs (3 rows by default; add or remove rows as needed). Model Auto uses the provider's configured default. Provider Auto expands to every provider ordered by audit score and makes all rows below it inactive. The same provider may appear multiple times with different models. Unavailable connections are skipped automatically; changing a rank swaps the entries.</p>
+          <p class="draft-note">Each role is an accordion with an ordered list of provider/model route rows (3 by default; add or remove rows as needed). Model Auto uses the provider's configured default. Provider Auto expands to every provider ordered by audit score and makes all rows below it inactive. The same provider may appear multiple times with different models. Each route also has a Timeout (per-attempt limit), Retries (retries of the same combo after any failure), Retry delay (wait between those retries), and a Stream toggle (on = SSE streaming with per-chunk timer reset; off = blocking call with a hard deadline). Unavailable connections are skipped automatically; changing a rank swaps the entries.</p>
           <div id="routing-roles"></div>
           <section class="route-role"><strong>Chat window</strong><div class="route-order"><label>Provider
             <select id="chat-provider-select"></select>
