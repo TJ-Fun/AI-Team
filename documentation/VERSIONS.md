@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.1 — 2026-11-14
+
+- Fixed Routing route-row alignment: the settings labels inherited `flex-direction:column` from the `.task-form` base rule, which stacked each label's children and pushed Retries ~9px down and the Stream checkbox ~10px up. Labels now force `flex-direction:row`, and the number inputs / Stream checkbox got specificity fixes so they render at the intended size with dark-theme styling.
+- Updated documentation to 0.99.1.
+
 ## 0.99 — 2026-11-14
 
 - Settings → Routing route rows are now a single line: the Timeout, Retries, Retry delay, and Stream settings sit inline between the Model dropdown and the move/remove buttons (Provider/Model selects shrink via flex sizing; rows wrap the settings to a second line only below 900px viewport width).
