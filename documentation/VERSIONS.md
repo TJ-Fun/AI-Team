@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.2 — 2026-11-14
+
+- Routing route-row settings labels now stack above/below their fields again (Timeout/Retry delay text above the input with the `min` unit below, Retries above, Stream checkbox above its label) while the fields themselves stay center-aligned on the row.
+- Updated documentation to 0.99.2.
+
 ## 0.99.1 — 2026-11-14
 
 - Fixed Routing route-row alignment: the settings labels inherited `flex-direction:column` from the `.task-form` base rule, which stacked each label's children and pushed Retries ~9px down and the Stream checkbox ~10px up. Labels now force `flex-direction:row`, and the number inputs / Stream checkbox got specificity fixes so they render at the intended size with dark-theme styling.
