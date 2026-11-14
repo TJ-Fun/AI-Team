@@ -1,5 +1,11 @@
 # Version log
 
+## 0.99 — 2026-11-14
+
+- Settings → Routing route rows are now a single line: the Timeout, Retries, Retry delay, and Stream settings sit inline between the Model dropdown and the move/remove buttons (Provider/Model selects shrink via flex sizing; rows wrap the settings to a second line only below 900px viewport width).
+- Number inputs styled to match the dark theme; inactive (below-Auto) rows use a dark-theme background.
+- Updated documentation to 0.99.
+
 ## 0.98 — 2026-11-14
 
 - Settings → Routing role cards are now collapsible accordions (collapsed by default, header shows role + route count).
