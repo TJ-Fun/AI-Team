@@ -1,10 +1,10 @@
 # AI-Team
 
-Current application version: **0.77**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
+Current application version: **0.97**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
 
 The web client is served from `static/` (`index.html`, `app.js`, `style.css`, and ES modules under `js/`). The server keeps application data and logs under `TEAM_DATA_DIR` (default: `data/`).
 
-Settings are organized into Projects, Connections, Routing, Agent prompts, Logs, and About tabs. In **Connections**, providers can be added (built-in presets or custom OpenAI-compatible endpoints), removed, and reordered; the list order is the default routing for all agents. **Routing** sets up to four preferred providers per role, with an **Auto** fallback that picks by audit score and then Connections order. Project-specific context is available from the Project Board. Statistics remain available from the main header.
+Settings are organized into Projects, Connections, Routing, Agent prompts, Logs, and About tabs. In **Connections**, providers can be added (built-in presets or custom OpenAI-compatible endpoints), removed, and reordered; the list order is the default routing for all agents. **Routing** configures an ordered list of provider/model route entries per role (add/remove rows, Auto provider expands by audit score, Auto model uses the provider default). Project-specific context is available from the Project Board. Statistics remain available from the main header.
 
 In **Settings → Logs**, **Store from** sets the minimum level written to the rotating log files and persists across restarts. **Show** filters the most recent matching entries in the log viewer. The **Documentation** button browses the local `documentation/` folder; **Files** browses the active project's configured local clone.
 
