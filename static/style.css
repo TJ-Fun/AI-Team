@@ -440,7 +440,7 @@ dialog::backdrop{background:#000000aa}
 .route-row select.route-provider{flex:1 1 150px;min-width:105px;max-width:200px;width:auto}
 .route-row select.route-model{flex:1.6 1 170px;min-width:120px;width:auto}
 .route-settings{flex:0 0 auto;display:flex;gap:7px;align-items:center;white-space:nowrap}
-.route-settings label{display:flex;flex-direction:row;align-items:center;gap:3px;margin:0!important;font-size:9px!important;font-weight:400!important;color:var(--muted)!important;white-space:nowrap}
+.route-settings label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;margin:0!important;font-size:9px!important;font-weight:400!important;color:var(--muted)!important;white-space:nowrap}
 .route-settings .route-num{flex:0 0 auto;width:44px;min-width:0;padding:3px 5px!important;font-size:10px!important;line-height:1.3;border:1px solid #3a423c;border-radius:6px;background:#1e2420;color:var(--ink)}
 .route-settings .route-stream-check input{flex:0 0 auto;width:auto;padding:0!important;border:0!important;background:transparent!important}
 .route-row-actions{flex:0 0 auto;display:flex;gap:4px}
