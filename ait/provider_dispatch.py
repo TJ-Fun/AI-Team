@@ -78,9 +78,10 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
                 task["qa_return_role"] = str(task.get("assigned_role") or "Unknown")
                 task["assigned_role"] = "QA"
                 task["workflow_phase"] = "qa"
-            selected_provider = provider_for_role(task, "QA", "qa_routing_cycle_start")
-            if selected_provider != provider:
+            entry = route_entry_for_role(task, "QA", "qa_routing_cycle_start")
+            if not entry or entry["provider"] != provider:
                 continue
+            task["_route_model"] = entry["model"]
             repo_key = task_repository_key(task)
             if repo_key and repo_key in ACTIVE_REPOSITORY_TASKS:
                 continue
@@ -104,8 +105,10 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
                     continue
                 if candidate.get("workflow_phase") == "qa":
                     continue
-                if task_provider(candidate) != provider:
+                entry = task_route_entry(candidate)
+                if not entry or entry["provider"] != provider:
                     continue
+                candidate["_route_model"] = entry["model"]
                 if task_phase_gated(candidate, all_tasks):
                     continue
                 repo_key = task_repository_key(candidate)
@@ -140,11 +143,13 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         attempts = task.setdefault("attempts", [])
         attempt_num = max((int(a.get("number", 0)) for a in attempts), default=0) + 1
         ts = now_iso()
+        route_model = str(task.get("_route_model") or "auto")
         attempts.append(
             {
                 "number": attempt_num,
                 "provider": provider,
                 "model": model,
+                "route_model": route_model,
                 "role": str(task.get("assigned_role") or "PM/PO"),
                 "state": "in_progress",
                 "started_at": ts,
@@ -574,13 +579,16 @@ def run_watchdog_pass() -> int:
                     cycle_key = "qa_routing_cycle_start" if qa_active else "routing_cycle_start"
                     start = max(0, int(task.get(cycle_key) or 0))
                     tried = {
-                        str(a.get("provider", ""))
+                        (str(a.get("provider", "")), str(a.get("route_model") or "auto"))
                         for a in (task.get("attempts") or [])[start:]
                         if str(a.get("role") or role) == role
                     }
-                    order = selection_order_for_role("QA" if qa_active else role)
+                    order = route_entries_for_role("QA" if qa_active else role)
                     configured = configured_providers()
-                    if not any(p in configured and p not in tried for p in order):
+                    if not any(
+                        e["provider"] in configured and (e["provider"], e["model"]) not in tried
+                        for e in order
+                    ):
                         task[cycle_key] = len(task.get("attempts") or [])
                 task["status"] = "Ready"
                 task.pop("retry_after", None)

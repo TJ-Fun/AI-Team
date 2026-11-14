@@ -1,5 +1,12 @@
 # Version log
 
+## 0.97 — 2026-11-14
+
+- Routing data model reworked: `routing.json` now stores per-role route entries `{"provider", "model"}` (up to `MAX_ROUTE_ENTRIES` = 25) instead of plain provider-name lists; legacy string entries are migrated on read and duplicate providers are allowed.
+- Provider selection now resolves full route entries (`route_entries_for_role`, `route_entry_for_role`, `task_route_entry`); dispatch records `route_model` on each attempt and "tried" tracking keys on provider+model so the same provider can appear multiple times with different models.
+- `/api/routing` now returns `max_routes` instead of `max_preferred`; the Routing settings UI update lands in the next batch.
+- Updated documentation to 0.97.
+
 ## 0.96 — 2026-11-13
 
 - Fixed the app-update progress bar not appearing when the update is started from the notification center: the progress element is now created only after the confirmation and in-progress flag, so board polling can no longer wipe it mid-update.

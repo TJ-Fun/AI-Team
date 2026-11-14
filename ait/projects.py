@@ -6,7 +6,34 @@ from ait.common import *
 
 
 # --- Routing, Projects, Tasks, Context ---
-def get_routing() -> dict[str, list[str]]:
+def _clean_route_model(value: Any) -> str:
+    model = str(value or "").strip()
+    if not model or model.lower() == "auto":
+        return "auto"
+    return model[:160]
+
+
+def _routing_entries(raw: Any, active: set[str]) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    items = raw if isinstance(raw, list) else []
+    for item in items:
+        if isinstance(item, dict):
+            provider = str(item.get("provider", "")).strip()
+            model = _clean_route_model(item.get("model"))
+        else:
+            provider = str(item).strip()
+            model = "auto"
+        if provider == "Auto":
+            model = "auto"
+        elif provider not in active:
+            continue
+        entries.append({"provider": provider, "model": model})
+        if len(entries) >= MAX_ROUTE_ENTRIES:
+            break
+    return entries
+
+
+def get_routing() -> dict[str, list[dict[str, str]]]:
     ensure_data()
     routing_path = DATA / "settings" / "routing.json"
     saved: dict[str, Any] = {}
@@ -15,57 +42,80 @@ def get_routing() -> dict[str, list[str]]:
             saved = json.loads(routing_path.read_text(encoding="utf-8"))
         except Exception:
             saved = {}
-    active = provider_names()
-    result: dict[str, list[str]] = {}
+    active = set(provider_names())
+    result: dict[str, list[dict[str, str]]] = {}
     for role in WORK_ROLES:
         raw = saved.get(role) if isinstance(saved, dict) else None
-        preferred: list[str] = []
-        if isinstance(raw, list):
-            for item in raw:
-                name = str(item).strip()
-                if (name == "Auto" or name in active) and name not in preferred:
-                    preferred.append(name)
-                if len(preferred) >= MAX_PREFERRED_PROVIDERS:
-                    break
-        result[role] = preferred
+        result[role] = _routing_entries(raw, active)
     return result
 
 
-def save_routing(value: Any) -> dict[str, list[str]]:
+def save_routing(value: Any) -> dict[str, list[dict[str, str]]]:
     if not isinstance(value, dict):
         raise ValueError("Routing settings must be an object.")
-    active = provider_names()
-    cleaned: dict[str, list[str]] = {}
+    active = set(provider_names())
+    cleaned: dict[str, list[dict[str, str]]] = {}
     for role in WORK_ROLES:
         order = value.get(role, [])
         if not isinstance(order, list):
             raise ValueError(f"Provider preference for {role} must be a list.")
-        preferred: list[str] = []
-        for item in order:
-            name = str(item).strip()
-            if (name == "Auto" or name in active) and name not in preferred:
-                preferred.append(name)
-            if len(preferred) >= MAX_PREFERRED_PROVIDERS:
-                break
-        cleaned[role] = preferred
+        cleaned[role] = _routing_entries(order, active)
     atomic_json(DATA / "settings" / "routing.json", cleaned)
     return cleaned
 
 
-def selection_order_for_role(role: str) -> list[str]:
-    order: list[str] = []
-    auto = auto_provider_order()
-    for name in get_routing().get(role, []):
-        if name == "Auto":
-            for provider in auto:
-                if provider not in order:
-                    order.append(provider)
-        elif name not in order:
-            order.append(name)
-    for provider in auto:
-        if provider not in order:
-            order.append(provider)
-    return order
+def route_entries_for_role(role: str) -> list[dict[str, str]]:
+    """Expanded routing chain for a role: explicit entries plus Auto fallback.
+
+    Each entry is {"provider": name, "model": model-or-"auto"}. Duplicate providers
+    are allowed when they carry different models; identical provider+model pairs
+    are deduplicated.
+    """
+    entries: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(provider: str, model: str) -> None:
+        key = (provider, model or "auto")
+        if key not in seen:
+            seen.add(key)
+            entries.append({"provider": provider, "model": key[1]})
+
+    for entry in get_routing().get(role, []):
+        provider = entry["provider"]
+        if provider == "Auto":
+            for name in auto_provider_order():
+                add(name, "auto")
+        else:
+            add(provider, entry.get("model") or "auto")
+    for name in auto_provider_order():
+        add(name, "auto")
+    return entries
+
+
+def _attempt_route_keys(
+    attempts: list[dict[str, Any]], role: str, start: int, default_role: str
+) -> set[tuple[str, str]]:
+    keys: set[tuple[str, str]] = set()
+    for attempt in attempts[start:]:
+        if str(attempt.get("role") or default_role) != role:
+            continue
+        provider = str(attempt.get("provider") or "")
+        if not provider:
+            continue
+        keys.add((provider, str(attempt.get("route_model") or "auto")))
+    return keys
+
+
+def route_entry_for_role(task: dict[str, Any], role: str, cycle_key: str) -> dict[str, str] | None:
+    """First untried routing entry (provider + model) for a role, or None."""
+    configured = configured_providers()
+    attempts = task.get("attempts") or []
+    start = max(0, int(task.get(cycle_key, len(attempts)) or 0))
+    tried = _attempt_route_keys(attempts, role, start, str(task.get("assigned_role") or ""))
+    for entry in route_entries_for_role(role):
+        if entry["provider"] in configured and (entry["provider"], entry["model"]) not in tried:
+            return entry
+    return None
 
 
 def cleanup_provider_references(name: str) -> None:
@@ -82,9 +132,15 @@ def cleanup_provider_references(name: str) -> None:
             changed = False
             for role in WORK_ROLES:
                 raw = saved.get(role)
-                if isinstance(raw, list) and target in [str(p) for p in raw]:
-                    saved[role] = [p for p in raw if str(p) != target]
-                    changed = True
+                if isinstance(raw, list):
+                    def _entry_provider(item: Any) -> str:
+                        if isinstance(item, dict):
+                            return str(item.get("provider", "")).strip()
+                        return str(item).strip()
+
+                    if target in [_entry_provider(p) for p in raw]:
+                        saved[role] = [p for p in raw if _entry_provider(p) != target]
+                        changed = True
             if changed:
                 atomic_json(routing_path, saved)
     if str(read_app_config().get("chat_provider") or "").strip() == target:
@@ -603,46 +659,48 @@ def read_task_replies(task_id: str) -> list[dict[str, Any]]:
     return replies
 
 
-def task_provider(task: dict[str, Any]) -> str:
+def task_route_entry(task: dict[str, Any]) -> dict[str, str] | None:
+    """Routing entry (provider + model) selected for a task, or None."""
     if task.get("workflow_phase") == "qa":
-        return provider_for_role(task, "QA", "qa_routing_cycle_start")
+        return route_entry_for_role(task, "QA", "qa_routing_cycle_start")
     val = str(task.get("provider", ""))
     if val == "Antigravity":
         val = "Automatic"
     configured = configured_providers()
     if is_active_provider(val):
-        return val if val in configured else ""
+        return {"provider": val, "model": "auto"} if val in configured else None
     legacy = {"Gemini": "Gemini", "OpenRouter free agent": "OpenRouter"}
     role = str(task.get("assigned_role", ""))
     if role in legacy:
         p = legacy[role]
-        return p if p in configured else ""
+        return {"provider": p, "model": "auto"} if p in configured else None
     if val not in ("Automatic", "Auto"):
-        return ""
+        return None
     attempts = task.get("attempts") or []
     start = max(0, int(task.get("routing_cycle_start") or 0))
-    tried = {
+    tried_names = {
         str(a.get("provider", ""))
         for a in attempts[start:]
         if str(a.get("role") or role) == role
     }
     if val == "Auto":
-        return select_auto_provider(tried)
-    order = selection_order_for_role(role or "PM/PO")
-    return next((p for p in order if p in configured and p not in tried), "")
+        p = select_auto_provider(tried_names)
+        return {"provider": p, "model": "auto"} if p else None
+    tried = _attempt_route_keys(attempts, role, start, role)
+    for entry in route_entries_for_role(role or "PM/PO"):
+        if entry["provider"] in configured and (entry["provider"], entry["model"]) not in tried:
+            return entry
+    return None
+
+
+def task_provider(task: dict[str, Any]) -> str:
+    entry = task_route_entry(task)
+    return entry["provider"] if entry else ""
 
 
 def provider_for_role(task: dict[str, Any], role: str, cycle_key: str) -> str:
-    configured = configured_providers()
-    attempts = task.get("attempts") or []
-    start = max(0, int(task.get(cycle_key, len(attempts)) or 0))
-    tried = {
-        str(attempt.get("provider", ""))
-        for attempt in attempts[start:]
-        if str(attempt.get("role") or task.get("assigned_role") or "") == role
-    }
-    order = selection_order_for_role(role)
-    return next((provider for provider in order if provider in configured and provider not in tried), "")
+    entry = route_entry_for_role(task, role, cycle_key)
+    return entry["provider"] if entry else ""
 
 
 def has_untried_alternate(task: dict[str, Any], failed_provider: str) -> bool:
@@ -651,13 +709,11 @@ def has_untried_alternate(task: dict[str, Any], failed_provider: str) -> bool:
     role = str(task.get("assigned_role") or "PM/PO")
     cycle_key = "qa_routing_cycle_start" if role == "QA" else "routing_cycle_start"
     start = max(0, int(task.get(cycle_key, 0) or 0))
-    tried = {
-        str(a.get("provider", ""))
-        for a in attempts[start:]
-        if str(a.get("role") or role) == role
-    }
-    order = selection_order_for_role(role)
-    return any(p != failed_provider and p not in tried and p in configured for p in order)
+    tried = _attempt_route_keys(attempts, role, start, role)
+    return any(
+        entry["provider"] in configured and (entry["provider"], entry["model"]) not in tried
+        for entry in route_entries_for_role(role)
+    )
 
 
 def task_repository_key(task: dict[str, Any]) -> str:

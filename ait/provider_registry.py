@@ -6,7 +6,6 @@ from ait.common import *
 
 
 PROVIDER_REGISTRY_FILE = DATA / "settings" / "providers.json"
-MAX_PREFERRED_PROVIDERS = 4
 
 PROVIDER_PRESETS: dict[str, dict[str, Any]] = {
     "gemini": {

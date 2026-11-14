@@ -49,7 +49,7 @@ def handle_providers_get(handler, path, query) -> bool:
                 "providers": provider_names(),
                 "configured": configured_providers(),
                 "routing": get_routing(),
-                "max_preferred": MAX_PREFERRED_PROVIDERS,
+                "max_routes": MAX_ROUTE_ENTRIES,
                 "chat_provider": get_chat_provider(),
                 "autonomy": get_autonomy(),
             }
