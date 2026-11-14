@@ -249,10 +249,10 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
                 modelDisabled ? "disabled" : ""
               }>${routeModelOptionsHtml(entry)}</select>
               <div class="route-settings">
-                <label>Timeout <input type="number" class="route-num" min="1" max="1440" step="1" value="${timeoutMin}" data-route-setting="timeout" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}> min</label>
-                <label>Retries <input type="number" class="route-num" min="0" max="10" step="1" value="${entry.retries ?? 2}" data-route-setting="retries" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}></label>
-                <label>Retry delay <input type="number" class="route-num" min="0" max="1440" step="1" value="${delayMin}" data-route-setting="delay" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}> min</label>
-                <label class="route-stream-check"><input type="checkbox" data-route-setting="stream" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${entry.stream !== false ? "checked" : ""} ${inactive ? "disabled" : ""}> Stream</label>
+                <label><span class="route-lbl">Timeout</span><input type="number" class="route-num" min="1" max="1440" step="1" value="${timeoutMin}" data-route-setting="timeout" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}><span class="route-unit">min</span></label>
+                <label><span class="route-lbl">Retries</span><input type="number" class="route-num" min="0" max="10" step="1" value="${entry.retries ?? 2}" data-route-setting="retries" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}></label>
+                <label><span class="route-lbl">Retry delay</span><input type="number" class="route-num" min="0" max="1440" step="1" value="${delayMin}" data-route-setting="delay" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${inactive ? "disabled" : ""}><span class="route-unit">min</span></label>
+                <label class="route-stream-check"><input type="checkbox" data-route-setting="stream" data-route-role="${escapeHtml(role)}" data-route-idx="${idx}" ${entry.stream !== false ? "checked" : ""} ${inactive ? "disabled" : ""}><span class="route-lbl">Stream</span></label>
               </div>
               <span class="route-row-actions">
                 <button type="button" class="secondary route-move" data-route-move="up" data-route-role="${escapeHtml(

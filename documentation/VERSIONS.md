@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.3 — 2026-11-14
+
+- Routing route-row settings now center **only the field** (number input / Stream checkbox) on the row's center line; the Timeout/Retries/Retry delay/Stream labels and `min` units are absolutely positioned above/below their field, so they no longer affect field alignment regardless of label length.
+- Updated documentation to 0.99.3.
+
 ## 0.99.2 — 2026-11-14
 
 - Routing route-row settings labels now stack above/below their fields again (Timeout/Retry delay text above the input with the `min` unit below, Retries above, Stream checkbox above its label) while the fields themselves stay center-aligned on the row.
