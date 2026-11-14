@@ -65,6 +65,17 @@ def _routing_entries(raw: Any, active: set[str]) -> list[dict[str, Any]]:
     return entries
 
 
+def _with_model_flags(result: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    flags = load_model_flags()
+    if flags:
+        for role, entries in result.items():
+            for entry in entries:
+                key = f"{role}|{entry.get('provider')}|{entry.get('model')}"
+                if key in flags:
+                    entry["model_unavailable"] = True
+    return result
+
+
 def get_routing() -> dict[str, list[dict[str, Any]]]:
     ensure_data()
     routing_path = DATA / "settings" / "routing.json"
@@ -79,7 +90,7 @@ def get_routing() -> dict[str, list[dict[str, Any]]]:
     for role in WORK_ROLES:
         raw = saved.get(role) if isinstance(saved, dict) else None
         result[role] = _routing_entries(raw, active)
-    return result
+    return _with_model_flags(result)
 
 
 def save_routing(value: Any) -> dict[str, list[dict[str, Any]]]:
@@ -93,7 +104,7 @@ def save_routing(value: Any) -> dict[str, list[dict[str, Any]]]:
             raise ValueError(f"Provider preference for {role} must be a list.")
         cleaned[role] = _routing_entries(order, active)
     atomic_json(DATA / "settings" / "routing.json", cleaned)
-    return cleaned
+    return _with_model_flags(cleaned)
 
 
 def route_entries_for_role(role: str) -> list[dict[str, Any]]:

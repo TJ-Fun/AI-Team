@@ -237,6 +237,23 @@ def get_notifications() -> list[dict[str, Any]]:
                     }
                 )
 
+    for flag in load_model_flags().values():
+        if not isinstance(flag, dict):
+            continue
+        role = str(flag.get("role") or "")
+        provider = str(flag.get("provider") or "")
+        model = str(flag.get("model") or "")
+        since = str(flag.get("since") or "")
+        items.append(
+            {
+                "id": f"model:{role}|{provider}|{model}|{since}",
+                "kind": "provider_model",
+                "severity": "high",
+                "title": f"Model unavailable: {provider} · {model}",
+                "message": f"{role} routing references a model that {provider} no longer lists. Update the route or restore the model.",
+            }
+        )
+
     dismissed_path = DATA / "settings" / "notifications_dismissed.json"
     dismissed: set[str] = set()
     if dismissed_path.is_file():

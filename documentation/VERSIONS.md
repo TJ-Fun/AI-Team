@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.5 — 2026-11-14
+
+- Routing entries whose explicit model is no longer listed by its provider are now flagged (`model_unavailable` in `GET /api/routing`), persisted in `data/settings/model_availability.json`, and surfaced as a persistent high-severity notification. Flags clear automatically when the model reappears or the route is removed; all transitions are logged.
+- Updated documentation to 0.99.5.
+
 ## 0.99.4 — 2026-11-14
 
 - Added a daily background worker (`ait/model_refresh.py`) that refreshes every connected provider's model list once per day (and once at startup), with up to 3 retries and backoff; results are cached in `data/settings/model_cache.json`, keeping the last good list on failure. All refresh outcomes are logged to `data/logs/activity.jsonl` and `app.log`.
