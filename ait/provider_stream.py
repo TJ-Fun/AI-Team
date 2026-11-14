@@ -70,7 +70,52 @@ def _task_prompt(task: dict[str, Any], provider: str, extra_context: str) -> tup
     return role, prompt, contract
 
 
-def call_gemini_task(task: dict[str, Any], extra_context: str = "", model_override: str = "") -> tuple[str, dict[str, Any]]:
+def _blocking_gemini_task(api_key: str, model: str, sys_inst: str, prompt: str, timeout: int) -> tuple[str, dict[str, Any]]:
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model, safe='')}"
+        f":generateContent?key={urllib.parse.quote(api_key, safe='')}"
+    )
+    payload = {
+        "systemInstruction": {"parts": [{"text": sys_inst}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.2},
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": HTTP_USER_AGENT},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            result = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")[:1500]
+        raise ProviderFailure("Gemini", exc.code, body, exc.headers.get("Retry-After")) from exc
+    except Exception as exc:
+        raise ProviderFailure("Gemini", 503, f"Gemini request failed: {exc}"[:1000]) from exc
+
+    candidates = result.get("candidates") or []
+    cand = candidates[0] if candidates and isinstance(candidates[0], dict) else {}
+    parts = [
+        str(p.get("text", ""))
+        for p in ((cand.get("content") or {}).get("parts") or [])
+        if isinstance(p, dict) and p.get("text")
+    ]
+    text = "".join(parts).strip()
+    if not text:
+        feedback = result.get("promptFeedback") or {}
+        blocked = str(feedback.get("blockReason") or "")
+        hint = f" (blocked: {blocked})" if blocked else ""
+        raise ProviderFailure("Gemini", 400, f"Gemini returned no text.{hint}")
+    return text, {
+        "usage_metadata": result.get("usageMetadata"),
+        "finish_reason": cand.get("finishReason"),
+        "streamed": False,
+    }
+
+
+def call_gemini_task(task: dict[str, Any], extra_context: str = "", model_override: str = "", idle_timeout: int = STREAM_IDLE_TIMEOUT_SECONDS, stream_enabled: bool = True) -> tuple[str, dict[str, Any]]:
     api_key = get_provider_key("gemini")
     if not api_key:
         raise ProviderFailure("Gemini", 401, "Gemini API key is not configured.")
@@ -78,6 +123,8 @@ def call_gemini_task(task: dict[str, Any], extra_context: str = "", model_overri
 
     sys_inst = combined_agent_prompt(role) + (("\n\n" + contract) if contract else "")
     model = provider_model("Gemini", model_override)
+    if not stream_enabled:
+        return _blocking_gemini_task(api_key, model, sys_inst, prompt, idle_timeout)
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model, safe='')}"
         f":streamGenerateContent?alt=sse&key={urllib.parse.quote(api_key, safe='')}"
@@ -98,7 +145,7 @@ def call_gemini_task(task: dict[str, Any], extra_context: str = "", model_overri
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=STREAM_IDLE_TIMEOUT_SECONDS) as resp:
+        with urllib.request.urlopen(req, timeout=idle_timeout) as resp:
             parts: list[str] = []
             usage = None
             finish = None
@@ -161,7 +208,7 @@ def _openai_headers(provider: str, api_key: str, cfg: dict[str, Any]) -> dict[st
     return headers
 
 
-def _stream_openai_compat(provider: str, endpoint: str, headers: dict[str, str], payload: dict[str, Any], include_usage: bool) -> tuple[str, str, dict[str, Any]]:
+def _stream_openai_compat(provider: str, endpoint: str, headers: dict[str, str], payload: dict[str, Any], include_usage: bool, idle_timeout: int = STREAM_IDLE_TIMEOUT_SECONDS) -> tuple[str, str, dict[str, Any]]:
     body = dict(payload)
     body["stream"] = True
     if include_usage:
@@ -173,7 +220,7 @@ def _stream_openai_compat(provider: str, endpoint: str, headers: dict[str, str],
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=STREAM_IDLE_TIMEOUT_SECONDS) as resp:
+        with urllib.request.urlopen(req, timeout=idle_timeout) as resp:
             parts: list[str] = []
             usage = None
             finish = None
@@ -210,7 +257,7 @@ def _stream_openai_compat(provider: str, endpoint: str, headers: dict[str, str],
     return text, model_seen or str(payload.get("model") or ""), {"usage": usage, "finish_reason": finish, "streamed": True}
 
 
-def _blocking_openai_compat(provider: str, endpoint: str, headers: dict[str, str], payload: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+def _blocking_openai_compat(provider: str, endpoint: str, headers: dict[str, str], payload: dict[str, Any], timeout: int = 150) -> tuple[str, str, dict[str, Any]]:
     req = urllib.request.Request(
         endpoint,
         data=json.dumps(payload).encode("utf-8"),
@@ -218,7 +265,7 @@ def _blocking_openai_compat(provider: str, endpoint: str, headers: dict[str, str
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=150) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             result = json.loads(resp.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as exc:
         raise ProviderFailure(provider, exc.code, _openai_error_detail(exc), exc.headers.get("Retry-After")) from exc
@@ -248,7 +295,7 @@ def _blocking_openai_compat(provider: str, endpoint: str, headers: dict[str, str
     }
 
 
-def call_openai_compatible_task(task: dict[str, Any], provider: str, extra_context: str = "", model_override: str = "") -> tuple[str, str, dict[str, Any]]:
+def call_openai_compatible_task(task: dict[str, Any], provider: str, extra_context: str = "", model_override: str = "", idle_timeout: int = STREAM_IDLE_TIMEOUT_SECONDS, stream_enabled: bool = True) -> tuple[str, str, dict[str, Any]]:
     cfg = openai_compat_config(provider, model_override)
     if not cfg:
         raise ProviderFailure(provider, 400, f"Unsupported provider: {provider}")
@@ -261,12 +308,14 @@ def call_openai_compatible_task(task: dict[str, Any], provider: str, extra_conte
     headers = _openai_headers(provider, api_key, cfg)
     endpoint = cfg["endpoint"]
 
+    if not stream_enabled:
+        return _blocking_openai_compat(provider, endpoint, headers, payload, timeout=idle_timeout)
     try:
-        return _stream_openai_compat(provider, endpoint, headers, payload, include_usage=True)
+        return _stream_openai_compat(provider, endpoint, headers, payload, include_usage=True, idle_timeout=idle_timeout)
     except _StreamUnsupported:
         logger.info("Provider %s rejected stream_options; retrying stream without usage", provider)
     try:
-        return _stream_openai_compat(provider, endpoint, headers, payload, include_usage=False)
+        return _stream_openai_compat(provider, endpoint, headers, payload, include_usage=False, idle_timeout=idle_timeout)
     except _StreamUnsupported:
         logger.info("Provider %s does not support streaming; using blocking call", provider)
-    return _blocking_openai_compat(provider, endpoint, headers, payload)
+    return _blocking_openai_compat(provider, endpoint, headers, payload, timeout=idle_timeout)

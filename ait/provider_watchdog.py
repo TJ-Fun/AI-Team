@@ -24,23 +24,62 @@ def run_watchdog_pass() -> int:
                     active["state"] = "timed_out"
                     active["finished_at"] = now_iso()
                     active["error"] = "No response before the attempt timeout."
-                retries = int(task.get("automatic_retries") or 0)
-                if retries >= MAX_AUTOMATIC_RETRIES:
-                    task["status"] = "Blocked"
-                    reason = "Automatic retry limit reached after an agent timeout."
-                    task["block_reason"] = reason
-                    if task.get("workflow_phase") == "qa":
-                        task["assigned_role"] = str(task.pop("qa_return_role", "Unknown"))
-                        task.pop("workflow_phase", None)
-                        task.pop("qa_attempt_active", None)
+                routed = task.get("workflow_phase") == "qa" or str(task.get("provider") or "") in (
+                    "Automatic",
+                    "Auto",
+                    "Antigravity",
+                )
+                if routed:
+                    qa_active = task.get("workflow_phase") == "qa"
+                    role = "QA" if qa_active else str(task.get("assigned_role") or "PM/PO")
+                    cycle_key = "qa_routing_cycle_start" if qa_active else "routing_cycle_start"
+                    nxt = (
+                        route_entry_for_role(task, role, cycle_key)
+                        if qa_active
+                        else task_route_entry(task)
+                    )
+                    failed_key = (
+                        str((active or {}).get("provider") or ""),
+                        str((active or {}).get("route_model") or "auto"),
+                    )
+                    if nxt is None:
+                        task["status"] = "Blocked"
+                        reason = "All route combinations exhausted after an agent timeout."
+                        task["block_reason"] = reason
+                        if qa_active:
+                            task["assigned_role"] = str(task.pop("qa_return_role", "Unknown"))
+                            task.pop("workflow_phase", None)
+                            task.pop("qa_attempt_active", None)
+                    elif route_combo_key(nxt) == failed_key:
+                        delay = int(
+                            nxt.get("retry_delay_seconds")
+                            if nxt.get("retry_delay_seconds") is not None
+                            else DEFAULT_ROUTE_RETRY_DELAY_SECONDS
+                        )
+                        task["status"] = "Waiting for capacity"
+                        task["retry_after"] = (
+                            datetime.now(timezone.utc) + timedelta(seconds=delay)
+                        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                        task["waiting_reason"] = "Agent attempt timed out."
+                        reason = f"Agent attempt timed out; retrying in {delay}s."
+                        if qa_active:
+                            task.pop("qa_attempt_active", None)
+                    else:
+                        task["status"] = "Ready"
+                        task["dispatch_note"] = "Attempt timed out; trying next provider/model."
+                        reason = "Agent attempt timed out; trying the next route."
                 else:
-                    wait_h = min(2 * (retries + 1), 6)
-                    task["status"] = "Waiting for capacity"
-                    task["retry_after"] = (datetime.now(timezone.utc) + timedelta(hours=wait_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
-                    task["waiting_reason"] = "Agent attempt timed out."
-                    reason = f"Agent attempt timed out; retry scheduled after {wait_h} hours."
-                    if task.get("workflow_phase") == "qa":
-                        task.pop("qa_attempt_active", None)
+                    retries = int(task.get("automatic_retries") or 0)
+                    if retries >= MAX_AUTOMATIC_RETRIES:
+                        task["status"] = "Blocked"
+                        reason = "Automatic retry limit reached after an agent timeout."
+                        task["block_reason"] = reason
+                    else:
+                        wait_h = min(2 * (retries + 1), 6)
+                        task["status"] = "Waiting for capacity"
+                        task["retry_after"] = (datetime.now(timezone.utc) + timedelta(hours=wait_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                        task["waiting_reason"] = "Agent attempt timed out."
+                        reason = f"Agent attempt timed out; retry scheduled after {wait_h} hours."
                 ts = now_iso()
                 task["updated_at"] = ts
                 task.setdefault("activity", []).append(
@@ -60,24 +99,13 @@ def run_watchdog_pass() -> int:
                 if retry_ts is None or now_epoch < retry_ts:
                     continue
                 ts = now_iso()
-                task["automatic_retries"] = int(task.get("automatic_retries") or 0) + 1
-                if task.get("provider") == "Automatic" or task.get("workflow_phase") == "qa":
-                    role = str(task.get("assigned_role") or "PM/PO")
-                    qa_active = task.get("workflow_phase") == "qa"
-                    cycle_key = "qa_routing_cycle_start" if qa_active else "routing_cycle_start"
-                    start = max(0, int(task.get(cycle_key) or 0))
-                    tried = {
-                        (str(a.get("provider", "")), str(a.get("route_model") or "auto"))
-                        for a in (task.get("attempts") or [])[start:]
-                        if str(a.get("role") or role) == role
-                    }
-                    order = route_entries_for_role("QA" if qa_active else role)
-                    configured = configured_providers()
-                    if not any(
-                        e["provider"] in configured and (e["provider"], e["model"]) not in tried
-                        for e in order
-                    ):
-                        task[cycle_key] = len(task.get("attempts") or [])
+                routed = task.get("workflow_phase") == "qa" or str(task.get("provider") or "") in (
+                    "Automatic",
+                    "Auto",
+                    "Antigravity",
+                )
+                if not routed:
+                    task["automatic_retries"] = int(task.get("automatic_retries") or 0) + 1
                 task["status"] = "Ready"
                 task.pop("retry_after", None)
                 task.pop("waiting_reason", None)

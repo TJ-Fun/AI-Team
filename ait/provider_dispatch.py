@@ -49,6 +49,20 @@ def select_auto_provider(tried: set[str] | None = None) -> str:
     return ""
 
 
+def _stash_route_settings(task: dict[str, Any], entry: dict[str, Any]) -> None:
+    task["_route_model"] = str(entry.get("model") or "auto")
+    task["_route_timeout"] = int(entry.get("timeout_seconds") or DEFAULT_ROUTE_TIMEOUT_SECONDS)
+    task["_route_retries"] = int(
+        entry.get("retries") if entry.get("retries") is not None else DEFAULT_ROUTE_RETRIES
+    )
+    task["_route_retry_delay"] = int(
+        entry.get("retry_delay_seconds")
+        if entry.get("retry_delay_seconds") is not None
+        else DEFAULT_ROUTE_RETRY_DELAY_SECONDS
+    )
+    task["_route_stream"] = bool(entry.get("stream", True))
+
+
 def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
     if provider not in configured_providers():
         return None
@@ -80,7 +94,7 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
             entry = route_entry_for_role(task, "QA", "qa_routing_cycle_start")
             if not entry or entry["provider"] != provider:
                 continue
-            task["_route_model"] = entry["model"]
+            _stash_route_settings(task, entry)
             repo_key = task_repository_key(task)
             if repo_key and repo_key in ACTIVE_REPOSITORY_TASKS:
                 continue
@@ -107,7 +121,7 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
                 entry = task_route_entry(candidate)
                 if not entry or entry["provider"] != provider:
                     continue
-                candidate["_route_model"] = entry["model"]
+                _stash_route_settings(candidate, entry)
                 if task_phase_gated(candidate, all_tasks):
                     continue
                 repo_key = task_repository_key(candidate)
@@ -144,6 +158,18 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
         ts = now_iso()
         route_model = str(task.get("_route_model") or "auto")
         model = provider_model(provider, route_model)
+        route_timeout = int(task.get("_route_timeout") or DEFAULT_ROUTE_TIMEOUT_SECONDS)
+        route_stream = bool(task.get("_route_stream", True))
+        route_retries = int(
+            task.get("_route_retries")
+            if task.get("_route_retries") is not None
+            else DEFAULT_ROUTE_RETRIES
+        )
+        route_delay = int(
+            task.get("_route_retry_delay")
+            if task.get("_route_retry_delay") is not None
+            else DEFAULT_ROUTE_RETRY_DELAY_SECONDS
+        )
         attempts.append(
             {
                 "number": attempt_num,
@@ -153,11 +179,17 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
                 "role": str(task.get("assigned_role") or "PM/PO"),
                 "state": "in_progress",
                 "started_at": ts,
+                "timeout_seconds": route_timeout,
+                "stream": route_stream,
+                "retries": route_retries,
+                "retry_delay_seconds": route_delay,
             }
         )
         task["status"] = "In progress"
         task["updated_at"] = ts
-        task["attempt_timeout_seconds"] = DEFAULT_ATTEMPT_TIMEOUT_SECONDS
+        task["attempt_timeout_seconds"] = (
+            route_timeout * STREAM_HARD_CAP_FACTOR if route_stream else route_timeout
+        )
         task["dispatch_note"] = f"{provider} is working on this task."
         task.setdefault("activity", []).append(
             {
@@ -419,14 +451,45 @@ def dispatch_one_for_provider(provider: str) -> bool:
             fresh = read_task(tid)
             if fresh:
                 ts = now_iso()
-                retryable = failure.status in (408, 429) or failure.status >= 500
-                fallbackable = retryable or failure.status in (400, 401, 403)
-                fallback = (
-                    fallbackable
-                    and has_untried_alternate(fresh, provider)
-                    and (qa_active or fresh.get("provider") == "Automatic")
+                routed = qa_active or str(fresh.get("provider") or "") in ("Automatic", "Auto", "Antigravity")
+                failed_attempt = next(
+                    (a for a in fresh.get("attempts") or [] if int(a.get("number", 0)) == attempt_num),
+                    {},
                 )
-                next_status = "Ready" if fallback else ("Waiting for capacity" if retryable else "Blocked")
+                failed_key = (
+                    provider,
+                    str(failed_attempt.get("route_model") or fresh.get("_route_model") or "auto"),
+                )
+                nxt_entry: dict[str, Any] | None = None
+                retry_same = False
+                retryable = failure.status in (408, 429) or failure.status >= 500
+                if routed:
+                    role = "QA" if qa_active else str(fresh.get("assigned_role") or "PM/PO")
+                    cycle_key = "qa_routing_cycle_start" if qa_active else "routing_cycle_start"
+                    nxt_entry = (
+                        route_entry_for_role(fresh, role, cycle_key)
+                        if qa_active
+                        else task_route_entry(fresh)
+                    )
+                    if nxt_entry is None:
+                        next_status = "Blocked"
+                        fallback = False
+                    elif route_combo_key(nxt_entry) == failed_key:
+                        next_status = "Waiting for capacity"
+                        fallback = False
+                        retry_same = True
+                    else:
+                        next_status = "Ready"
+                        fallback = True
+                else:
+                    fallbackable = retryable or failure.status in (400, 401, 403)
+                    fallback = (
+                        fallbackable
+                        and has_untried_alternate(fresh, provider)
+                        and (qa_active or fresh.get("provider") == "Automatic")
+                    )
+                    next_status = "Ready" if fallback else ("Waiting for capacity" if retryable else "Blocked")
+                waiting_capacity = retry_same or (not routed and retryable)
                 folder = provider.lower().replace(" ", "")
                 rel = f"replies/{tid}/{folder}/attempt-{attempt_num:03d}.json"
                 atomic_json(
@@ -443,15 +506,33 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 )
                 for att in fresh.get("attempts") or []:
                     if att.get("number") == attempt_num:
-                        att["state"] = "provider_unavailable" if fallback else ("waiting_for_capacity" if retryable else "failed")
+                        att["state"] = "provider_unavailable" if fallback else ("waiting_for_capacity" if waiting_capacity else "failed")
                         att["finished_at"] = ts
                         att["reply_file"] = rel
                 msg = f"{provider} API error {failure.status}: {failure}."
                 if fallback:
-                    nxt = provider_for_role(fresh, "QA", "qa_routing_cycle_start") if qa_active else task_provider(fresh)
+                    nxt = (
+                        str(nxt_entry["provider"])
+                        if nxt_entry
+                        else (provider_for_role(fresh, "QA", "qa_routing_cycle_start") if qa_active else task_provider(fresh))
+                    )
                     fresh["dispatch_note"] = f"{provider} unavailable; switching to {nxt}."
                     msg = f"{msg} Trying {nxt} automatically."
-                elif retryable:
+                elif retry_same and nxt_entry is not None:
+                    delay = int(
+                        nxt_entry.get("retry_delay_seconds")
+                        if nxt_entry.get("retry_delay_seconds") is not None
+                        else DEFAULT_ROUTE_RETRY_DELAY_SECONDS
+                    )
+                    retry_iso = (datetime.now(timezone.utc) + timedelta(seconds=delay)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    if failure.retry_after:
+                        hdr_iso = retry_after_time(failure.retry_after, 0)
+                        if (parse_iso_epoch(hdr_iso) or 0) > (parse_iso_epoch(retry_iso) or 0):
+                            retry_iso = hdr_iso
+                    fresh["retry_after"] = retry_iso
+                    fresh["waiting_reason"] = msg
+                    msg = f"{msg} Retrying {provider} in {delay}s."
+                elif not routed and retryable:
                     fresh["retry_after"] = retry_after_time(failure.retry_after, 24 if failure.status == 429 else 2)
                     fresh["waiting_reason"] = msg
                 else:
@@ -461,7 +542,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 fresh["latest_reply_file"] = rel
                 if qa_active:
                     fresh.pop("qa_attempt_active", None)
-                    if not fallback and not retryable:
+                    if next_status == "Blocked":
                         fresh["assigned_role"] = str(fresh.pop("qa_return_role", "Unknown"))
                         fresh.pop("workflow_phase", None)
                 fresh.setdefault("activity", []).append(
