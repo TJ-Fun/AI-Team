@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.6 — 2026-11-14
+
+- `GET /api/providers/{id}/models` now serves the cached model list (with `fetched_at`/`stale` fields) and falls back to a live fetch when no cache exists. New `POST /api/providers/{id}/refresh-models` endpoint refreshes one provider on demand (with retries) and re-checks routing availability. `POST /api/providers/{id}/test-model` already existed for connection cards.
+- Updated documentation to 0.99.6.
+
 ## 0.99.5 — 2026-11-14
 
 - Routing entries whose explicit model is no longer listed by its provider are now flagged (`model_unavailable` in `GET /api/routing`), persisted in `data/settings/model_availability.json`, and surfaced as a persistent high-severity notification. Flags clear automatically when the model reappears or the route is removed; all transitions are logged.

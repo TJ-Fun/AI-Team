@@ -67,7 +67,7 @@ def handle_providers_get(handler, path, query) -> bool:
     m_prov_models = re.fullmatch(r"/api/providers/([a-z0-9-]+)/models", path)
     if m_prov_models:
         try:
-            handler.send_json(list_provider_models(m_prov_models.group(1)))
+            handler.send_json(provider_models_response(m_prov_models.group(1)))
             return True
         except ValueError as exc:
             handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
@@ -110,6 +110,17 @@ def handle_providers_post(handler, path, body) -> bool:
         except ValueError as exc:
             handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return True
+
+    m_prov_refresh_models = re.fullmatch(r"/api/providers/([a-z0-9-]+)/refresh-models", path)
+    if m_prov_refresh_models:
+        try:
+            result = refresh_provider_model_list(m_prov_refresh_models.group(1))
+        except ValueError as exc:
+            handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
+        check_routing_model_availability()
+        handler.send_json(result)
+        return True
 
     m_prov_test_model = re.fullmatch(r"/api/providers/([a-z0-9-]+)/test-model", path)
     if m_prov_test_model:
