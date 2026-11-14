@@ -160,6 +160,7 @@ def list_provider_models(conn_id: str) -> dict[str, Any]:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 parsed = json.loads(resp.read().decode("utf-8", errors="replace"))
             models = sorted({str(m.get("id", "")).strip() for m in (parsed.get("data") or []) if isinstance(m, dict) and str(m.get("id", "")).strip()})
+        models = [m for m in models if not is_non_chat_model(m)]
         if not models:
             return {"provider": name, "current": current, "models": [], "selectable": False, "error": "Endpoint did not list any models."}
         return {"provider": name, "current": current, "models": models, "selectable": True}

@@ -64,6 +64,31 @@ STREAM_IDLE_TIMEOUT_SECONDS = 15 * 60
 MAX_AUTOMATIC_RETRIES = 2
 MAX_ROUTE_ENTRIES = 25
 
+NON_CHAT_MODEL_PATTERNS = (
+    "embed",
+    "dall-e",
+    "dalle",
+    "stable-diffusion",
+    "sdxl",
+    "flux",
+    "whisper",
+    "tts",
+    "text-to-speech",
+    "speech",
+    "audio",
+    "moderation",
+    "rerank",
+    "re-rank",
+    "guard",
+    "image",
+)
+
+
+def is_non_chat_model(model: str) -> bool:
+    """True when a model id looks like a non-chat model (embedding, image, TTS, etc.)."""
+    lowered = str(model or "").lower()
+    return any(pattern in lowered for pattern in NON_CHAT_MODEL_PATTERNS)
+
 WORK_ROLES = [
     "PM/PO",
     "Frontend developer",
