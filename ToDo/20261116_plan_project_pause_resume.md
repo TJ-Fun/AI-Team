@@ -1,7 +1,7 @@
 # Plan: Project pause/resume (activate/deactivate)
 
 Date: 2026-11-16
-Status: Awaiting "Go"
+Status: Completed (batches 1–3 executed 2026-11-16, v0.100)
 Target version: **0.100** (subsequent changes use 0.101, 0.102, …)
 
 ## Confirmed decisions

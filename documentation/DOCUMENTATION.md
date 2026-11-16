@@ -46,6 +46,7 @@ The supplied service runs as the unprivileged `ubuntu` user, uses `ProtectSystem
 3. Use **New task** to create a draft with a role, provider preference, project/sub-project, request, and optional acceptance checks.
 4. User-created tasks remain drafts until reviewed and marked Ready. By default, PM/PO-proposed work tasks are created as drafts and released when the user approves the project overview; Settings → Routing → Autonomy can disable this plan-approval gate. Project-overview documents still require user approval. After plan approval, dispatch, QA, repository merge, and guarded local sync continue without further user action unless an autonomy gate or failure requires attention. Deliverable work requires acceptance checks before it can enter the agent queue.
 5. Follow status, attempts, agent replies, validation results, and activity from the board/task details. Browser polling refreshes board and runtime status. The notification center surfaces blocked/rework/capacity/CI/GitHub/local-sync/provider issues plus PM/PO decisions (clarification answers, project-overview and design-review approvals) and merge approvals; task notifications open the related task detail.
+6. Use **Pause project** / **Resume project** (next to **New task**) to deactivate a project. A paused project keeps its board, tasks, chat, and history visible, but the dispatcher skips its tasks and the release publish/auto-advance worker skips it; in-flight provider calls finish normally. The button toggles back to resume.
 
 ### 4.2 PM/PO chat
 
@@ -109,7 +110,7 @@ Projects can be planned as sequential **phases** (`v0.N`) containing ordered **r
 - **Gate.** The dispatcher only runs `Ready` tasks whose release is the project's current release, and work tasks wait until all `env_setup` tasks in that release are Done. Untagged legacy tasks are unaffected; when no plan block exists the earliest open release is used.
 - **Publish.** A background worker (`ait/release_publish.py`, 60s) detects a release whose tasks are all Done/Canceled, then runs `git tag` + push in the project's local checkout and `gh release create --verify-tag` (tag-only fallback when `gh` is missing; failures retry every 10 minutes). State is kept in `data/releases/{project}.json`. On success the plan block marks the release done and advances `current_release`/`current_phase`, and a chat notice is posted.
 - **Auto-advance.** When a project has no open tasks and the current release has no tasks yet, the worker queues a PM/PO planning task (`auto_release_plan`) that skips the project-overview approval gate and creates the release's tasks directly as Ready — env setup first, then dev/QA/docs work.
-- **UI.** Task cards show a release badge and the board sorts versioned tasks by release, env tasks first, then `release_order`.
+- **UI.** Task cards show a release badge and the board sorts versioned tasks by release, env tasks first, then `release_order`. Paused projects (`active: false`) are skipped entirely by the publish and auto-advance pass.
 
 ## 5. Installation and deployment (Ubuntu/Oracle Cloud)
 
