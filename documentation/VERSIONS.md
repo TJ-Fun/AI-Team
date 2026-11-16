@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.10 — 2026-11-16
+
+- Release-driven workflow, batch 3 (publish): a new background worker (`ait/release_publish.py`, 60s interval) detects releases whose tasks are all Done/Canceled, then publishes them: `git tag` + push in the project's local checkout, followed by `gh release create --verify-tag` (falls back to tag-only when `gh` is unavailable; failures retry every 10 minutes). Publish state is tracked per project in `data/releases/{project}.json`. On success the `ait-release-plan` block inside `master_plan` is updated (release marked done, `current_release`/`current_phase` advanced to the next planned release) and a chat notice is posted. The PM planning and roadmap-update contracts now require `release`/`release_order` task fields and the `ait-release-plan` JSON block.
+- Updated documentation to 0.99.10.
+
 ## 0.99.9 — 2026-11-16
 
 - Release-driven workflow, batch 2 (gate): the provider dispatcher now enforces release ordering. A `Ready` task tagged with a `release` only dispatches when that release is the project's `current_release` in the `master_plan` plan block (falling back to the earliest open release when no plan block exists), and work tasks wait until all `env_setup` tasks in the same release are Done. Untagged legacy tasks are unaffected.

@@ -153,3 +153,64 @@ def project_open_release_tasks(tasks: list[dict[str, Any]], project_id: str) -> 
         and str(t.get("release") or "")
         and t.get("status") not in DONE_TASK_STATUSES
     ]
+
+
+def render_release_plan_block(plan: dict[str, Any]) -> str:
+    return "```json\n" + json.dumps(plan, indent=2) + "\n```"
+
+
+def update_release_plan_doc(project_id: str, plan: dict[str, Any]) -> None:
+    """Write the release-plan JSON block back into the master_plan document."""
+    block = render_release_plan_block(plan)
+    doc = load_project_context(project_id, ROADMAP_DOC_SLUG)
+    if RELEASE_PLAN_FENCE_RE.search(doc):
+        new_doc = RELEASE_PLAN_FENCE_RE.sub(lambda _m: block, doc, count=1)
+    else:
+        header = "## Release plan\n\n"
+        new_doc = (doc.rstrip() + "\n\n" + header + block + "\n") if doc.strip() else (header + block + "\n")
+    save_project_context_document(project_id, ROADMAP_DOC_SLUG, new_doc)
+
+
+def _all_plan_releases(plan: dict[str, Any] | None) -> list[tuple[str, dict[str, Any]]]:
+    rows: list[tuple[str, dict[str, Any]]] = []
+    for ph in (plan or {}).get("phases") or []:
+        for rel in ph.get("releases") or []:
+            rows.append((str(ph.get("id") or ""), rel))
+    rows.sort(key=lambda row: release_sort_key(str(row[1].get("id") or "v0.0.0")))
+    return rows
+
+
+def advance_release_plan(plan: dict[str, Any], completed_id: str) -> str:
+    """Mark a release done and move current_release/current_phase to the next planned one.
+
+    Returns the new current release id ('' when the plan is exhausted).
+    """
+    completed = find_release(plan, completed_id)
+    if completed is not None:
+        completed["status"] = "done"
+        completed["completed_at"] = now_iso()
+    rows = _all_plan_releases(plan)
+    nxt = ""
+    nxt_phase = ""
+    seen_completed = False
+    for phase_id, rel in rows:
+        if rel.get("id") == completed_id:
+            seen_completed = True
+            continue
+        if not seen_completed and rel.get("status") == "done":
+            continue
+        if rel.get("status") == "done":
+            continue
+        nxt = str(rel.get("id") or "")
+        nxt_phase = phase_id
+        break
+    if nxt:
+        rel = find_release(plan, nxt)
+        if rel is not None and rel.get("status") == "planned":
+            rel["status"] = "in_progress"
+        plan["current_release"] = nxt
+        plan["current_phase"] = nxt_phase or plan.get("current_phase")
+    else:
+        plan["current_release"] = ""
+        plan["current_phase"] = ""
+    return nxt

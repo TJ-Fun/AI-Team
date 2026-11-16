@@ -232,12 +232,16 @@ PM_PLANNING_CONTRACT = (
     '{"type":"plan","summary":"brief plan summary","project_overview":{"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log"},'
     '"tasks":[{"title":"task title","request":"bounded implementation request",'
-    '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1}]}. '
+    '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1,"release":"v0.1.1","release_order":1}]}. '
     "To ask the user to perform host/account setup, include a task with \"kind\":\"env_setup\", \"title\", \"request\", and \"steps\":[{\"title\":\"short step\",\"instructions\":\"exact step-by-step commands/checks\",\"expected\":\"expected output\"}]; env tasks are manual, use role \"User\", and are not dispatched to providers. "
     "Use only these work roles: PM/PO, Frontend developer, Backend developer, QA, UI designer, Documentation. "
     "Use only sub-project IDs listed in the project context; use an empty module_id for the whole project. "
     "Propose 1 to 12 small tasks. Assign each task a phase number (1 = first milestone, 2 = next, and so on); "
-    "later phases only start after earlier phases complete. Every plan that produces deliverables must include "
+    "later phases only start after earlier phases complete. Within a phase, group tasks into ordered releases "
+    "with ids like v0.1.1, v0.1.2 (matching phase v0.1); set release and release_order on every task, keep each "
+    "release small and self-contained, and place env_setup tasks inside the same release as the work that needs "
+    "them, ordered first. Only one release per project runs at a time. "
+    "Every plan that produces deliverables must include "
     "at least one Documentation task per phase covering user-facing or technical documentation. "
     "When writing the overview, preserve confirmed existing context, separate facts from assumptions, "
     "and provide concise complete content for all three documents. Do not claim the tasks have already been created."
@@ -281,6 +285,9 @@ ROADMAP_UPDATE_CONTRACT = (
     "master_plan is required and describes the whole plan; phases may contain phase_1 through phase_9 entries "
     "with the complete plan for each phase (omitted phase documents stay unchanged); active_phase is the current "
     "phase number or null. Each document must be non-empty and under 20,000 characters. "
+    "The master_plan must embed a fenced json block (```json) named ait-release-plan with shape "
+    '{"current_phase":"v0.1","current_release":"v0.1.1","phases":[{"id":"v0.1","title":"...","status":"planned|in_progress|done","releases":[{"id":"v0.1.1","title":"...","status":"planned|in_progress|done","task_ids":["T-0001"]}]}]}; '
+    "keep it consistent with the task board. "
     "Request any on-request project documents you need via info_requests before answering."
 )
 
