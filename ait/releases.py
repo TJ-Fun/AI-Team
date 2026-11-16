@@ -117,16 +117,29 @@ def release_env_blocked(task: dict[str, Any], all_tasks: list[dict[str, Any]]) -
     return False
 
 
+def derived_current_release(all_tasks: list[dict[str, Any]], project_id: str) -> str:
+    """Earliest open release id for a project, used when master_plan has no plan block."""
+    ids = {
+        str(t.get("release") or "")
+        for t in all_tasks
+        if str(t.get("project_id") or "default") == project_id
+        and str(t.get("release") or "")
+        and t.get("status") not in DONE_TASK_STATUSES
+    }
+    ids.discard("")
+    return min(ids, key=release_sort_key) if ids else ""
+
+
 def task_release_gated(task: dict[str, Any], all_tasks: list[dict[str, Any]], plan: dict[str, Any] | None) -> bool:
     """True when a Ready task must wait because its release is not current."""
     rid = str(task.get("release") or "")
     if not rid:
         return False
-    if plan is None:
-        return True
-    current = str(plan.get("current_release") or "")
+    current = str((plan or {}).get("current_release") or "")
     if not current:
-        return True
+        current = derived_current_release(all_tasks, str(task.get("project_id") or "default"))
+    if not current:
+        return False
     if rid != current:
         return True
     return release_env_blocked(task, all_tasks)

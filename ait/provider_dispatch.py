@@ -110,6 +110,7 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
             task = None
 
         if task is None:
+            release_plans: dict[str, dict[str, Any] | None] = {}
             for summary in reversed(all_tasks):
                 if summary.get("status") != "Ready":
                     continue
@@ -123,6 +124,11 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
                     continue
                 _stash_route_settings(candidate, entry)
                 if task_phase_gated(candidate, all_tasks):
+                    continue
+                cand_pid = str(candidate.get("project_id") or "default")
+                if cand_pid not in release_plans:
+                    release_plans[cand_pid] = load_release_plan(cand_pid)
+                if task_release_gated(candidate, all_tasks, release_plans[cand_pid]):
                     continue
                 repo_key = task_repository_key(candidate)
                 if repo_key and repo_key in ACTIVE_REPOSITORY_TASKS:

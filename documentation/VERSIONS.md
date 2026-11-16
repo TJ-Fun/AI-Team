@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.9 — 2026-11-16
+
+- Release-driven workflow, batch 2 (gate): the provider dispatcher now enforces release ordering. A `Ready` task tagged with a `release` only dispatches when that release is the project's `current_release` in the `master_plan` plan block (falling back to the earliest open release when no plan block exists), and work tasks wait until all `env_setup` tasks in the same release are Done. Untagged legacy tasks are unaffected.
+- Updated documentation to 0.99.9.
+
 ## 0.99.8 — 2026-11-16
 
 - Release-driven workflow, batch 1 (schema): PM/PO plans can now tag tasks with a `release` id (`v0.N` phase / `v0.N.M` release format) and `release_order`; both work and `env_setup` tasks persist these fields. New `ait/releases.py` parses the `ait-release-plan` JSON block embedded in the `master_plan` project document and provides release-gating helpers. The PM/PO prompt now instructs release grouping, env-tasks-inside-release ordering, and the master_plan JSON schema. Gating is not yet enforced (batch 2).
