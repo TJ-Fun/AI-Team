@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.13 — 2026-11-16
+
+- Release-driven workflow, batch 6 (docs): documented the release-driven project workflow (phases `v0.N`, releases `v0.N.M`, master_plan `ait-release-plan` block, dispatch gate, git/GitHub publish, auto-advance) in `documentation/DOCUMENTATION.md` §4.8 and the repository map, and summarized it in `README.md`.
+- Updated documentation to 0.99.13.
+
 ## 0.99.12 — 2026-11-16
 
 - Release-driven workflow, batch 5 (UI): task cards now show a release badge (`v0.N.M`) next to the status/ENV chips, and the board sorts versioned tasks by release, then env_setup tasks before work tasks, then `release_order`. Untagged legacy tasks keep their original order ahead of versioned ones.

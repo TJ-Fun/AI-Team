@@ -1,7 +1,7 @@
 # Plan: Release-Driven Project Workflow (v0.N phases / v0.N.M releases)
 
 Date: 2026-11-16
-Status: Awaiting "Go"
+Status: Completed (batches 1–6 executed 2026-11-16, v0.99.8–v0.99.13)
 
 ## Confirmed decisions
 - Releases published via `gh release create` (GitHub token already available).

@@ -15,7 +15,7 @@ The application is intended for a trusted, single-user environment. The default 
 | Path | Purpose |
 |---|---|
 | `server.py` | Thin entry point; delegates to the `ait` package. Kept for the systemd unit and existing deployment commands. |
-| `ait/` | Application package split from the former monolithic `server.py`. `common.py` holds constants, logging, locks, and shared helpers; `settings.py`, `provider_registry.py`, `secrets.py`, `prompts.py`, `projects.py`, `git_app_sync.py`, `git_github_api.py`, `git_local_ops.py`, `git_task_postprocess.py`, `github_checks.py`, `env_tasks.py`, `project_services.py`, `provider_health.py`, `provider_stream.py`, `provider_calls.py`, `provider_dispatch.py`, `provider_watchdog.py`, `info_requests.py`, `notifications.py`, `providers.py`, `chat.py`, `routes_*.py` (HTTP route handlers), and `http_handler.py` hold the domain logic; `main.py` starts background workers and the HTTP server. The package shares one flat namespace across modules, mirroring the original single-file layout. |
+| `ait/` | Application package split from the former monolithic `server.py`. `common.py` holds constants, logging, locks, and shared helpers; `settings.py`, `provider_registry.py`, `secrets.py`, `prompts.py`, `projects.py`, `git_app_sync.py`, `git_github_api.py`, `git_local_ops.py`, `git_task_postprocess.py`, `github_checks.py`, `env_tasks.py`, `project_services.py`, `provider_health.py`, `provider_stream.py`, `provider_calls.py`, `provider_dispatch.py`, `provider_watchdog.py`, `releases.py`, `release_publish.py`, `info_requests.py`, `notifications.py`, `providers.py`, `chat.py`, `routes_*.py` (HTTP route handlers), and `http_handler.py` hold the domain logic; `main.py` starts background workers and the HTTP server. The package shares one flat namespace across modules, mirroring the original single-file layout. |
 | `static/index.html` | Application layout, dialogs, forms, and tab structure. |
 | `static/app.js` | ES module entry point for browser behavior, API calls, rendering, polling, form submissions, and dialogs. |
 | `static/js/` | Shared frontend modules; `core.js` holds state, API, dialog, update-progress, and formatting helpers, and feature modules such as `prompts.js`, `project-context.js`, `repository-viewer.js`, `header.js`, `providers.js`, `project-settings.js`, `task-utils.js`, `project-selectors.js`, `task-board.js`, `task-detail.js`, `task-detail-actions.js`, `task-env.js`, `project-editor.js`, and `task-dialog.js` are initialized by `app.js`. |
@@ -100,6 +100,16 @@ PM/PO plans can propose manual **env_setup** tasks for host/account preparation.
 Each project also stores a **Services & hosting** manifest (web host, API runtime, database, auth, media, bot protection, preview/staging/production URLs, and health path). The manifest is editable in **Settings → Projects** and summarized into PM/PO project context so planning accounts for external services.
 
 For repository tasks with a pull request, QA review instructions include read-only GitHub Actions check-run evidence for the reviewed commit. Check runs are also available through `GET /api/git/{project}/checks?ref=<sha-or-branch>`.
+
+### 4.8 Release-driven project workflow
+
+Projects can be planned as sequential **phases** (`v0.N`) containing ordered **releases** (`v0.N.M`). PM/PO plans tag every task with a `release` id and `release_order`; `env_setup` tasks live inside the same release as the work that needs them and are ordered first.
+
+- **Master plan.** The `master_plan` project document embeds a fenced `json` block (`ait-release-plan`) describing phases, releases, statuses, and `current_phase`/`current_release`. `ait/releases.py` parses and rewrites that block.
+- **Gate.** The dispatcher only runs `Ready` tasks whose release is the project's current release, and work tasks wait until all `env_setup` tasks in that release are Done. Untagged legacy tasks are unaffected; when no plan block exists the earliest open release is used.
+- **Publish.** A background worker (`ait/release_publish.py`, 60s) detects a release whose tasks are all Done/Canceled, then runs `git tag` + push in the project's local checkout and `gh release create --verify-tag` (tag-only fallback when `gh` is missing; failures retry every 10 minutes). State is kept in `data/releases/{project}.json`. On success the plan block marks the release done and advances `current_release`/`current_phase`, and a chat notice is posted.
+- **Auto-advance.** When a project has no open tasks and the current release has no tasks yet, the worker queues a PM/PO planning task (`auto_release_plan`) that skips the project-overview approval gate and creates the release's tasks directly as Ready — env setup first, then dev/QA/docs work.
+- **UI.** Task cards show a release badge and the board sorts versioned tasks by release, env tasks first, then `release_order`.
 
 ## 5. Installation and deployment (Ubuntu/Oracle Cloud)
 
