@@ -266,6 +266,10 @@ def read_projects() -> list[dict[str, Any]]:
     return default_project
 
 
+def paused_project_ids() -> set[str]:
+    return {str(p.get("id")) for p in read_projects() if p.get("active") is False}
+
+
 def read_tasks() -> list[dict[str, Any]]:
     ensure_data()
     tasks: list[dict[str, Any]] = []
@@ -420,6 +424,7 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
             active_phase = None
         if active_phase is not None:
             active_phase = min(max(active_phase, 1), 9)
+        active = bool(raw["active"]) if "active" in raw else bool(old_proj.get("active", True))
         cleaned.append(
             {
                 "id": pid,
@@ -433,6 +438,7 @@ def save_projects(items: Any) -> list[dict[str, Any]]:
                 "completed_phases": completed_phases,
                 "milestones": milestones,
                 "active_phase": active_phase,
+                "active": active,
             }
         )
 

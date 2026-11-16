@@ -3,7 +3,25 @@
     "id": "default",
     "name": "Main project",
     "repository": "",
+    "local_path": "",
     "context": "",
-    "modules": []
+    "modules": [],
+    "services": {
+      "web_host": "",
+      "api_runtime": "",
+      "database": "",
+      "auth": "",
+      "media": "",
+      "bot_protection": "",
+      "preview_url": "",
+      "staging_url": "",
+      "production_url": "",
+      "health_path": ""
+    },
+    "version": 1,
+    "completed_phases": [],
+    "milestones": [],
+    "active_phase": null,
+    "active": true
   }
 ]

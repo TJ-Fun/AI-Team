@@ -67,10 +67,12 @@ def claim_task_for_provider(provider: str) -> dict[str, Any] | None:
     if provider not in configured_providers():
         return None
     with STATE_LOCK:
+        paused = paused_project_ids()
         all_tasks = [
             item
             for item in read_tasks()
             if str(item.get("project_id") or "default") not in PROJECT_MAINTENANCE
+            and str(item.get("project_id") or "default") not in paused
             and item.get("task_type") != "env_setup"
         ]
         summaries = reversed(all_tasks)

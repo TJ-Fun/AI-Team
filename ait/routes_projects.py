@@ -75,6 +75,24 @@ def handle_projects_get(handler, path, query) -> bool:
 
 
 def handle_projects_post(handler, path, body) -> bool:
+    m_active = re.fullmatch(r"/api/projects/([a-z0-9-]+)/active", path)
+    if m_active:
+        pid = m_active.group(1)
+        projs = read_projects()
+        proj = next((p for p in projs if p.get("id") == pid), None)
+        if not proj:
+            handler.send_json({"error": "Project not found."}, HTTPStatus.NOT_FOUND)
+            return True
+        active = body.get("active")
+        if not isinstance(active, bool):
+            handler.send_json({"error": "'active' must be a boolean."}, HTTPStatus.BAD_REQUEST)
+            return True
+        proj["active"] = active
+        save_projects(projs)
+        append_event({"at": now_iso(), "type": "project_active_changed", "project_id": pid, "active": active})
+        handler.send_json({"project": proj})
+        return True
+
     m_clear_tasks = re.fullmatch(r"/api/projects/([a-z0-9-]+)/clear-tasks", path)
     if m_clear_tasks:
         if body.get("confirm") is not True:

@@ -1,5 +1,11 @@
 # Version log
 
+## 0.100 — 2026-11-16
+
+- Project pause/resume (backend): projects now carry an `active` flag (default true) persisted in `projects.json`. New endpoint `POST /api/projects/{id}/active` toggles it. While paused, the dispatcher skips the project's tasks and the release publish/auto-advance worker skips the project; in-flight provider calls finish normally and chat/board/manual task creation stay available.
+- Versioning scheme moves to 0.100+.
+- Updated documentation to 0.100.
+
 ## 0.99.13 — 2026-11-16
 
 - Release-driven workflow, batch 6 (docs): documented the release-driven project workflow (phases `v0.N`, releases `v0.N.M`, master_plan `ait-release-plan` block, dispatch gate, git/GitHub publish, auto-advance) in `documentation/DOCUMENTATION.md` §4.8 and the repository map, and summarized it in `README.md`.

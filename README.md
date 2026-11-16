@@ -1,6 +1,6 @@
 # AI-Team
 
-Current application version: **0.99.13**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
+Current application version: **0.100**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
 
 The web client is served from `static/` (`index.html`, `app.js`, `style.css`, and ES modules under `js/`). The server keeps application data and logs under `TEAM_DATA_DIR` (default: `data/`).
 
@@ -13,6 +13,8 @@ Git clone runs as a background job so a slow network fetch does not hold the bro
 For the supplied systemd service, project clone paths may be placed under `/home/ubuntu/projects`; the service unit grants write access to that workspace while keeping the rest of `/home` read-only and the rest of the OS protected. The service still runs as the unprivileged `ubuntu` user, so normal Unix ownership and permissions apply. Create the workspace if needed with `sudo install -d -o ubuntu -g ubuntu -m 0750 /home/ubuntu/projects`. After installing an updated `personal-ai-team.service`, run `sudo systemctl daemon-reload` and `sudo systemctl restart personal-ai-team`. Ensure the workspace is writable by `ubuntu` (for example, check with `sudo -u ubuntu test -w /home/ubuntu/projects`). Do not run the app as root or grant it write access to the entire filesystem.
 
 Permission errors when checking or creating a clone are returned as actionable messages and logged, rather than as an unhandled server error. The local Files browser is read-only; filesystem write/delete capabilities are currently used by Git clone/pull/push, and changing systemd access alone does not add a general file editor or deletion UI.
+
+Projects can be paused and resumed from the board: a paused project keeps its tasks, chat, and history visible but receives no new dispatches, release publishes, or auto-advance planning until resumed.
 
 Projects can also be planned as sequential phases (`v0.N`) of ordered releases (`v0.N.M`): PM/PO tags tasks with a release id, the dispatcher runs only the current release (env setup tasks first), a background worker publishes each finished release as a git tag plus GitHub release, and PM/PO is automatically asked to plan the next release when the project goes idle. The release tree lives in the `ait-release-plan` JSON block inside the project's master plan document.
 

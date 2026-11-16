@@ -132,8 +132,11 @@ def run_release_publish_pass() -> int:
     handled = 0
     tasks = read_tasks()
     projects = read_projects()
+    paused = paused_project_ids()
     for proj in projects:
         pid = str(proj.get("id") or "default")
+        if pid in paused:
+            continue
         state = read_release_state(pid)
         published = state.setdefault("published", {})
         plan = load_release_plan(pid)
