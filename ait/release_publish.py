@@ -198,7 +198,81 @@ def run_release_publish_pass() -> int:
                     pid,
                 )
             handled += 1
+        fresh_tasks = read_tasks()
+        fresh_plan = load_release_plan(pid)
+        queued = maybe_queue_release_plan(proj, fresh_tasks, fresh_plan)
+        if queued:
+            handled += 1
     return handled
+
+
+def maybe_queue_release_plan(
+    project: dict[str, Any], tasks: list[dict[str, Any]], plan: dict[str, Any] | None
+) -> str | None:
+    """Queue a PM/PO planning task for the current release when the project is idle
+    and that release has no tasks yet. Returns the new task id or None."""
+    if plan is None:
+        return None
+    pid = str(project.get("id") or "default")
+    cur = str(plan.get("current_release") or "")
+    if not cur:
+        return None
+    members = _release_tasks(tasks, pid, cur)
+    if members:
+        return None
+    open_tasks = [
+        t
+        for t in tasks
+        if str(t.get("project_id") or "default") == pid and t.get("status") not in DONE_TASK_STATUSES
+    ]
+    if open_tasks:
+        return None
+    phase_id = str(plan.get("current_phase") or "")
+    rel = find_release(plan, cur) or {}
+    title = str(rel.get("title") or cur)
+    ts = now_iso()
+    tid = next_task_id()
+    request = (
+        f"Plan release {cur} (phase {phase_id or 'n/a'}) for project '{project.get('name', pid)}'.\n\n"
+        f"Release title: {title}\n\n"
+        "The master_plan document already marks this release as current. Propose the tasks needed to complete "
+        "this release: start with env_setup tasks for any required environment/user setup (small, step-by-step), "
+        "then the dev/QA/docs work tasks. Tag every task with release \"" + cur + "\" and sequential "
+        "release_order values. Keep the release small and self-contained. Do not create tasks for later releases."
+    )
+    write_task(
+        {
+            "id": tid,
+            "task_type": "pm_planning",
+            "title": f"PM/PO plan release {cur}: {project.get('name', pid)}",
+            "request": request,
+            "original_request": request,
+            "release_plan_for": cur,
+            "auto_release_plan": True,
+            "assigned_role": "PM/PO",
+            "provider": "Automatic",
+            "status": "Ready",
+            "project_id": pid,
+            "module_id": "",
+            "produces_deliverable": False,
+            "acceptance_checks": [],
+            "attempts": [],
+            "validation": None,
+            "created_at": ts,
+            "updated_at": ts,
+            "dispatch_note": "Automatic next-release planning queued by the release watchdog.",
+            "activity": [{"at": ts, "type": "created", "message": f"Auto-queued planning for release {cur}."}],
+        }
+    )
+    append_chat_notice(
+        f"Release {cur} is next in the master plan. I queued PM/PO planning ({tid}) to break it into tasks.",
+        ts,
+        tid,
+        pid,
+    )
+    append_event({"at": ts, "type": "release_plan_queued", "task_id": tid, "project_id": pid, "release": cur})
+    DISPATCH_EVENT.set()
+    return tid
 
 
 def release_worker_loop() -> None:

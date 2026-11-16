@@ -1,0 +1,8 @@
+[
+  {
+    "role": "assistant",
+    "content": "Release v0.1.1 is next in the master plan. I queued PM/PO planning (T-0002) to break it into tasks.",
+    "at": "2026-11-16T10:11:53Z",
+    "task_id": "T-0002"
+  }
+]

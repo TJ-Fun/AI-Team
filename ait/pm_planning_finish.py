@@ -51,9 +51,13 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
             }
             return "Done", f"PM/PO clarification questions logged as {', '.join(ids)}. Waiting for your answers."
 
-        ov_id = next_task_id()
-        ids.append(ov_id)
-        write_task(
+        auto_plan = bool(task.get("auto_release_plan"))
+        ov_id = ""
+        ids: list[str] = []
+        if not auto_plan:
+            ov_id = next_task_id()
+            ids.append(ov_id)
+            write_task(
             {
                 "id": ov_id,
                 "task_type": "project_overview",
@@ -74,7 +78,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                 "activity": [{"at": ts, "type": "created", "message": "PM/PO prepared a project overview; waiting for your approval."}],
             }
         )
-        plan_status = "Draft" if get_autonomy().get("plan_requires_approval") else "Ready"
+        plan_status = "Ready" if auto_plan else ("Draft" if get_autonomy().get("plan_requires_approval") else "Ready")
         work_ids: list[str] = []
         for item in res["tasks"]:
             wid = next_task_id()
