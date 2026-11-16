@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.8 — 2026-11-16
+
+- Release-driven workflow, batch 1 (schema): PM/PO plans can now tag tasks with a `release` id (`v0.N` phase / `v0.N.M` release format) and `release_order`; both work and `env_setup` tasks persist these fields. New `ait/releases.py` parses the `ait-release-plan` JSON block embedded in the `master_plan` project document and provides release-gating helpers. The PM/PO prompt now instructs release grouping, env-tasks-inside-release ordering, and the master_plan JSON schema. Gating is not yet enforced (batch 2).
+- Updated documentation to 0.99.8.
+
 ## 0.99.7 — 2026-11-14
 
 - Settings → Routing rows now have a **Test** button (after the Model dropdown, before Timeout/Retry settings) that sends "Hi" to the row's provider/model via `POST /api/providers/{id}/test-model` and shows the reply in a dialog. Rows whose model is flagged unavailable render the Model dropdown with a red border/text (`route-model--missing`); changing the provider or model clears the local flag.

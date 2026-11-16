@@ -59,6 +59,8 @@ def create_env_task(
     source_plan_task_id: str | None = None,
     planning_root_id: str | None = None,
     phase: int | None = None,
+    release: str = "",
+    release_order: int | None = None,
 ) -> dict[str, Any]:
     proj = next((p for p in read_projects() if p.get("id") == project_id), None)
     if not proj:
@@ -76,6 +78,8 @@ def create_env_task(
         "project_id": project_id,
         "module_id": module_id,
         "phase": phase or 1,
+        "release": normalize_release_id(release),
+        "release_order": release_order,
         "status": status if status in ("Draft", "Ready") else "Ready",
         "produces_deliverable": False,
         "acceptance_checks": [],

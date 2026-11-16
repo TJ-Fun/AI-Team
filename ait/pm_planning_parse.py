@@ -75,6 +75,14 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
             role = str(t.get("role", "")).strip()
             mid = str(t.get("module_id", "")).strip()
             checks = t.get("acceptance_checks", [])
+            release = normalize_release_id(t.get("release"))
+            release_order = t.get("release_order")
+            try:
+                release_order = int(release_order) if release_order is not None else None
+            except (TypeError, ValueError):
+                release_order = None
+            if str(t.get("release") or "").strip() and not release:
+                warnings.append(f"Task '{title}' had an invalid release id and was left unversioned.")
             if not title:
                 raise ValueError("Each proposed task needs a non-empty title.")
             if not req:
@@ -98,6 +106,8 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
                         "acceptance_checks": [],
                         "produces_deliverable": False,
                         "phase": env_phase,
+                        "release": release,
+                        "release_order": release_order,
                         "steps": clean_env_steps(t.get("steps")),
                     }
                 )
@@ -134,6 +144,8 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
                     "acceptance_checks": clean_checks,
                     "produces_deliverable": produces,
                     "phase": phase,
+                    "release": release,
+                    "release_order": release_order,
                 }
             )
         ov = data.get("project_overview")

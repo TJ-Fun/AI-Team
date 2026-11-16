@@ -92,6 +92,8 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                     source_plan_task_id=task["id"],
                     planning_root_id=task.get("planning_root_id"),
                     phase=item.get("phase"),
+                    release=item.get("release") or "",
+                    release_order=item.get("release_order"),
                 )
                 continue
             write_task(
@@ -105,6 +107,8 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                     "acceptance_checks": item["acceptance_checks"],
                     "produces_deliverable": item["produces_deliverable"],
                     "phase": item.get("phase") or 1,
+                    "release": item.get("release") or "",
+                    "release_order": item.get("release_order"),
                     "status": plan_status,
                     "planning_root_id": task.get("planning_root_id"),
                     "source_plan_task_id": task["id"],
