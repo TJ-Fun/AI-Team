@@ -101,7 +101,6 @@ export function initRepositoryViewer() {
     }
   }
 
-  $("#open-documentation")?.addEventListener("click", () => void openRepositoryView("documentation"));
   $("#open-files")?.addEventListener("click", () => void openRepositoryView("files"));
   $("#close-repository-view")?.addEventListener("click", () => repoDialog.close());
 

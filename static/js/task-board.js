@@ -163,6 +163,38 @@ export function initTaskBoard(context = {}) {
       .join("");
   }
 
+  function renderProjectActiveToggle() {
+    const btn = $("#toggle-project-active");
+    const badge = $("#project-paused-badge");
+    if (!btn) return;
+    const proj = state.projects.find((p) => p.id === state.activeProjectId);
+    const paused = Boolean(proj) && proj.active === false;
+    btn.textContent = paused ? "▶ Resume project" : "⏸ Pause project";
+    btn.title = paused
+      ? "Resume this project: allow new dispatches, release publishing, and auto planning"
+      : "Pause this project: stop new dispatches, release publishing, and auto planning (running tasks finish)";
+    if (badge) badge.hidden = !paused;
+  }
+
+  $("#toggle-project-active")?.addEventListener("click", async () => {
+    const btn = $("#toggle-project-active");
+    const proj = state.projects.find((p) => p.id === state.activeProjectId);
+    if (!proj) return;
+    const next = proj.active !== false ? false : true;
+    btn.disabled = true;
+    try {
+      await api(`/api/projects/${encodeURIComponent(proj.id)}/active`, {
+        method: "POST",
+        body: JSON.stringify({ active: next }),
+      });
+      await refreshBoard();
+    } catch (err) {
+      appAlert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   for (const [btnId, kind] of [
     ["update-docs", "docs"],
     ["update-roadmap", "roadmap"],
@@ -253,6 +285,7 @@ export function initTaskBoard(context = {}) {
       state.qualityRows = qualityRes.quality || [];
 
       context.renderActiveProjectSelect();
+      renderProjectActiveToggle();
       context.renderNotifications();
       renderTasks();
       if ($("#statistics-dialog")?.open) {
