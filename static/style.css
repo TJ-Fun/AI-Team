@@ -8,6 +8,7 @@
 .watchdog-info{font-size:10px;color:#929990;margin:-7px 0 12px}
 .provider-statistics{margin:0 0 10px;padding:9px 10px;border:1px solid #e9ece6;border-radius:8px;background:#fafbf9}.provider-statistics[hidden]{display:none}.provider-statistics .progress-heading{font-size:10px;margin-bottom:6px}.provider-statistics .progress-heading span{font-size:9px;color:#929990}.provider-stat-row{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;padding:4px 0;color:#70786e;font-size:10px}.provider-stat-row+ .provider-stat-row{border-top:1px solid #eff1ed}.provider-stat-row strong{color:#475447}.task-ai-info{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:9px;color:#6f786d;font-size:10px;line-height:1.4}.task-ai-info span:first-child{font-weight:650;color:#576455}
 .state-done{background:#e3f3e6;color:#286b39}.state-draft,.state-needs-answer,.state-needs-approval{background:#fff2c7;color:#795900}.state-ready{background:#e3efff;color:#315d91}.state-in-progress{background:#dcecff;color:#315d91}.state-waiting-for-capacity{background:#ffebc8;color:#8b5c13}.state-blocked,.state-rework-needed{background:#fde3df;color:#9b382c}.state-needs-validation{background:#eee7ff;color:#654c9b}.state-canceled{background:#eceeeb;color:#687066}
+.state-release{background:#eef1ee;color:#4c564f}
 .agent-status{font-size:10px;color:#64806a;margin:-7px 0 8px}.state-in-progress{background:#edf2fa;color:#516d9b}.state-waiting-for-capacity{background:#fff4e5;color:#9b7544}.state-needs-validation{background:#f0edfa;color:#77649c}.state-rework-needed{background:#fbefea;color:#a0604a}.reply-card{border:1px solid var(--line);border-radius:8px;padding:10px;margin:7px 0}.reply-heading{font-size:10px;color:#71806f;font-weight:700;margin-bottom:7px}.reply-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 system-ui,sans-serif;color:#343a33;max-height:320px;overflow:auto}.agent-replies{font-size:11px}
 .validation-result{border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11px;color:#657064}.validation-check{margin-top:6px;line-height:1.45;overflow-wrap:anywhere}
 .danger{font:600 11px system-ui,sans-serif;border:1px solid #ecd4cf;background:#fff8f6;color:#a34e40;border-radius:8px;padding:8px 10px;cursor:pointer;margin-left:auto}.danger:hover{background:#fcedea}.danger:disabled{opacity:.5;cursor:wait}
@@ -211,6 +212,7 @@ body{background:#0f1210;color:var(--ink)}
 .state-waiting-for-capacity{background:#33291a;color:#e8c96a}
 .state-needs-validation{background:#2a2340;color:#b3a3e0}
 .state-canceled{background:#262b28;color:#9aa396}
+.state-release{background:#232a26;color:#a8b3aa}
 .deliverable-tag{background:#1d3327;color:#8fd3a8}
 .text-button{color:#7fbf95}
 .muted{color:#7d8a80}

@@ -1,5 +1,10 @@
 # Version log
 
+## 0.99.12 — 2026-11-16
+
+- Release-driven workflow, batch 5 (UI): task cards now show a release badge (`v0.N.M`) next to the status/ENV chips, and the board sorts versioned tasks by release, then env_setup tasks before work tasks, then `release_order`. Untagged legacy tasks keep their original order ahead of versioned ones.
+- Updated documentation to 0.99.12.
+
 ## 0.99.11 — 2026-11-16
 
 - Release-driven workflow, batch 4 (auto-advance): the release worker now queues a PM/PO planning task automatically when a project has no open tasks and the master plan's `current_release` has no tasks yet (`maybe_queue_release_plan`). These `auto_release_plan` planning tasks skip the project-overview approval gate and create their tasks directly as `Ready`, so the next release starts without manual intervention. A chat notice announces each queued planning task.
