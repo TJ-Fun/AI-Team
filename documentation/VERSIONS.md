@@ -1,5 +1,10 @@
 # Version log
 
+## 0.101 — 2026-11-16
+
+- UI fix: the PAUSED badge moved from the board-actions button row to inline next to the **Tasks** heading, so toggling pause/resume no longer shifts the action buttons.
+- Updated documentation to 0.101.
+
 ## 0.100 — 2026-11-16
 
 - Project pause/resume (backend): projects now carry an `active` flag (default true) persisted in `projects.json`. New endpoint `POST /api/projects/{id}/active` toggles it. While paused, the dispatcher skips the project's tasks and the release publish/auto-advance worker skips the project; in-flight provider calls finish normally and chat/board/manual task creation stay available.
