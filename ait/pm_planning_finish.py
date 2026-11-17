@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ait.common import *
+from ait.format_retry import maybe_format_retry
 
 
 # --- PM planning/escalation completion ---
@@ -158,6 +159,9 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
             "checks": [{"check": "PM/PO response structure", "kind": "schema", "passed": False, "message": msg}],
             "validated_at": now_iso(),
         }
+        retried, retry_msg = maybe_format_retry(task, provider, msg)
+        if retried:
+            return "Ready", retry_msg
         task["planning_error"] = msg
         return "Rework needed", f"{provider} replied, but the PM/PO result could not be logged: {msg}"
 
@@ -294,5 +298,8 @@ def finish_pm_escalation_task(task: dict[str, Any], reply: str, provider: str) -
             "checks": [{"check": "PM/PO escalation structure", "kind": "schema", "passed": False, "message": msg}],
             "validated_at": now_iso(),
         }
+        retried, retry_msg = maybe_format_retry(task, provider, msg)
+        if retried:
+            return "Ready", retry_msg
         task["planning_error"] = msg
         return "Rework needed", f"{provider} replied, but the PM/PO escalation could not be logged: {msg}"

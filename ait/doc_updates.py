@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ait.common import *
+from ait.format_retry import maybe_format_retry
 
 
 DOC_UPDATE_SLUGS = ("project_brief", "technical_overview", "decisions", "outcomes")
@@ -88,6 +89,9 @@ def _finish_update_task(task: dict[str, Any], reply: str, provider: str, parser,
             "checks": [{"check": "PM/PO update structure", "kind": "schema", "passed": False, "message": msg}],
             "validated_at": now_iso(),
         }
+        retried, retry_msg = maybe_format_retry(task, provider, msg)
+        if retried:
+            return "Ready", retry_msg
         task["planning_error"] = msg
         return "Rework needed", f"{provider} replied, but the {label} could not be logged: {msg}"
     ts = now_iso()

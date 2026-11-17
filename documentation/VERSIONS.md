@@ -1,5 +1,10 @@
 # Version log
 
+## 0.104 — 2026-11-17
+
+- Automatic format retry: when a PM/PO contract reply (plan, escalation, doc update, roadmap update) fails structure validation, the task is automatically requeued as Ready with explicit "reply in this format" feedback instead of immediately becoming Rework needed. Up to 2 auto-retries per task; afterwards it falls back to Rework needed for manual handling.
+- Updated documentation to 0.104.
+
 ## 0.103 — 2026-11-17
 
 - PM plan parsing: `env_setup` tasks with a missing or empty `steps` array no longer fail the whole plan; a single step is synthesized from the task request and a warning is recorded. Malformed step lists still raise.
