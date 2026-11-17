@@ -65,6 +65,8 @@ def _task_prompt(task: dict[str, Any], provider: str, extra_context: str) -> tup
         prompt += "\n\n" + contract
     if (task.get("validation") or {}).get("status") == "failed":
         prompt += "\n\nPrevious attempt failed validation checks:\n" + json.dumps(task["validation"].get("checks", []), indent=2)
+    if task.get("format_retry_feedback"):
+        prompt += "\n\n" + str(task["format_retry_feedback"])
     if extra_context:
         prompt += "\n\n" + extra_context
     return role, prompt, contract

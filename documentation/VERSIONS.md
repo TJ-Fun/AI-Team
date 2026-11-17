@@ -1,5 +1,10 @@
 # Version log
 
+## 0.105 — 2026-11-17
+
+- Format-retry feedback is now injected into the agent prompt on automatic retries: the provider sees the exact validation error plus an explicit "reply with ONLY the required JSON object" instruction. The feedback is cleared once a reply parses successfully.
+- Updated documentation to 0.105.
+
 ## 0.104 — 2026-11-17
 
 - Automatic format retry: when a PM/PO contract reply (plan, escalation, doc update, roadmap update) fails structure validation, the task is automatically requeued as Ready with explicit "reply in this format" feedback instead of immediately becoming Rework needed. Up to 2 auto-retries per task; afterwards it falls back to Rework needed for manual handling.

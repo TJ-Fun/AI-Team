@@ -45,6 +45,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
             task["child_task_ids"] = ids
             task["planning_result_type"] = "questions"
             task["planning_summary"] = res["summary"]
+            task.pop("format_retry_feedback", None)
             task["validation"] = {
                 "status": "passed",
                 "checks": [{"check": "PM/PO response structure", "kind": "schema", "passed": True, "message": "Response parsed and saved."}],
@@ -131,6 +132,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
         task["child_task_ids"] = ids
         task["planning_result_type"] = "plan"
         task["planning_summary"] = res["summary"]
+        task.pop("format_retry_feedback", None)
         task["planning_warnings"] = res["warnings"]
         task["validation"] = {
             "status": "passed",
@@ -272,6 +274,7 @@ def finish_pm_escalation_task(task: dict[str, Any], reply: str, provider: str) -
             "checks": [{"check": "PM/PO escalation structure", "kind": "schema", "passed": True, "message": "Response parsed and saved."}],
             "validated_at": ts,
         }
+        task.pop("format_retry_feedback", None)
         if review_id:
             msg = (
                 f"PM/PO proposed a design change. Queued {len(team_ids)} provisional task(s) "

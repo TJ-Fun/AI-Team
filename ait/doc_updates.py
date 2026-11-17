@@ -96,6 +96,7 @@ def _finish_update_task(task: dict[str, Any], reply: str, provider: str, parser,
         return "Rework needed", f"{provider} replied, but the {label} could not be logged: {msg}"
     ts = now_iso()
     task["update_payload"] = payload
+    task.pop("format_retry_feedback", None)
     task["validation"] = {
         "status": "passed",
         "checks": [{"check": "PM/PO update structure", "kind": "schema", "passed": True, "message": "Response parsed and saved."}],
