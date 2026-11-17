@@ -1,5 +1,11 @@
 # Version log
 
+## 0.103 — 2026-11-17
+
+- PM plan parsing: `env_setup` tasks with a missing or empty `steps` array no longer fail the whole plan; a single step is synthesized from the task request and a warning is recorded. Malformed step lists still raise.
+- Removed the hard 10-step cap on environment setup steps; at least one step is still required.
+- Updated documentation to 0.103.
+
 ## 0.102 — 2026-11-17
 
 - PM/PO planning contract strengthened: the task JSON example now includes `kind` and `steps`, `env_setup` tasks explicitly MUST include a non-empty `steps` array (no fixed maximum), and the JSON-only/no-markdown requirement is emphasized.

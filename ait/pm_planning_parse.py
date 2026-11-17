@@ -96,6 +96,14 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
                 except (TypeError, ValueError):
                     env_phase = 1
                 env_phase = min(max(env_phase, 1), 9)
+                raw_steps = t.get("steps")
+                if isinstance(raw_steps, list) and raw_steps:
+                    env_steps = clean_env_steps(raw_steps)
+                else:
+                    env_steps = clean_env_steps([{"title": title, "instructions": req, "expected": ""}])
+                    warnings.append(
+                        f"Task '{title}' was marked env_setup without steps; a single step was generated from its request."
+                    )
                 norm_t.append(
                     {
                         "title": title,
@@ -108,7 +116,7 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
                         "phase": env_phase,
                         "release": release,
                         "release_order": release_order,
-                        "steps": clean_env_steps(t.get("steps")),
+                        "steps": env_steps,
                     }
                 )
                 continue

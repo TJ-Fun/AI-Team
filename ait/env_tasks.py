@@ -10,8 +10,8 @@ ENV_DONE_STEP_STATES = {"confirmed", "skipped"}
 
 
 def clean_env_steps(raw: Any) -> list[dict[str, Any]]:
-    if not isinstance(raw, list) or not (1 <= len(raw) <= 10):
-        raise ValueError("Environment tasks need between 1 and 10 steps.")
+    if not isinstance(raw, list) or len(raw) < 1:
+        raise ValueError("Environment tasks need at least 1 step.")
     steps: list[dict[str, Any]] = []
     seen: set[str] = set()
     for i, item in enumerate(raw, 1):
