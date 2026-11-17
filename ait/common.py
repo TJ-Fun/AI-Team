@@ -232,8 +232,12 @@ PM_PLANNING_CONTRACT = (
     '{"type":"plan","summary":"brief plan summary","project_overview":{"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log"},'
     '"tasks":[{"title":"task title","request":"bounded implementation request",'
-    '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1,"release":"v0.1.1","release_order":1}]}. '
-    "To ask the user to perform host/account setup, include a task with \"kind\":\"env_setup\", \"title\", \"request\", and \"steps\":[{\"title\":\"short step\",\"instructions\":\"exact step-by-step commands/checks\",\"expected\":\"expected output\"}]; env tasks are manual, use role \"User\", and are not dispatched to providers. "
+    '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1,"release":"v0.1.1","release_order":1,"kind":"","steps":[]}]}. '
+    "Task fields: kind is empty for normal work tasks; set kind to \"env_setup\" only for manual user/host setup tasks. "
+    "An env_setup task MUST include a non-empty \"steps\" array with one object per user action: "
+    "{\"title\":\"short step\",\"instructions\":\"exact step-by-step commands/checks\",\"expected\":\"expected output\"}. "
+    "Keep each step short and focused; there is no fixed maximum, but prefer the fewest steps that fully cover the setup. "
+    "Env tasks are manual, use role \"User\", are not dispatched to providers, and a plan containing an env_setup task without steps is invalid. "
     "Use only these work roles: PM/PO, Frontend developer, Backend developer, QA, UI designer, Documentation. "
     "Use only sub-project IDs listed in the project context; use an empty module_id for the whole project. "
     "Propose 1 to 12 small tasks. Assign each task a phase number (1 = first milestone, 2 = next, and so on); "

@@ -1,5 +1,10 @@
 # Version log
 
+## 0.102 — 2026-11-17
+
+- PM/PO planning contract strengthened: the task JSON example now includes `kind` and `steps`, `env_setup` tasks explicitly MUST include a non-empty `steps` array (no fixed maximum), and the JSON-only/no-markdown requirement is emphasized.
+- Updated documentation to 0.102.
+
 ## 0.101 — 2026-11-16
 
 - UI fix: the PAUSED badge moved from the board-actions button row to inline next to the **Tasks** heading, so toggling pause/resume no longer shifts the action buttons.
