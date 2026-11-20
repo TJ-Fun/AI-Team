@@ -103,16 +103,6 @@ WORK_ROLES = [
 ]
 
 PROVIDERS = ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"]
-TASK_PROVIDERS = ["Automatic", *PROVIDERS]
-
-ROUTING_DEFAULTS: dict[str, list[str]] = {
-    "PM/PO": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
-    "Frontend developer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
-    "Backend developer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
-    "QA": ["GroqCloud", "Gemini", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
-    "UI designer": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
-    "Documentation": ["Gemini", "GroqCloud", "OpenRouter", "OmniRoute", "9Router", "Nvidia"],
-}
 
 PROMPT_FILES: dict[str, str] = {
     "shared_rules": "Shared rules",
@@ -151,16 +141,6 @@ ROLE_AUTO_DOCS: dict[str, list[str]] = {
     "QA": ["technical_overview", "outcomes"],
     "UI designer": ["project_brief", "decisions", "outcomes"],
     "Documentation": ["project_brief", "technical_overview", "outcomes"],
-}
-
-CONNECTION_SPECS: dict[str, tuple[str, str]] = {
-    "gemini": ("Gemini", "GEMINI_API_KEY"),
-    "groq": ("GroqCloud", "GROQ_API_KEY"),
-    "openrouter": ("OpenRouter", "OPENROUTER_API_KEY"),
-    "omniroute": ("OmniRoute", "OMNIROUTE_API_KEY"),
-    "ninerouter": ("9Router", "NINEROUTER_API_KEY"),
-    "nvidia": ("Nvidia", "NVIDIA_API_KEY"),
-    "github": ("GitHub repository connector", "GITHUB_TOKEN"),
 }
 
 # --- Logging Setup ---
@@ -300,12 +280,6 @@ DISPATCH_EVENT = threading.Event()
 
 ACTIVE_CHAT_LOCK = threading.Lock()
 ACTIVE_CHAT_COUNT = 0
-ACTIVE_GEMINI_COUNT = 0
-ACTIVE_GROQ_COUNT = 0
-ACTIVE_OPENROUTER_COUNT = 0
-ACTIVE_OMNIROUTE_COUNT = 0
-ACTIVE_NINEROUTER_COUNT = 0
-ACTIVE_NVIDIA_COUNT = 0
 ACTIVE_REPOSITORY_TASKS: set[str] = set()
 MAX_QA_FAILURES = 3
 

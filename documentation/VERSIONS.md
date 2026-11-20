@@ -1,5 +1,15 @@
 # Version log
 
+## 0.107 — 2026-11-20
+
+- Dead code removal, batch 1 (`ait/common.py` constants; each verified unreferenced before removal):
+  - `TASK_PROVIDERS` — unused; provider lists come from `ait/provider_registry.py`.
+  - `ROUTING_DEFAULTS` — unused ~45-line dict; `get_routing()` in `ait/projects.py` builds defaults dynamically.
+  - `CONNECTION_SPECS` — unused; superseded by the dynamic `connection_specs()` in `ait/provider_registry.py`.
+  - `ACTIVE_GEMINI_COUNT`, `ACTIVE_GROQ_COUNT`, `ACTIVE_OPENROUTER_COUNT`, `ACTIVE_OMNIROUTE_COUNT`, `ACTIVE_NINEROUTER_COUNT`, `ACTIVE_NVIDIA_COUNT` — legacy per-provider counters; only `ACTIVE_CHAT_COUNT` is still used.
+- No behavior change; `python -m py_compile ait/*.py` passes.
+- Updated documentation to 0.107.
+
 ## 0.106 — 2026-11-20
 
 - Documentation gap closure: `DOCUMENTATION.md` updated to 0.106 — repository map now lists all `ait/` modules (`doc_updates`, `format_retry`, `github_repo_wipe`, `model_refresh`, `pm_planning*` facade, `project_cleanup`, `qa_review`) and all `static/js/` modules (`chat`, `notifications`, `settings`, `statistics`); new `TEAM_DATA_DIR` layout and `routes_*.py` API module map; documented project clear-tasks and GitHub wipe workflows, approval-gated doc/roadmap update tasks, `info_requests`, format-retry, and the watchdog pass; new §4.9 covers agent prompts and project templates; configuration reference gained `TEAM_SECRET_KEY`, `GEMINI_MODEL`, `OPENROUTER_MODEL`, `GROQ_MODEL`, and `TEAM_USER_AGENT`, plus a note that `TEAM_SECRET_KEY_FILE` in the example unit is currently unread.
