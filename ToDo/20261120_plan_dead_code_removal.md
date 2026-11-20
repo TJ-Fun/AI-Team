@@ -1,6 +1,6 @@
 # Plan: Dead code removal (investigate → confirm → remove → document → bump → push)
 
-Date: 2026-11-20 · Pending user "Go"
+Date: 2026-11-20 · **EXECUTED** — all 3 batches completed and pushed (v0.107 `cdbec43`, v0.108 `debd0ba`, v0.109 `4bfde71`). Every item was re-investigated case-sensitively and confirmed unreferenced before removal.
 
 ## Rules for every batch
 
