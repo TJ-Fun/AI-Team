@@ -1,5 +1,10 @@
 # Version log
 
+## 0.106 — 2026-11-20
+
+- Documentation gap closure: `DOCUMENTATION.md` updated to 0.106 — repository map now lists all `ait/` modules (`doc_updates`, `format_retry`, `github_repo_wipe`, `model_refresh`, `pm_planning*` facade, `project_cleanup`, `qa_review`) and all `static/js/` modules (`chat`, `notifications`, `settings`, `statistics`); new `TEAM_DATA_DIR` layout and `routes_*.py` API module map; documented project clear-tasks and GitHub wipe workflows, approval-gated doc/roadmap update tasks, `info_requests`, format-retry, and the watchdog pass; new §4.9 covers agent prompts and project templates; configuration reference gained `TEAM_SECRET_KEY`, `GEMINI_MODEL`, `OPENROUTER_MODEL`, `GROQ_MODEL`, and `TEAM_USER_AGENT`, plus a note that `TEAM_SECRET_KEY_FILE` in the example unit is currently unread.
+- Updated documentation to 0.106.
+
 ## 0.105 — 2026-11-17
 
 - Format-retry feedback is now injected into the agent prompt on automatic retries: the provider sees the exact validation error plus an explicit "reply with ONLY the required JSON object" instruction. The feedback is cleared once a reply parses successfully.
