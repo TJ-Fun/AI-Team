@@ -59,17 +59,3 @@ def github_checks_summary_text(checks: list[dict[str, Any]], ref: str = "") -> s
         url = run.get("url") or ""
         lines.append(f"- {label}: {state}" + (f" — {url}" if url else ""))
     return "\n".join(lines)
-
-
-def github_checks_for_task(task: dict[str, Any]) -> dict[str, Any]:
-    project_id = str(task.get("project_id") or "default")
-    pull = task.get("pull_request") if isinstance(task.get("pull_request"), dict) else {}
-    head = pull.get("head") if isinstance(pull.get("head"), dict) else {}
-    ref = str(head.get("sha") or task.get("qa_reviewed_head_sha") or task.get("github_ref") or "").strip()
-    if not ref:
-        return {"available": False, "reason": "No pull request head SHA or git ref is linked to this task."}
-    try:
-        checks = github_check_runs(project_id, ref)
-    except Exception as exc:
-        return {"available": False, "reason": str(exc)}
-    return {"available": True, "ref": ref, "checks": checks, "summary": github_checks_summary(checks)}

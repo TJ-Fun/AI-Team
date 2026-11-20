@@ -1,5 +1,15 @@
 # Version log
 
+## 0.109 — 2026-11-20
+
+- Dead code removal, batch 3 (each verified unreferenced before removal):
+  - `github_checks_for_task()` (`ait/github_checks.py`) — unused; the checks endpoint calls `github_check_runs()` + `github_checks_summary()` directly.
+  - `project_open_release_tasks()` (`ait/releases.py`) — unused; release publish/auto-advance use their own `_release_tasks()` filters.
+  - `OPEN_TASK_STATUSES` (`ait/releases.py`) — unused; `DONE_TASK_STATUSES` remains in use.
+  - `HEALTH_TTL_SECONDS` (`ait/provider_health.py`) — unused; the health cache does not reference it.
+- No behavior change; `python -m py_compile ait/*.py` passes.
+- Updated documentation to 0.109.
+
 ## 0.108 — 2026-11-20
 
 - Dead code removal, batch 2 (each verified unreferenced before removal):

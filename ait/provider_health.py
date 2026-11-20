@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ait.common import *
 
-HEALTH_TTL_SECONDS = 60
 _HEALTH_LOCK = threading.Lock()
 _HEALTH: dict[str, Any] = {"checked_at": "", "providers": {}}
 

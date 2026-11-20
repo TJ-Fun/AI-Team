@@ -145,16 +145,6 @@ def task_release_gated(task: dict[str, Any], all_tasks: list[dict[str, Any]], pl
     return release_env_blocked(task, all_tasks)
 
 
-def project_open_release_tasks(tasks: list[dict[str, Any]], project_id: str) -> list[dict[str, Any]]:
-    return [
-        t
-        for t in tasks
-        if str(t.get("project_id") or "default") == project_id
-        and str(t.get("release") or "")
-        and t.get("status") not in DONE_TASK_STATUSES
-    ]
-
-
 def render_release_plan_block(plan: dict[str, Any]) -> str:
     return "```json\n" + json.dumps(plan, indent=2) + "\n```"
 
