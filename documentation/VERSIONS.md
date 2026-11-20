@@ -1,5 +1,13 @@
 # Version log
 
+## 0.108 — 2026-11-20
+
+- Dead code removal, batch 2 (each verified unreferenced before removal):
+  - `chat_provider_options()` (`ait/provider_registry.py`) — unused; chat provider options are built in the frontend.
+  - `set_chat_model()` (`ait/chat.py`) — unused; the chat model override is written via `POST /api/routing` (`static/js/providers.js`), not this setter.
+- No behavior change; `python -m py_compile ait/*.py` passes.
+- Updated documentation to 0.108.
+
 ## 0.107 — 2026-11-20
 
 - Dead code removal, batch 1 (`ait/common.py` constants; each verified unreferenced before removal):

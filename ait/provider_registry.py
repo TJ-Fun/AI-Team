@@ -208,10 +208,6 @@ def task_provider_options() -> list[str]:
     return ["Automatic", "Auto", *provider_names()]
 
 
-def chat_provider_options() -> list[str]:
-    return ["Auto", *provider_names()]
-
-
 def available_presets() -> list[dict[str, Any]]:
     active_ids = {str(p.get("id", "")) for p in active_providers()}
     result: list[dict[str, Any]] = []

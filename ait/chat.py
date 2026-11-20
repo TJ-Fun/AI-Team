@@ -26,16 +26,6 @@ def chat_model_override(provider: str) -> str:
     return get_chat_models().get(provider, "")
 
 
-def set_chat_model(provider: str, model: str) -> None:
-    models = get_chat_models()
-    clean = str(model or "").strip()
-    if clean:
-        models[provider] = clean
-    else:
-        models.pop(provider, None)
-    save_app_config({"chat_models": models})
-
-
 def chat_provider_model(provider: str) -> str:
     if provider == "Auto":
         provider = select_auto_provider() or (configured_providers()[0] if configured_providers() else "")
