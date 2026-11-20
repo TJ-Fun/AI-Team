@@ -5,3 +5,6 @@ __pycache__/
 *.log
 *.log.*
 *.bak
+data/settings/secrets.enc
+data/settings/secrets.enc.tmp
+data/settings/secret.key

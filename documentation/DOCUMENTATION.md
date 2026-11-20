@@ -283,7 +283,7 @@ Additional model identifiers and user-agent values can be configured through the
 - Run as an unprivileged service account; do not run the app as root.
 - Keep the listener private or add a trusted authenticated reverse proxy. The application itself does not authenticate users.
 - Restrict systemd writable paths to the app data, intended project checkout workspace, and app installation directory.
-- Protect `/etc/personal-ai-team.env`, the generated Fernet key, and backups containing application data.
+- Protect `/etc/personal-ai-team.env`, the generated Fernet key, and backups containing application data. `data/settings/secrets.enc` and `data/settings/secret.key` are gitignored so saved credentials and their key are never committed; the rest of `data/` may be tracked intentionally.
 - Use an adequately scoped GitHub token. The app uses the configured credential for GitHub operations and avoids embedding tokens in remote URLs.
 - App updates copy files; they are not a transactional deployment or rollback system. Back up application source and data before major changes.
 - Confirm actual deployment paths, service user, Python executable, chat provider selection, and proxy settings before applying commands to a production Oracle host.
