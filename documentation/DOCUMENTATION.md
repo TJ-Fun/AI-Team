@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.109 · Updated 2026-11-20
+Version 0.110 · Updated 2026-11-20
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -276,7 +276,7 @@ The app's rotating file log and the systemd journal contain different informatio
 | `OMNIROUTE_BASE_URL` / `NINEROUTER_BASE_URL` | `http://localhost:20128/v1` / `http://localhost:20129/v1` | OpenAI-compatible gateway endpoints. |
 | `NVIDIA_BASE_URL` | `https://integrate.api.nvidia.com/v1` | Nvidia NIM OpenAI-compatible endpoint. |
 
-Additional model identifiers and user-agent values can be configured through the corresponding environment variables in `ait/common.py`. The example systemd unit also sets `TEAM_SECRET_KEY_FILE=/etc/personal-ai-team/credential.key`; no code currently reads that variable — supply `TEAM_SECRET_KEY` instead, or let the app generate `TEAM_DATA_DIR/settings/secret.key`.
+Additional model identifiers and user-agent values can be configured through the corresponding environment variables in `ait/common.py`. To supply the credential-encryption key explicitly, set `TEAM_SECRET_KEY`; otherwise the app generates `TEAM_DATA_DIR/settings/secret.key`.
 
 ## 7. Operational and security notes
 

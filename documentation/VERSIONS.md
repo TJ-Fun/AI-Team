@@ -1,5 +1,10 @@
 # Version log
 
+## 0.110 — 2026-11-20
+
+- Removed dead config: `TEAM_SECRET_KEY_FILE=/etc/personal-ai-team/credential.key` from `personal-ai-team.service`. No code ever read the variable; credential encryption uses `TEAM_SECRET_KEY` or the generated `TEAM_DATA_DIR/settings/secret.key`. The configuration reference was updated to match, and deployments that installed the old unit should reinstall it and run `sudo systemctl daemon-reload && sudo systemctl restart personal-ai-team` (the removed variable was inert, so no functional change results).
+- Updated documentation to 0.110.
+
 ## 0.109 — 2026-11-20
 
 - Dead code removal, batch 3 (each verified unreferenced before removal):
