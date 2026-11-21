@@ -1,5 +1,10 @@
 # Version log
 
+## 0.111 — 2026-11-21
+
+- Added the `project_vision` project document: a PM/PO-maintained direction document auto-included in PM/PO prompts and plan-overview approvals, on-request for other roles via the document map/`info_requests`, and included in `doc_update` payloads (now five documents). New `project_templates/project_vision.md` starter; overview approval UI, confirm texts, and notifications updated to include it.
+- Updated documentation to 0.111.
+
 ## 0.110 — 2026-11-20
 
 - Removed dead config: `TEAM_SECRET_KEY_FILE=/etc/personal-ai-team/credential.key` from `personal-ai-team.service`. No code ever read the variable; credential encryption uses `TEAM_SECRET_KEY` or the generated `TEAM_DATA_DIR/settings/secret.key`. The configuration reference was updated to match, and deployments that installed the old unit should reinstall it and run `sudo systemctl daemon-reload && sudo systemctl restart personal-ai-team` (the removed variable was inert, so no functional change results).

@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.110 · Updated 2026-11-20
+Version 0.111 · Updated 2026-11-21
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -22,7 +22,7 @@ The application is intended for a trusted, single-user environment. The default 
 | `static/style.css` | Application styling and responsive layouts. |
 | `personal-ai-team.service` | Example systemd unit for the `ubuntu` service account. |
 | `prompts/` | Built-in shared and role-specific agent prompts. |
-| `project_templates/` | Starter documents for project briefs, technical overviews, decisions, and outcomes. |
+| `project_templates/` | Starter documents for project visions, briefs, technical overviews, decisions, and outcomes. |
 | `documentation/` | Local documentation, About information, and version history shown by the UI. |
 | `requirements.txt` | Python dependency declaration (`cryptography`). |
 | `README.md` | Short repository and deployment notes. |
@@ -123,7 +123,7 @@ Projects can be planned as sequential **phases** (`v0.N`) containing ordered **r
 
 ### 4.9 Agent prompts and project templates
 
-Built-in agent prompts live in `prompts/`: `shared_rules.md` plus one file per role (`pm_po`, `frontend_developer`, `backend_developer`, `qa`, `ui_designer`, `documentation`). **Settings → Agent prompts** edits per-role overrides stored under `TEAM_DATA_DIR/prompts/`; a role's effective prompt is `shared_rules` + its role file, and **Reset** restores the built-in default (`ait/prompts.py`). `project_templates/` holds starter documents (`project_brief`, `technical_overview`, `decisions`, `outcomes`) that are copied into a project's context folder the first time each document is requested (`ait/projects.py`).
+Built-in agent prompts live in `prompts/`: `shared_rules.md` plus one file per role (`pm_po`, `frontend_developer`, `backend_developer`, `qa`, `ui_designer`, `documentation`). **Settings → Agent prompts** edits per-role overrides stored under `TEAM_DATA_DIR/prompts/`; a role's effective prompt is `shared_rules` + its role file, and **Reset** restores the built-in default (`ait/prompts.py`). `project_templates/` holds starter documents (`project_vision`, `project_brief`, `technical_overview`, `decisions`, `outcomes`) that are copied into a project's context folder the first time each document is requested (`ait/projects.py`). `project_vision` is the PM/PO-maintained direction document: it is auto-included in PM/PO prompts and plan-overview approvals, on-request for other roles, and part of document-update payloads.
 
 ## 5. Installation and deployment (Ubuntu/Oracle Cloud)
 

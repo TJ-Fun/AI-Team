@@ -128,7 +128,7 @@ def get_notifications() -> list[dict[str, Any]]:
         if t.get("status") == "Needs approval" and task_type in ("project_overview", "design_review"):
             if task_type == "project_overview":
                 decision_title = "Project overview needs approval"
-                decision_message = "PM/PO proposed project brief, technical overview, and decisions for your review."
+                decision_message = "PM/PO proposed project vision, brief, technical overview, and decisions for your review."
             else:
                 review = t.get("review_data") or {}
                 design_change = review.get("design_change") or {}

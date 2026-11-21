@@ -115,6 +115,7 @@ PROMPT_FILES: dict[str, str] = {
 }
 
 PROJECT_CONTEXT_FILES: dict[str, str] = {
+    "project_vision": "Project vision",
     "project_brief": "Project brief",
     "technical_overview": "Technical overview",
     "decisions": "Decision log",
@@ -127,6 +128,7 @@ INFO_REQUEST_MAX_ROUNDS = 2
 INFO_REQUEST_MAX_DOCS = 4
 
 PROJECT_DOC_DESCRIPTIONS: dict[str, str] = {
+    "project_vision": "Product direction and intent — the user/PM alignment document.",
     "project_brief": "Project goals, scope, and audience.",
     "technical_overview": "Tech stack, architecture, and repository structure.",
     "decisions": "Approved decision log.",
@@ -135,7 +137,7 @@ PROJECT_DOC_DESCRIPTIONS: dict[str, str] = {
 }
 
 ROLE_AUTO_DOCS: dict[str, list[str]] = {
-    "PM/PO": ["project_brief", ROADMAP_DOC_SLUG],
+    "PM/PO": ["project_vision", "project_brief", ROADMAP_DOC_SLUG],
     "Frontend developer": ["technical_overview"],
     "Backend developer": ["technical_overview"],
     "QA": ["technical_overview", "outcomes"],
@@ -209,7 +211,8 @@ PM_PLANNING_CONTRACT = (
     '"description":"short effect"},{"label":"another choice","description":"short effect"}],'
     '"allow_free_text":true}]}. Provide 2 to 8 useful options per question and allow free text. '
     "If no more clarification is needed: "
-    '{"type":"plan","summary":"brief plan summary","project_overview":{"project_brief":"complete Markdown brief",'
+    '{"type":"plan","summary":"brief plan summary","project_overview":{"project_vision":"complete Markdown project vision",'
+    '"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log"},'
     '"tasks":[{"title":"task title","request":"bounded implementation request",'
     '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1,"release":"v0.1.1","release_order":1,"kind":"","steps":[]}]}. '
@@ -228,7 +231,7 @@ PM_PLANNING_CONTRACT = (
     "Every plan that produces deliverables must include "
     "at least one Documentation task per phase covering user-facing or technical documentation. "
     "When writing the overview, preserve confirmed existing context, separate facts from assumptions, "
-    "and provide concise complete content for all three documents. Do not claim the tasks have already been created."
+    "and provide concise complete content for all four documents. Do not claim the tasks have already been created."
 )
 
 ESCALATION_CONTRACT = (
@@ -254,10 +257,11 @@ WORK_REPLY_CONTRACT = (
 
 DOC_UPDATE_CONTRACT = (
     "For a project-document update request, return ONLY one valid JSON object, no markdown: "
-    '{"type":"doc_update","summary":"brief summary","documents":{"project_brief":"complete Markdown brief",'
+    '{"type":"doc_update","summary":"brief summary","documents":{"project_vision":"complete Markdown project vision",'
+    '"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log",'
     '"outcomes":"complete Markdown confirmed outcomes"}}. '
-    "Return the full updated text of all four documents, preserving confirmed facts, marking assumptions, "
+    "Return the full updated text of all five documents, preserving confirmed facts, marking assumptions, "
     "and reflecting the current task board. Each document must be non-empty and under 20,000 characters. "
     "Request any on-request project documents you need via info_requests before answering."
 )

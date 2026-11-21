@@ -64,7 +64,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                 "id": ov_id,
                 "task_type": "project_overview",
                 "title": "Project overview — review and approve",
-                "request": "Review the PM/PO's proposed project brief, technical overview, and decisions. Edit any text before approval.",
+                "request": "Review the PM/PO's proposed project vision, brief, technical overview, and decisions. Edit any text before approval.",
                 "overview_documents": res["project_overview"],
                 "assigned_role": "PM/PO",
                 "provider": "Automatic",

@@ -210,7 +210,7 @@ export function bindTaskDetailActions({ detailDialog, refreshBoard, openTaskDial
       if (
         approve &&
         !(await appConfirm(
-          "Approve this overview and replace Project brief, Technical overview, and Decision log? Current versions will be saved in history; Confirmed outcomes are preserved.",
+          "Approve this overview and replace Project vision, brief, Technical overview, and Decision log? Current versions will be saved in history; Confirmed outcomes are preserved.",
           { title: "Approve overview" }
         ))
       ) {

@@ -220,9 +220,9 @@ def call_chat_provider(context_messages: list[dict[str, Any]], project_id: str) 
 def clean_overview_documents(body: dict[str, Any]) -> dict[str, str]:
     docs = body.get("documents")
     if not isinstance(docs, dict):
-        raise ValueError("Project brief, technical overview, and decisions are required.")
+        raise ValueError("Project vision, brief, technical overview, and decisions are required.")
     cleaned: dict[str, str] = {}
-    for slug in ("project_brief", "technical_overview", "decisions"):
+    for slug in ("project_vision", "project_brief", "technical_overview", "decisions"):
         val = docs.get(slug)
         if not isinstance(val, str) or not val.strip() or len(val) > 20000:
             raise ValueError(f"{PROJECT_CONTEXT_FILES[slug]} must contain text under 20,000 characters.")

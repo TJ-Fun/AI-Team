@@ -202,6 +202,7 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
         const docs = task.overview_documents || {};
         const editable = task.status === "Needs approval";
         const pairs = [
+          ["project_vision", "Project vision"],
           ["project_brief", "Project brief"],
           ["technical_overview", "Technical overview"],
           ["decisions", "Decision log"],
