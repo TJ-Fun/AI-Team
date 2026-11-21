@@ -201,10 +201,15 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
       if (resetInputs || !fieldsWrap.querySelector("textarea")) {
         const docs = task.overview_documents || {};
         const editable = task.status === "Needs approval";
+        const phaseKeys = Object.keys(docs)
+          .filter((k) => /^phase_[1-9]$/.test(k))
+          .sort((a, b) => parseInt(a.split("_")[1], 10) - parseInt(b.split("_")[1], 10));
         const pairs = [
           ["project_brief", "Project brief"],
           ["technical_overview", "Technical overview"],
           ["decisions", "Decision log"],
+          ["roadmap", "Roadmap (phase overview)"],
+          ...phaseKeys.map((k) => [k, `Phase ${k.split("_")[1]} plan`]),
         ];
         fieldsWrap.innerHTML =
           `<p class="draft-note">Project vision is user-owned and read-only for the PM/PO — it is not part of this proposal. Edit it via Project context if needed.</p>` +

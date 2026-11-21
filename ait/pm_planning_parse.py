@@ -165,6 +165,23 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
             if not isinstance(val, str) or not val.strip() or len(val) > 20000:
                 raise ValueError(f"The project overview needs non-empty {slug} text under 20,000 characters.")
             ov_docs[slug] = val.strip()
+        roadmap = ov.get("roadmap")
+        if not isinstance(roadmap, str) or not roadmap.strip() or len(roadmap) > 20000:
+            raise ValueError("The project overview needs non-empty roadmap text under 20,000 characters.")
+        ov_docs["roadmap"] = roadmap.strip()
+        raw_phases = ov.get("phases") or {}
+        if not isinstance(raw_phases, dict):
+            raise ValueError("project_overview 'phases' must be an object.")
+        for key, val in raw_phases.items():
+            slug = str(key).strip()
+            if not PHASE_DOC_RE.fullmatch(slug):
+                raise ValueError(f"Invalid phase document slug in overview: {slug or '(empty)'}.")
+            if not isinstance(val, str) or not val.strip() or len(val) > 20000:
+                raise ValueError(f"The project overview needs non-empty {slug} text under 20,000 characters.")
+            ov_docs[slug] = val.strip()
+        for ph in sorted({int(t.get("phase") or 1) for t in norm_t}):
+            if f"phase_{ph}" not in ov_docs:
+                warnings.append(f"No phase_{ph} plan document was provided for phase {ph}.")
         return {
             "type": "plan",
             "summary": summary,

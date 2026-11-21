@@ -27,6 +27,7 @@ from ait import model_refresh  # noqa: F401
 from ait import notifications  # noqa: F401
 from ait import outcomes  # noqa: F401
 from ait import projects  # noqa: F401
+from ait import trackers  # noqa: F401
 from ait import project_cleanup  # noqa: F401
 from ait import releases  # noqa: F401
 from ait import release_publish  # noqa: F401
@@ -64,6 +65,7 @@ _DOMAIN_MODULES = (
     secrets,
     prompts,
     projects,
+    trackers,
     project_cleanup,
     releases,
     release_publish,
