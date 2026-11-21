@@ -122,6 +122,8 @@ def apply_doc_update(task: dict[str, Any]) -> dict[str, Any]:
         for slug, content in payload.items():
             if slug in DOC_UPDATE_SLUGS:
                 snapshots[slug] = save_project_context_document(pid, slug, str(content))
+    elif task.get("task_type") == "vision_update":
+        snapshots["project_vision"] = save_project_context_document(pid, "project_vision", str(payload.get("project_vision") or ""))
     elif task.get("task_type") == "roadmap_update":
         snapshots[ROADMAP_DOC_SLUG] = save_project_context_document(pid, ROADMAP_DOC_SLUG, str(payload.get("master_plan") or ""))
         for slug, content in (payload.get("phases") or {}).items():

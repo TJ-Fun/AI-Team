@@ -224,7 +224,7 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
 
     // Project document / roadmap / chain plan update section
     const updSec = $("#detail-update-section");
-    const isUpdateTask = ["doc_update", "roadmap_update", "chain_plan"].includes(task.task_type);
+    const isUpdateTask = ["doc_update", "roadmap_update", "chain_plan", "vision_update"].includes(task.task_type);
     if (task.task_type === "chain_plan" && task.chain_plan) {
       updSec.hidden = false;
       const plan = task.chain_plan;
@@ -245,12 +245,14 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
       updSec.hidden = false;
       const payload = task.update_payload;
       const entries =
-        task.task_type === "doc_update"
-          ? Object.entries(payload.documents || {})
-          : [
+        task.task_type === "roadmap_update"
+          ? [
               ["master_plan", payload.master_plan || ""],
               ...Object.entries(payload.phases || {}),
-            ];
+            ]
+          : Object.entries(payload.documents || payload).filter(
+              ([key]) => !["type", "summary"].includes(key)
+            );
       const meta =
         task.task_type === "roadmap_update" && payload.active_phase != null
           ? `<p class="draft-note"><strong>Active phase:</strong> ${escapeHtml(String(payload.active_phase))}</p>`

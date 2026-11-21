@@ -40,7 +40,7 @@ export function renderTaskDetailActions(task) {
         <button class="secondary" type="button" data-overview-action="save">Save edits</button>
         <button class="primary" type="button" data-overview-action="approve">Approve and update Project context</button>`;
     }
-    if (["doc_update", "roadmap_update"].includes(task.task_type) && task.status === "Needs approval") {
+    if (["doc_update", "roadmap_update", "vision_update"].includes(task.task_type) && task.status === "Needs approval") {
       actionHtml += `
         <button class="secondary" type="button" data-update-decision="reject">Reject</button>
         <button class="primary" type="button" data-update-decision="approve">Approve and apply</button>`;

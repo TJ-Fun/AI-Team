@@ -1,5 +1,10 @@
 # Version log
 
+## 0.114 — 2026-11-21
+
+- Replan chain stages implemented (`ait/replan_stages.py`): review subtasks report via the work envelope; docs subtasks (`chain_doc`) auto-apply routine context-document updates inside the approved stage; vision subtasks (`vision_update`) propose `project_vision` for user approval via the existing doc-update decision flow; roadmap subtasks reuse `roadmap_update`. The board **Major replan** button (formerly Update roadmap) now starts a replan chain instead of a single roadmap update. `CHAIN_DOC_CONTRACT`/`VISION_UPDATE_CONTRACT` added; update-payload rendering fixed for flat doc payloads.
+- Updated documentation to 0.114.
+
 ## 0.113 — 2026-11-21
 
 - Replan chain infrastructure (`ait/replan.py`): staged PM/PO replanning as trackable task chains. New `chain_plan` task type asks PM/PO to split a replan stage (review → vision → docs → roadmap → board delta) into subtasks; approving the stage plan queues subtasks one at a time (Draft until the previous finishes). A 60s worker (`replan_worker_loop`) releases the next subtask, advances stages, and cancels the chain if any member is canceled. Chain plan approval UI, `POST /api/tasks/{id}/chain-plan-decision`, decision notifications, and `CHAIN_PLAN_CONTRACT` added. Also fixed a missing `from ait import outcomes` import introduced in 0.112.

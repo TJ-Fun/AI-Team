@@ -65,22 +65,22 @@ def handle_tasks_pm_post(handler, path, body) -> bool:
         if not proj:
             handler.send_json({"error": "Choose a valid project."}, HTTPStatus.BAD_REQUEST)
             return True
+        if kind == "roadmap":
+            try:
+                task = start_replan_chain(pid)
+            except ValueError as exc:
+                handler.send_json({"error": str(exc)}, HTTPStatus.CONFLICT)
+                return True
+            handler.send_json({"task": task}, HTTPStatus.CREATED)
+            return True
         specs = {
             "docs": (
                 "doc_update",
                 "Update project documentation",
-                "Review the project's current documents and task board, then propose updated versions of all four "
-                "project documents (project_brief, technical_overview, decisions, outcomes). Request any "
+                "Review the project's current documents and task board, then propose updated versions of all five "
+                "project documents (project_vision, project_brief, technical_overview, decisions, outcomes). Request any "
                 "on-request documents you need via info_requests before answering. Keep confirmed facts, mark "
                 "assumptions, and keep each document under 20,000 characters.",
-            ),
-            "roadmap": (
-                "roadmap_update",
-                "Update roadmap",
-                "Review the project's master plan, phase plans, and task board, then propose an updated "
-                "master_plan, any changed phase plans (phase_1 through phase_9), and the current active_phase. "
-                "Request any on-request documents you need via info_requests before answering. Keep each "
-                "document under 20,000 characters.",
             ),
         }
         spec = specs.get(kind)

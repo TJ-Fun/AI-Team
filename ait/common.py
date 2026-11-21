@@ -275,6 +275,21 @@ CHAIN_PLAN_CONTRACT = (
     "Do not claim the subtasks have already been created."
 )
 
+CHAIN_DOC_CONTRACT = (
+    "For a replan chain doc subtask, return ONLY one valid JSON object, no markdown: "
+    '{"type":"chain_doc","summary":"brief summary","documents":{"project_brief":"complete Markdown brief",'
+    '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log",'
+    '"outcomes":"complete Markdown confirmed outcomes"}}. '
+    "Include only the documents that need changes; each must be non-empty and under 20,000 characters. "
+    "Updates are applied automatically — do not include project_vision here."
+)
+
+VISION_UPDATE_CONTRACT = (
+    "For a replan chain vision subtask, return ONLY one valid JSON object, no markdown: "
+    '{"type":"vision_update","summary":"brief summary","project_vision":"complete Markdown project vision"}. '
+    "project_vision must be non-empty and under 20,000 characters. The user reviews and approves it before it is applied."
+)
+
 ROADMAP_UPDATE_CONTRACT = (
     "For a roadmap update request, return ONLY one valid JSON object, no markdown: "
     '{"type":"roadmap_update","summary":"brief summary","master_plan":"complete Markdown big plan / roadmap",'

@@ -30,6 +30,7 @@ from ait import project_cleanup  # noqa: F401
 from ait import releases  # noqa: F401
 from ait import release_publish  # noqa: F401
 from ait import replan  # noqa: F401
+from ait import replan_stages  # noqa: F401
 from ait import env_tasks  # noqa: F401
 from ait import project_services  # noqa: F401
 from ait import prompts  # noqa: F401
@@ -65,6 +66,8 @@ _DOMAIN_MODULES = (
     project_cleanup,
     releases,
     release_publish,
+    replan,
+    replan_stages,
     env_tasks,
     project_services,
     git_app_sync,
