@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.141 · Updated 2026-11-21
+Version 0.143 · Updated 2026-11-21
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -52,6 +52,7 @@ The supplied service runs as the unprivileged `ubuntu` user, uses `ProtectSystem
 5. Follow status, attempts, agent replies, validation results, and activity from the board/task details. The **Copy** button on a task card or in the task detail dialog copies the full task dump (request, checks, replies, activity, and other stored fields) to the clipboard as plain text. Browser polling refreshes board and runtime status. The notification center surfaces blocked/rework/capacity/CI/GitHub/local-sync/provider issues plus PM/PO decisions (clarification answers, project-overview and design-review approvals) and merge approvals; task notifications open the related task detail.
 6. Use **Pause project** / **Resume project** (next to **New task**) to deactivate a project. A paused project keeps its board, tasks, chat, and history visible, but the dispatcher skips its tasks and the release publish/auto-advance worker skips it; in-flight provider calls finish normally. The button toggles back to resume.
 7. Project maintenance actions live on the project editor. **Clear tasks** (`POST /api/projects/{id}/clear-tasks`, requires `confirm: true`) deletes all of the project's task files, reply folders, and activity-log entries; it refuses while any task is In progress or a Git clone is running. **Wipe GitHub** (`POST /api/projects/{id}/wipe-github`) is the destructive repository reset described in §4.4.
+8. When a deliverable task reaches **Done**, the app automatically appends a one-line outcome entry (date, title, task id, and validation verdict) to the project's `outcomes` context document — once per task (`ait/outcomes.py`).
 
 ### 4.2 PM/PO chat
 

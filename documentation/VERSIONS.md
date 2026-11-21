@@ -1,5 +1,10 @@
 # Version log
 
+## 0.143 — 2026-11-21
+
+- Documentation gap fixes (batch 4 of 4, complete): documented the `outcomes.py` auto-logging of deliverable completions into the `outcomes` context document (§4.1 item 8) and expanded `ABOUT.md` with a brief feature list. All gaps from the documentation review are now addressed.
+- Updated documentation to 0.143.
+
 ## 0.142 — 2026-11-21
 
 - Documentation gap fixes (batch 3 of 4): documented the staged replan chain as new §4.10 (Major replan → Review/Docs/Roadmap/Board delta stages, `chain_plan` approvals, sequential subtasks, `board_delta` mutations, chain cancellation rules), renamed "Update roadmap" to the actual **Major replan** button label, replaced the `master_plan` slug reference with `roadmap`, noted the `vision_update` task type, and re-applied the lost `ait/projects.py` → `ait/project_context.py` fix in §4.9.
