@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ait.common import *
+from ait.format_retry import maybe_format_retry
 
 
 AUTO_ORDER_CACHE: dict[str, Any] = {"at": 0.0, "order": []}
@@ -244,14 +245,47 @@ def dispatch_one_for_provider(provider: str) -> bool:
     qa_active = bool(task.get("qa_attempt_active"))
     bump_provider_activity(provider, 1)
 
+    reply_raw: str | None = None
     try:
         reply, actual_model, meta = call_task_provider(task, provider)
+        reply_raw = reply
+        ts_received = now_iso()
+        folder = provider.lower().replace(" ", "")
+        rel_received = f"replies/{tid}/{folder}/attempt-{attempt_num:03d}.json"
+        atomic_json(
+            DATA / rel_received,
+            {
+                "task_id": tid,
+                "provider": provider,
+                "model": actual_model,
+                "attempt": attempt_num,
+                "at": ts_received,
+                "state": "received",
+                "text": reply[:50000],
+                **({"prompt_file": task["_prompt_file_rel"]} if task.get("_prompt_file_rel") else {}),
+                **meta,
+            },
+        )
+        logger.info(
+            "Agent reply received task_id=%s provider=%s attempt=%s chars=%d",
+            tid, provider, attempt_num, len(reply),
+        )
+        append_event(
+            {
+                "at": ts_received,
+                "task_id": tid,
+                "type": "agent_reply_received",
+                "provider": provider,
+                "attempt": attempt_num,
+                "chars": len(reply),
+            }
+        )
 
         if needs_work_reply_envelope(task):
             try:
                 reply = parse_work_reply_envelope(reply)
             except ValueError as exc:
-                raise ProviderFailure(provider, 400, str(exc)) from exc
+                raise ProviderFailure(provider, 400, str(exc), error_kind="format") from exc
 
         with STATE_LOCK:
             current = read_task(tid)
@@ -325,6 +359,7 @@ def dispatch_one_for_provider(provider: str) -> bool:
                         "at": ts,
                         "state": "success",
                         "text": reply,
+                        **({"raw_text": reply_raw[:50000]} if reply_raw and reply_raw != reply else {}),
                         **meta,
                     },
                 )
@@ -465,6 +500,11 @@ def dispatch_one_for_provider(provider: str) -> bool:
 
     except Exception as exc:
         failure = exc if isinstance(exc, ProviderFailure) else ProviderFailure(provider, 503, str(exc)[:1000])
+        logger.warning(
+            "Dispatch failed task_id=%s provider=%s attempt=%s kind=%s error=%s reply_excerpt=%s",
+            tid, provider, attempt_num, failure.error_kind, str(failure)[:300],
+            (reply_raw or "")[:500].replace("\n", " "),
+        )
         with STATE_LOCK:
             fresh = read_task(tid)
             if fresh:
@@ -519,7 +559,10 @@ def dispatch_one_for_provider(provider: str) -> bool:
                         "at": ts,
                         "state": "error",
                         "error_status": failure.status,
+                        "error_kind": failure.error_kind,
                         "error": str(failure),
+                        **({"text": reply_raw[:50000]} if reply_raw else {}),
+                        **({"prompt_file": task.get("_prompt_file_rel")} if task.get("_prompt_file_rel") else {}),
                     },
                 )
                 for att in fresh.get("attempts") or []:
@@ -527,7 +570,15 @@ def dispatch_one_for_provider(provider: str) -> bool:
                         att["state"] = "provider_unavailable" if fallback else ("waiting_for_capacity" if waiting_capacity else "failed")
                         att["finished_at"] = ts
                         att["reply_file"] = rel
-                msg = f"{provider} API error {failure.status}: {failure}."
+                fresh["latest_reply_file"] = rel
+                if failure.error_kind == "format" and not qa_active:
+                    retried, _ = maybe_format_retry(fresh, provider, str(failure))
+                    if retried:
+                        return True
+                if failure.error_kind == "format":
+                    msg = f"{provider} reply format invalid: {failure}."
+                else:
+                    msg = f"{provider} API error {failure.status}: {failure}."
                 if fallback:
                     nxt = (
                         str(nxt_entry["provider"])

@@ -69,6 +69,7 @@ def _task_prompt(task: dict[str, Any], provider: str, extra_context: str) -> tup
         prompt += "\n\n" + str(task["format_retry_feedback"])
     if extra_context:
         prompt += "\n\n" + extra_context
+    _save_agent_prompt(task, provider, role, prompt, contract)
     return role, prompt, contract
 
 

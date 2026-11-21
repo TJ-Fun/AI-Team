@@ -19,6 +19,18 @@ def handle_tasks_core_get(handler, path, query) -> bool:
         handler.send_json({"replies": read_task_replies(tid)})
         return True
 
+    m_file = re.fullmatch(r"/api/tasks/(T-\d{4,})/file", path)
+    if m_file:
+        tid = m_file.group(1)
+        rel = str((query.get("path") or [""])[0] or "").strip()
+        root = (DATA / "replies" / tid).resolve()
+        target = (DATA / rel).resolve() if rel.startswith("replies/") else None
+        if not target or not str(target).startswith(str(root)) or not target.is_file():
+            handler.send_json({"error": "File not found."}, HTTPStatus.NOT_FOUND)
+            return True
+        handler.serve_file(target, "text/plain; charset=utf-8")
+        return True
+
     return False
 
 

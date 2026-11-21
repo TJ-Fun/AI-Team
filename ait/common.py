@@ -330,11 +330,12 @@ PREV_CPU_SAMPLE: tuple[int, int] | None = None
 
 
 class ProviderFailure(Exception):
-    def __init__(self, provider: str, status: int, message: str, retry_after: str | None = None):
+    def __init__(self, provider: str, status: int, message: str, retry_after: str | None = None, error_kind: str = "api"):
         super().__init__(message)
         self.provider = provider
         self.status = status
         self.retry_after = retry_after
+        self.error_kind = error_kind
 
 
 def now_iso() -> str:
