@@ -1,5 +1,10 @@
 # Version log
 
+## 0.120 — 2026-11-21
+
+- Fixed replan chain stage progression: `advance_chain()` now creates the next stage's plan task when the current stage finishes, so **Major replan** progresses review → vision → docs → roadmap → board_delta instead of completing after Review. Docs-stage subtasks auto-apply project-document updates once reached; smoke-tested plan creation without duplicates.
+- Updated documentation to 0.120.
+
 ## 0.119 — 2026-11-21
 
 - Raised OpenAI-compatible task `max_tokens` to 8192 so long report/contract replies (for example replan review subtasks) are not truncated mid-JSON before envelope parsing. Providers using `max_completion_tokens` (GroqCloud) already sent 8192 and are unchanged; `_openai_payload` was simplified now that `task`/`provider` parameters were unused.

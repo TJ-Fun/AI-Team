@@ -324,11 +324,17 @@ def advance_chain(chain_id: str, members: list[dict[str, Any]]) -> None:
     if any(m.get("status") == "Canceled" for m in members):
         _cancel_chain_members(members, f"Chain {chain_id} canceled: a chain task was canceled.")
         return
-    for stage in CHAIN_STAGES:
+    for index, stage in enumerate(CHAIN_STAGES):
         stage_tasks = [m for m in members if str(m.get("chain_stage") or "") == stage]
         if not stage_tasks:
             continue
         if all(m.get("status") in TERMINAL_STATES for m in stage_tasks):
+            if index + 1 < len(CHAIN_STAGES):
+                next_stage = CHAIN_STAGES[index + 1]
+                if not any(str(m.get("chain_stage") or "") == next_stage for m in members):
+                    pid = str(members[0].get("project_id") or "default") if members else "default"
+                    create_chain_plan_task(chain_id, next_stage, pid)
+                    return
             continue
         _release_next_chain_subtask(stage_tasks)
         return
