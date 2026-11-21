@@ -1,5 +1,10 @@
 # Version log
 
+## 0.151 — 2026-11-22
+
+- The notification center now surfaces tasks parked in **Needs approval** for the whole doc-update family (`doc_update`, `roadmap_update`, `vision_update`, `board_delta`, `doc_edit`) in `ait/notifications.py` — previously only project-overview, design-review, and chain-plan approvals notified, so per-document update proposals sat silently. Titles include the target document name (e.g. "Document update needs approval — Confirmed outcomes"); each notification links to the task.
+- Updated documentation to 0.151.
+
 ## 0.150 — 2026-11-22
 
 - The project board now sorts tasks by creation time, newest on top (`static/js/task-board.js`); the previous release-grouped ordering (release → release_order → env_setup first) is replaced by a strict `created_at` descending sort. Release badges on task cards are unchanged — display only.

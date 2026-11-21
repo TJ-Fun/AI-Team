@@ -158,6 +158,34 @@ def get_notifications() -> list[dict[str, Any]]:
                 }
             )
 
+        if t.get("status") == "Needs approval" and task_type in DOC_UPDATE_TASK_TYPES:
+            slug = str(t.get("doc_slug") or "").strip()
+            doc_label = project_doc_title(slug) if slug else ""
+            approval_titles = {
+                "doc_update": f"Document update needs approval{f' — {doc_label}' if doc_label else ''}",
+                "roadmap_update": "Roadmap update needs approval",
+                "vision_update": "Project vision update needs approval",
+                "board_delta": "Board delta needs approval",
+                "doc_edit": "Document edit needs approval",
+            }
+            approval_messages = {
+                "doc_update": f"PM/PO proposed an updated {doc_label or 'project'} document for your review.",
+                "roadmap_update": "PM/PO proposed roadmap and phase plan changes for your review.",
+                "vision_update": "PM/PO proposed a project vision change for your review.",
+                "board_delta": "PM/PO proposed board mutations (cancel/supersede/create) for your review.",
+                "doc_edit": "PM/PO proposed project document edits for your review.",
+            }
+            items.append(
+                {
+                    "id": f"task:{tid}:decision:{upd}",
+                    "kind": "decision",
+                    "severity": "medium",
+                    "title": approval_titles.get(task_type, "Document update needs approval"),
+                    "message": approval_messages.get(task_type, "PM/PO proposed document changes for your review."),
+                    "task_id": tid,
+                }
+            )
+
         if t.get("status") == "Needs validation" and not task_provider({**t, "workflow_phase": "qa"}):
             items.append(
                 {
