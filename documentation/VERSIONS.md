@@ -1,5 +1,10 @@
 # Version log
 
+## 0.131 — 2026-11-21
+
+- Split `static/js/providers.js` (batch 2 of 3): extracted the routing UI — route rows rendering, model cache, accordion, add/remove/reorder/test handlers, and the routing form submit — into `provider-routing.js`. `providers.js` is now ~420 lines; the exported API is unchanged.
+- Updated documentation to 0.131.
+
 ## 0.130 — 2026-11-21
 
 - Split `static/js/providers.js` (batch 1 of 3): extracted shared provider helpers into `provider-shared.js` and the chat provider/model selectors into `provider-chat-select.js`. `initProviders` keeps returning the same API object; no consumer changes.
