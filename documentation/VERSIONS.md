@@ -1,5 +1,10 @@
 # Version log
 
+## 0.129 — 2026-11-21
+
+- Fixed duplicated action buttons in the task detail dialog: `renderTaskDetailActions` embedded the accumulated `actionHtml` inside its own right-hand wrapper, so every workflow button (status actions, chain plan approve/reject, overview/update decisions, merge approval) rendered twice. The markup is now composed once — left group (Delete task, Copy) and right group (workflow actions + Close).
+- Updated documentation to 0.129.
+
 ## 0.128 — 2026-11-21
 
 - PM/PO feasibility rule: the planning contract now requires verifying every proposed task is executable by the assigned role with repository/provider access; anything needing user or host action (accounts, credentials, consoles, billing, third-party dashboards, manual installs) must be an `env_setup` User task. Env setup steps gained an optional `troubleshooting` field and tasks a `fallback` field (alternatives or plan/phase adjustments); both render in the env section and task copy. Also restored the roadmap/phases fields in the plan contract schema and the `roadmap` wording in the PM/PO prompt.

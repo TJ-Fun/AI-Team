@@ -54,7 +54,7 @@ export function renderTaskDetailActions(task) {
     if (task.status === "Needs approval" && task.merge_approval_required && task.pull_request) {
       actionHtml += `<button class="primary" type="button" data-merge-approve="1">Approve merge</button>`;
     }
-    actionHtml += `
+    $("#detail-actions").innerHTML = `
       <div class="detail-actions-left">
         <button class="danger" type="button" data-detail-delete="1">Delete task</button>
         <button class="secondary" type="button" data-detail-copy="1">Copy</button>
@@ -63,7 +63,6 @@ export function renderTaskDetailActions(task) {
         ${actionHtml}
         <button class="secondary" type="button" data-detail-close="1">Close</button>
       </div>`;
-    $("#detail-actions").innerHTML = actionHtml;
 }
 
 export function bindTaskDetailActions({ detailDialog, refreshBoard, openTaskDialog } = {}) {
