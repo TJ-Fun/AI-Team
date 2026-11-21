@@ -1,5 +1,7 @@
 # Plan: Chat-driven project document edits + remove Plan button
 
+**Status: complete (v0.138, batches 1–4 executed 2026-11-21).**
+
 ## Goal
 Let the user discuss document changes with the PM/PO in chat, say "proceed", and have the PM create a `doc_edit` task that updates any subset of: `roadmap`, `phase_1`–`phase_9`, `project_brief`, `technical_overview`, `decisions`, `outcomes` (optional `active_phase`). `project_vision` and `*_tracker` docs stay read-only. Changes always land in **Needs approval** before being applied. Remove the confusing "Plan" chat button and `/api/pm-requests` endpoint.
 

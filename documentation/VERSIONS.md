@@ -1,5 +1,10 @@
 # Version log
 
+## 0.138 — 2026-11-21
+
+- Chat-driven document edits (batch 4 of 4, complete): documented the `doc_edit` chat flow and Plan-button removal in `documentation/DOCUMENTATION.md` §4.2. The feature is now fully wired: discuss a change with PM/PO in chat, confirm, the agent queues a `doc_edit` task, and approving it on the board applies the new document text.
+- Updated documentation to 0.138.
+
 ## 0.137 — 2026-11-21
 
 - Chat-driven document edits (batch 3 of 4): removed the confusing "Plan" chat button, its `chat.js` handler, the unused `initChat` param, and the `/api/pm-requests` endpoint (`pm_planning` tasks remain for internal clarification follow-ups). `doc_edit` tasks now render in the task-detail update section with approve/reject actions, are excluded from the work reply envelope and phase trackers, and the chat notice explains the confirm-then-approve flow.
