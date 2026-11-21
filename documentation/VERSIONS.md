@@ -1,5 +1,10 @@
 # Version log
 
+## 0.148 — 2026-11-21
+
+- Fixed the `info_requests` follow-up loop (`ait/info_requests.py`): follow-up calls now send full text only for newly provided documents plus a compact "already provided" slug list (previously every cached document was resent each round, bloating context to ~100k chars); slugs that are user-owned (`project_vision`), auto-generated (trackers), unknown, or over the 4-per-reply cap are rejected up front and reported back to the agent with the reason instead of silently looping; the terminal check also fires when the final reply requests only rejected slugs.
+- Updated documentation to 0.148.
+
 ## 0.147 — 2026-11-21
 
 - Documentation for the per-document **Update docs** split (0.146): `DOCUMENTATION.md` §4.2 now describes the four independent `doc_update` tasks with `doc_slug` and single-document contracts, their independent approvals, and the legacy four-document behavior for pre-split tasks.
