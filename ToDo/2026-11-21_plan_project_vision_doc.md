@@ -1,5 +1,7 @@
 # Plan: `project_vision` doc + staged PM replan chains + doc-maintenance improvements
 
+**Status: EXECUTED — all 5 batches shipped (v0.111–v0.115, commits through b03f5cf).**
+
 ## Goal
 1. Add `project_vision` — PM-maintained user↔PM direction document (auto for PM/PO, on-request others).
 2. Replace single-shot "Update roadmap" with a **chain of trackable PM tasks** staged as: Review → Vision → Docs → Roadmap → Board delta. App-side chaining; every step is a normal task row (trackable, retryable).
