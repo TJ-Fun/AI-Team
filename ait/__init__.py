@@ -13,6 +13,7 @@ from pathlib import Path as _Path
 from ait import common  # noqa: F401
 from ait import chat  # noqa: F401
 from ait import doc_updates  # noqa: F401
+from ait import format_retry  # noqa: F401
 from ait import git_app_sync  # noqa: F401
 from ait import git_github_api  # noqa: F401
 from ait import github_repo_wipe  # noqa: F401
@@ -84,6 +85,7 @@ _DOMAIN_MODULES = (
     provider_health,
     provider_dispatch,
     provider_watchdog,
+    format_retry,
     pm_planning_parse,
     pm_planning_finish,
     pm_planning_escalation,

@@ -1,5 +1,10 @@
 # Version log
 
+## 0.118 — 2026-11-21
+
+- Fixed `maybe_format_retry` namespace registration: `ait/format_retry.py` is now imported and included in `ait/__init__.py`'s shared module namespace, so `write_task` is injected and format-correction retries can persist/requeue tasks instead of raising `NameError`. Verified the two-retry cap with a disposable data dir.
+- Updated documentation to 0.118.
+
 ## 0.117 — 2026-11-21
 
 - Recovery fix for agent exchange capture: implemented the missing `_save_agent_prompt` helper in `ait/provider_stream.py`, so each provider attempt writes `replies/{task}/{provider}/attempt-NNN.prompt.txt` and reply JSON links `prompt_file`.
