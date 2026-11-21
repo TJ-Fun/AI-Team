@@ -146,6 +146,14 @@
     <form id="context-form" class="task-form">
       <div class="dialog-heading"><div><p class="eyebrow">SAVED ON YOUR VM · <span id="context-project-name"></span></p><h2>Project context</h2></div><button class="icon-button" type="button" id="close-context" aria-label="Close">×</button></div>
       <label>Document<select name="document_id"></select></label>
+      <div class="context-new-doc">
+        <select id="new-context-doc-kind" aria-label="New document type">
+          <option value="">New document…</option>
+          <option value="phase">Phase plan</option>
+        </select>
+        <input id="new-context-doc-num" type="number" min="1" max="9" value="1" aria-label="Phase number" hidden>
+        <button class="secondary" type="button" id="create-context-doc">Create</button>
+      </div>
       <label>Project information<textarea name="content" rows="18" maxlength="20000" required></textarea></label>
       <div class="history-controls">
         <label>Previous version<select id="context-version"><option value="">No saved versions</option></select></label>

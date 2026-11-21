@@ -1,5 +1,11 @@
 # Version log
 
+## 0.123 — 2026-11-21
+
+- Fixed project context document routes: slug patterns now allow digits (`phase_1`, `phase_1_tracker`), so phase plans and trackers can be saved, restored, and have history managed — previously these routes 404'd before reaching the handler. Also fixed a `KeyError` 500 in the save/restore responses for non-core documents (`master_plan`, `phase_N`) by using `project_doc_title`.
+- Project context dialog: added a "New document" row that creates phase plan documents (`phase_1`–`phase_9`) that do not exist yet.
+- Updated documentation to 0.123.
+
 ## 0.122 — 2026-11-21
 
 - Task UI polish: the task card Delete button now renders red (the dark-theme `.card-delete` rule no longer overrides `.danger`), and the card's Details link is now a secondary button. Added a **Copy** button to both the task card and the task detail dialog that copies a full plain-text dump of the task — header fields, request, PM summary, answer, design review, proposed overview/update/board-delta/chain payloads, env-setup steps, acceptance checks, validation, pull request, all agent replies (including raw reply text), and the activity log — via the new `static/js/task-copy.js` module (`/api/tasks/{id}/replies` is fetched on demand).

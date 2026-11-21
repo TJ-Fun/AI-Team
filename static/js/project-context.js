@@ -41,6 +41,54 @@ export function initProjectContext() {
     }
   }
 
+  const newKind = $("#new-context-doc-kind");
+  const newNum = $("#new-context-doc-num");
+  const createBtn = $("#create-context-doc");
+
+  function refreshContextSelect(selectedSlug) {
+    contextSelect.innerHTML = state.contextDocs
+      .map((d) => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.title)}</option>`)
+      .join("");
+    if (selectedSlug && state.contextDocs.some((d) => d.id === selectedSlug)) {
+      contextSelect.value = selectedSlug;
+    }
+  }
+
+  newKind?.addEventListener("change", () => {
+    newNum.hidden = newKind.value !== "phase";
+  });
+
+  createBtn?.addEventListener("click", async () => {
+    $("#context-error").textContent = "";
+    const kind = newKind?.value || "";
+    if (!kind) {
+      appAlert("Choose a document type first.");
+      return;
+    }
+    const phaseNo = Math.min(9, Math.max(1, parseInt(newNum?.value || "1", 10) || 1));
+    const slug = kind === "phase" ? `phase_${phaseNo}` : kind;
+    if (state.contextDocs.some((d) => d.id === slug)) {
+      appAlert("That document already exists — select it from the list.");
+      return;
+    }
+    const starter = `# Phase ${phaseNo} plan\n\n`;
+    try {
+      await api(projectContextEndpoint(`/${encodeURIComponent(slug)}`), {
+        method: "PUT",
+        body: JSON.stringify({ content: starter }),
+      });
+      const res = await api(projectContextEndpoint());
+      state.contextDocs = res.documents || [];
+      refreshContextSelect(slug);
+      contextTextarea.value = starter;
+      await loadContextHistory(slug);
+      if (newKind) newKind.value = "";
+      if (newNum) newNum.hidden = true;
+    } catch (err) {
+      $("#context-error").textContent = err.message;
+    }
+  });
+
   $("#open-context")?.addEventListener("click", async () => {
     $("#context-error").textContent = "";
     try {

@@ -59,7 +59,7 @@ def handle_projects_get(handler, path, query) -> bool:
         handler.send_json({"documents": docs})
         return True
 
-    m_ctx_hist = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/history", path)
+    m_ctx_hist = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z0-9_]+)/history", path)
     if m_ctx_hist:
         project_id, slug = m_ctx_hist.groups()
         if not is_project_doc_slug(slug):
@@ -116,7 +116,7 @@ def handle_projects_post(handler, path, body) -> bool:
             handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         return True
 
-    m_ctx_res = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/restore", path)
+    m_ctx_res = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z0-9_]+)/restore", path)
     if m_ctx_res:
         pid, slug = m_ctx_res.groups()
         vid = str(body.get("snapshot_id", ""))
@@ -174,7 +174,7 @@ def handle_projects_post(handler, path, body) -> bool:
 
 
 def handle_projects_put(handler, path, body) -> bool:
-    m_ctx = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)", path)
+    m_ctx = re.fullmatch(r"/api/projects/([a-z0-9-]+)/context-documents/([a-z0-9_]+)", path)
     if m_ctx:
         pid, slug = m_ctx.groups()
         if not is_project_doc_slug(slug):
@@ -192,7 +192,7 @@ def handle_projects_put(handler, path, body) -> bool:
             {"at": now_iso(), "type": "project_context_saved", "project_id": pid, "document": slug, "snapshot": snap}
         )
         handler.send_json(
-            {"saved": True, "project_id": pid, "id": slug, "title": PROJECT_CONTEXT_FILES[slug], "content": content.strip(), "snapshot": snap}
+            {"saved": True, "project_id": pid, "id": slug, "title": project_doc_title(slug), "content": content.strip(), "snapshot": snap}
         )
         return True
 
@@ -211,7 +211,7 @@ def handle_projects_put(handler, path, body) -> bool:
 
 def handle_projects_delete(handler, path) -> bool:
     m_ctx_del = re.fullmatch(
-        r"/api/projects/([a-z0-9-]+)/context-documents/([a-z_]+)/history/(\d{8}T\d{12}Z)", path
+        r"/api/projects/([a-z0-9-]+)/context-documents/([a-z0-9_]+)/history/(\d{8}T\d{12}Z)", path
     )
     if m_ctx_del:
         pid, slug, vid = m_ctx_del.groups()

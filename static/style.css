@@ -474,3 +474,5 @@ dialog::backdrop{background:#000000aa}
 .detail-actions-left{display:flex;gap:7px;flex-wrap:wrap}
 .detail-actions-right{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:7px}
 @media(max-width:600px){.detail-actions{flex-direction:column}.detail-actions-right{justify-content:flex-start}}
+
+.context-new-doc{display:flex;gap:8px;margin:-4px 0 10px}.context-new-doc select{flex:1}.context-new-doc input{width:70px}
