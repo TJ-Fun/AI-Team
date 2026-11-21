@@ -72,6 +72,7 @@ _DOMAIN_MODULES = (
     git_task_postprocess,
     github_checks,
     notifications,
+    outcomes,
     model_refresh,
     provider_calls,
     provider_stream,

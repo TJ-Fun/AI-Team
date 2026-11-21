@@ -585,6 +585,11 @@ def project_doc_map_text(project_id: str, role: str, project: dict[str, Any]) ->
             size = len(load_project_context(project_id, slug))
         except Exception:
             size = 0
+        try:
+            mtime = project_context_file(project_id, slug).stat().st_mtime
+            updated = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d")
+        except Exception:
+            updated = ""
         if slug in PROJECT_DOC_DESCRIPTIONS:
             desc = PROJECT_DOC_DESCRIPTIONS[slug]
         elif PHASE_DOC_RE.fullmatch(slug):
@@ -592,7 +597,8 @@ def project_doc_map_text(project_id: str, role: str, project: dict[str, Any]) ->
         else:
             desc = ""
         tag = "auto-included above" if slug in auto else "on-request"
-        lines.append(f"- {slug} — {project_doc_title(slug)} ({size} chars, {tag}): {desc}")
+        freshness = f", updated {updated}" if updated else ""
+        lines.append(f"- {slug} — {project_doc_title(slug)} ({size} chars{freshness}, {tag}): {desc}")
     lines.append(
         "Documents marked on-request are not loaded. When you need one, include "
         f'"info_requests": ["slug", ...] (max {INFO_REQUEST_MAX_DOCS} slugs) in your structured reply; '

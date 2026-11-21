@@ -439,6 +439,8 @@ def dispatch_one_for_provider(provider: str) -> bool:
                         "to": next_status,
                     }
                 )
+                if next_status == "Done":
+                    maybe_log_outcome(fresh)
                 if next_status == "Blocked":
                     esc_id = maybe_create_escalation(fresh, msg)
                     if esc_id:

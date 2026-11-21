@@ -1,5 +1,10 @@
 # Version log
 
+## 0.112 — 2026-11-21
+
+- Doc maintenance: deliverable tasks now auto-append a one-line entry to the project's `outcomes` document the first time they reach Done (`ait/outcomes.py`, hooked into the dispatch completion path; idempotent via `outcome_logged`). The agent document map now shows each document's last-updated date alongside size and auto/on-request tag.
+- Updated documentation to 0.112.
+
 ## 0.111 — 2026-11-21
 
 - Added the `project_vision` project document: a PM/PO-maintained direction document auto-included in PM/PO prompts and plan-overview approvals, on-request for other roles via the document map/`info_requests`, and included in `doc_update` payloads (now five documents). New `project_templates/project_vision.md` starter; overview approval UI, confirm texts, and notifications updated to include it.
