@@ -1,5 +1,10 @@
 # Version log
 
+## 0.133 — 2026-11-21
+
+- Split `ait/projects.py` (batch 1 of 2): extracted routing configuration/resolution (including per-task route selection) into `ait/routing.py` and task JSON storage/reply lookup into `ait/tasks_store.py`. `projects.py` keeps project CRUD, context documents, and chat history; `ait/__init__.py` registers the new modules in the shared namespace. No call-site changes.
+- Updated documentation to 0.133.
+
 ## 0.132 — 2026-11-21
 
 - Split `static/js/providers.js` (batch 3 of 3, complete): extracted the connections UI — provider list rendering, credential save/test/clear, reorder, add-provider, and per-provider model selects — into `provider-connections.js`. `providers.js` is now a ~70-line orchestrator composing `provider-shared.js`, `provider-chat-select.js`, `provider-routing.js`, and `provider-connections.js`; the exported API is unchanged.
