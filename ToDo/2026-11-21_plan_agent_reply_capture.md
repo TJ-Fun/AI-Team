@@ -1,5 +1,7 @@
 # Plan: agent reply capture, error taxonomy, and exchange logging
 
+**Status: EXECUTED — all 5 batches shipped (v0.116, commits f64ff6f + 9a213d8).**
+
 ## Goal
 Fix the blind-failure problem seen on chain subtask T-0001/[Review 2]: Nvidia returned a non-envelope reply, the raw text was discarded, the error was mislabeled "API error 400", and nothing reached the logs. Make every agent exchange inspectable and format failures self-correcting.
 
