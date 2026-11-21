@@ -265,7 +265,7 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
       const entries =
         task.task_type === "roadmap_update"
           ? [
-              ["master_plan", payload.master_plan || ""],
+              ["roadmap", payload.roadmap || payload.master_plan || ""],
               ...Object.entries(payload.phases || {}),
             ]
           : Object.entries(payload.documents || payload).filter(

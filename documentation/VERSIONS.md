@@ -1,5 +1,10 @@
 # Version log
 
+## 0.125 — 2026-11-21
+
+- Renamed the project planning document from **master plan / big plan** to **Roadmap**: the context slug is now `roadmap` (legacy `master_plan` still resolves and existing `master_plan.md` files are migrated automatically, including history). `roadmap_update` payloads use the `roadmap` key; the PM/PO prompt, replan stage request, contracts, task detail/copy views, and docs all say Roadmap. Phase plans (`phase_1`–`phase_9`) remain the detailed per-phase documents.
+- Updated documentation to 0.125.
+
 ## 0.124 — 2026-11-21
 
 - **Project vision is now user-editable only.** The PM/PO planning contract no longer asks for `project_vision` in the project overview (brief, technical overview, and decisions only), `doc_update` covers the four PM-writable documents, and overview approval preserves the existing vision. The replan chain lost its `vision` stage (now review → docs → roadmap → board delta); pending legacy `vision_update` tasks still apply. Contracts state that clarification answers and direct user instructions override the vision.

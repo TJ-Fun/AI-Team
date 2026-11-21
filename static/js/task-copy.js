@@ -117,7 +117,7 @@ export function taskCopyText(task, replies = []) {
     } else {
       const entries =
         task.task_type === "roadmap_update"
-          ? [["master_plan", payload.master_plan || ""], ...Object.entries(payload.phases || {})]
+          ? [["roadmap", payload.roadmap || payload.master_plan || ""], ...Object.entries(payload.phases || {})]
           : Object.entries(payload.documents || payload).filter(([key]) => !["type", "summary"].includes(key));
       out += section(
         "Proposed document update",

@@ -177,7 +177,7 @@ def run_release_publish_pass() -> int:
                 try:
                     update_release_plan_doc(pid, plan)
                 except Exception as exc:
-                    logger.warning("Failed to update master_plan for %s: %s", pid, exc)
+                    logger.warning("Failed to update roadmap for %s: %s", pid, exc)
                 if nxt:
                     append_chat_notice(
                         f"Release {rid} is complete and published. The project advances to release {nxt}; "
@@ -188,7 +188,7 @@ def run_release_publish_pass() -> int:
                     )
                 else:
                     append_chat_notice(
-                        f"Release {rid} is complete and published. No further releases remain in the master plan.",
+                        f"Release {rid} is complete and published. No further releases remain in the roadmap.",
                         ts,
                         "",
                         pid,
@@ -238,7 +238,7 @@ def maybe_queue_release_plan(
     request = (
         f"Plan release {cur} (phase {phase_id or 'n/a'}) for project '{project.get('name', pid)}'.\n\n"
         f"Release title: {title}\n\n"
-        "The master_plan document already marks this release as current. Propose the tasks needed to complete "
+        "The roadmap document already marks this release as current. Propose the tasks needed to complete "
         "this release: start with env_setup tasks for any required environment/user setup (small, step-by-step), "
         "then the dev/QA/docs work tasks. Tag every task with release \"" + cur + "\" and sequential "
         "release_order values. Keep the release small and self-contained. Do not create tasks for later releases."
@@ -268,7 +268,7 @@ def maybe_queue_release_plan(
         }
     )
     append_chat_notice(
-        f"Release {cur} is next in the master plan. I queued PM/PO planning ({tid}) to break it into tasks.",
+        f"Release {cur} is next in the roadmap. I queued PM/PO planning ({tid}) to break it into tasks.",
         ts,
         tid,
         pid,

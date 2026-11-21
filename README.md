@@ -1,6 +1,6 @@
 # AI-Team
 
-Current application version: **0.124**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
+Current application version: **0.125**. See [About](documentation/ABOUT.md), the [version log](documentation/VERSIONS.md), and the [full project documentation](documentation/DOCUMENTATION.md).
 
 The web client is served from `static/` (`index.html`, `app.js`, `style.css`, and ES modules under `js/`). The server keeps application data and logs under `TEAM_DATA_DIR` (default: `data/`).
 
@@ -16,7 +16,7 @@ Permission errors when checking or creating a clone are returned as actionable m
 
 Projects can be paused and resumed from the board: a paused project keeps its tasks, chat, and history visible but receives no new dispatches, release publishes, or auto-advance planning until resumed.
 
-Projects can also be planned as sequential phases (`v0.N`) of ordered releases (`v0.N.M`): PM/PO tags tasks with a release id, the dispatcher runs only the current release (env setup tasks first), a background worker publishes each finished release as a git tag plus GitHub release, and PM/PO is automatically asked to plan the next release when the project goes idle. The release tree lives in the `ait-release-plan` JSON block inside the project's master plan document.
+Projects can also be planned as sequential phases (`v0.N`) of ordered releases (`v0.N.M`): PM/PO tags tasks with a release id, the dispatcher runs only the current release (env setup tasks first), a background worker publishes each finished release as a git tag plus GitHub release, and PM/PO is automatically asked to plan the next release when the project goes idle. The release tree lives in the `ait-release-plan` JSON block inside the project's roadmap document.
 
 By default, PM/PO-proposed work tasks are created as drafts and released when the user approves the project overview; autonomy can disable that plan-approval gate, and project-overview documents still wait for user approval. After plan approval, dispatch, QA, PR merge (unless merge approval is enabled), and guarded local checkout sync run automatically. Deliverables needing validation are reviewed by the QA role. Failed QA reviews automatically return work to its original role, and three unsuccessful QA reviews block the task for PM/PO escalation. When PM/PO proposes a design change it must include executable provisional team tasks and alternatives; approving the review confirms those tasks and cancels the superseded blocked task, while rejecting or choosing an alternative cancels unfinished provisional tasks and queues PM/PO round 2. Repository-changing tasks are serialized per GitHub repository; unrelated repositories may work concurrently. A dirty, divergent, or mismatched local checkout is left untouched and raises a task notification; after resolving it, retry the guarded sync from task details. The chat **Plan** button sends a request to PM/PO planning, and **Settings → Routing → Autonomy** controls plan approval, provisional escalation tasks during design review, and merge approval.
 

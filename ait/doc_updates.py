@@ -47,7 +47,7 @@ def parse_roadmap_update_response(reply: str) -> dict[str, Any]:
     data = _parse_reply_json(reply)
     if data.get("type") != "roadmap_update":
         raise ValueError("Roadmap update reply must have type 'roadmap_update'.")
-    master_plan = _clean_doc_text(data.get("master_plan"), "Master plan")
+    roadmap = _clean_doc_text(data.get("roadmap") or data.get("master_plan"), "Roadmap")
     phases: dict[str, str] = {}
     raw_phases = data.get("phases")
     if raw_phases is not None:
@@ -66,7 +66,7 @@ def parse_roadmap_update_response(reply: str) -> dict[str, Any]:
             raise ValueError("active_phase must be a phase number or null.") from None
         if not 1 <= active_phase <= 9:
             raise ValueError("active_phase must be between 1 and 9.")
-    return {"master_plan": master_plan, "phases": phases, "active_phase": active_phase}
+    return {"roadmap": roadmap, "phases": phases, "active_phase": active_phase}
 
 
 def _finish_update_task(task: dict[str, Any], reply: str, provider: str, parser, label: str) -> tuple[str, str]:
@@ -127,7 +127,7 @@ def apply_doc_update(task: dict[str, Any]) -> dict[str, Any]:
     elif task.get("task_type") == "board_delta":
         return apply_board_delta_update(task)
     elif task.get("task_type") == "roadmap_update":
-        snapshots[ROADMAP_DOC_SLUG] = save_project_context_document(pid, ROADMAP_DOC_SLUG, str(payload.get("master_plan") or ""))
+        snapshots[ROADMAP_DOC_SLUG] = save_project_context_document(pid, ROADMAP_DOC_SLUG, str(payload.get("roadmap") or payload.get("master_plan") or ""))
         for slug, content in (payload.get("phases") or {}).items():
             snapshots[slug] = save_project_context_document(pid, slug, str(content))
         if payload.get("active_phase") is not None:

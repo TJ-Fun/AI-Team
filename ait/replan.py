@@ -43,7 +43,7 @@ STAGE_REQUESTS = {
         "subtask updates specific documents and is applied automatically."
     ),
     "roadmap": (
-        "Replan stage ROADMAP: propose an updated master_plan and phase plans reflecting the approved "
+        "Replan stage ROADMAP: propose an updated roadmap and phase plans reflecting the approved "
         "vision and docs. Plan subtasks of kind 'roadmap' (usually one) producing the roadmap update "
         "for user approval."
     ),

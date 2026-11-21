@@ -1,4 +1,4 @@
-"""Release-driven project workflow: master_plan parsing and release gating."""
+"""Release-driven project workflow: roadmap parsing and release gating."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _clean_release_entry(raw: Any) -> dict[str, Any] | None:
 
 
 def parse_release_plan(doc_text: str) -> dict[str, Any] | None:
-    """Extract the release-plan JSON block embedded in the master_plan document."""
+    """Extract the release-plan JSON block embedded in the roadmap document."""
     text = str(doc_text or "")
     for match in RELEASE_PLAN_FENCE_RE.finditer(text):
         try:
@@ -118,7 +118,7 @@ def release_env_blocked(task: dict[str, Any], all_tasks: list[dict[str, Any]]) -
 
 
 def derived_current_release(all_tasks: list[dict[str, Any]], project_id: str) -> str:
-    """Earliest open release id for a project, used when master_plan has no plan block."""
+    """Earliest open release id for a project, used when the roadmap has no plan block."""
     ids = {
         str(t.get("release") or "")
         for t in all_tasks
@@ -150,7 +150,7 @@ def render_release_plan_block(plan: dict[str, Any]) -> str:
 
 
 def update_release_plan_doc(project_id: str, plan: dict[str, Any]) -> None:
-    """Write the release-plan JSON block back into the master_plan document."""
+    """Write the release-plan JSON block back into the roadmap document."""
     block = render_release_plan_block(plan)
     doc = load_project_context(project_id, ROADMAP_DOC_SLUG)
     if RELEASE_PLAN_FENCE_RE.search(doc):

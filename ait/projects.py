@@ -478,6 +478,7 @@ def is_project_doc_slug(slug: str) -> bool:
     return (
         slug in PROJECT_CONTEXT_FILES
         or slug == ROADMAP_DOC_SLUG
+        or slug == LEGACY_ROADMAP_SLUG
         or bool(PHASE_DOC_RE.fullmatch(slug))
     )
 
@@ -485,8 +486,8 @@ def is_project_doc_slug(slug: str) -> bool:
 def project_doc_title(slug: str) -> str:
     if slug in PROJECT_CONTEXT_FILES:
         return PROJECT_CONTEXT_FILES[slug]
-    if slug == ROADMAP_DOC_SLUG:
-        return "Master plan (big plan / roadmap)"
+    if slug == ROADMAP_DOC_SLUG or slug == LEGACY_ROADMAP_SLUG:
+        return "Roadmap"
     if PHASE_DOC_RE.fullmatch(slug):
         return f"Phase {slug.split('_', 1)[1]} plan"
     return slug
@@ -504,6 +505,8 @@ def project_doc_slugs(project_id: str) -> list[str]:
 
 
 def project_context_file(project_id: str, slug: str) -> Path:
+    if slug == LEGACY_ROADMAP_SLUG:
+        slug = ROADMAP_DOC_SLUG
     if not is_project_doc_slug(slug) or not re.fullmatch(r"[a-z0-9-]+", project_id):
         raise ValueError("Unknown project context.")
     if not any(p.get("id") == project_id for p in read_projects()):
@@ -512,6 +515,15 @@ def project_context_file(project_id: str, slug: str) -> Path:
 
 
 def ensure_project_context(project_id: str) -> None:
+    context_dir = DATA / "projects" / project_id / "context"
+    legacy_roadmap = context_dir / f"{LEGACY_ROADMAP_SLUG}.md"
+    new_roadmap = context_dir / f"{ROADMAP_DOC_SLUG}.md"
+    if legacy_roadmap.is_file() and not new_roadmap.exists():
+        legacy_roadmap.rename(new_roadmap)
+        legacy_hist = context_dir / "history" / LEGACY_ROADMAP_SLUG
+        new_hist = context_dir / "history" / ROADMAP_DOC_SLUG
+        if legacy_hist.is_dir() and not new_hist.exists():
+            legacy_hist.rename(new_hist)
     for slug in PROJECT_CONTEXT_FILES:
         path = project_context_file(project_id, slug)
         if not path.exists():
@@ -536,6 +548,8 @@ def load_project_context(project_id: str, slug: str) -> str:
 def save_project_context_document(project_id: str, slug: str, content: str) -> str | None:
     if not is_project_doc_slug(slug):
         raise ValueError("Unknown project context document.")
+    if slug == LEGACY_ROADMAP_SLUG:
+        slug = ROADMAP_DOC_SLUG
     ensure_project_context(project_id)
     p = project_context_file(project_id, slug)
     prev = p.read_text(encoding="utf-8") if p.is_file() else ""
@@ -553,6 +567,8 @@ def save_project_context_document(project_id: str, slug: str, content: str) -> s
 def get_project_context_history(project_id: str, slug: str) -> list[dict[str, str]]:
     if not is_project_doc_slug(slug):
         return []
+    if slug == LEGACY_ROADMAP_SLUG:
+        slug = ROADMAP_DOC_SLUG
     ensure_project_context(project_id)
     folder = project_context_file(project_id, slug).parent / "history" / slug
     if not folder.is_dir():

@@ -122,7 +122,8 @@ PROJECT_CONTEXT_FILES: dict[str, str] = {
     "outcomes": "Confirmed outcomes",
 }
 
-ROADMAP_DOC_SLUG = "master_plan"
+ROADMAP_DOC_SLUG = "roadmap"
+LEGACY_ROADMAP_SLUG = "master_plan"
 PHASE_DOC_RE = re.compile(r"phase_[1-9]")
 INFO_REQUEST_MAX_ROUNDS = 2
 INFO_REQUEST_MAX_DOCS = 4
@@ -133,7 +134,7 @@ PROJECT_DOC_DESCRIPTIONS: dict[str, str] = {
     "technical_overview": "Tech stack, architecture, and repository structure.",
     "decisions": "Approved decision log.",
     "outcomes": "Confirmed delivered outcomes.",
-    ROADMAP_DOC_SLUG: "Big plan / roadmap overview.",
+    ROADMAP_DOC_SLUG: "Roadmap: phase overview and release plan.",
 }
 
 ROLE_AUTO_DOCS: dict[str, list[str]] = {
@@ -307,12 +308,12 @@ BOARD_DELTA_CONTRACT = (
 
 ROADMAP_UPDATE_CONTRACT = (
     "For a roadmap update request, return ONLY one valid JSON object, no markdown: "
-    '{"type":"roadmap_update","summary":"brief summary","master_plan":"complete Markdown big plan / roadmap",'
+    '{"type":"roadmap_update","summary":"brief summary","roadmap":"complete Markdown roadmap (phase overview)",'
     '"phases":{"phase_1":"complete Markdown phase plan"},"active_phase":1}. '
-    "master_plan is required and describes the whole plan; phases may contain phase_1 through phase_9 entries "
-    "with the complete plan for each phase (omitted phase documents stay unchanged); active_phase is the current "
+    "roadmap is required and gives the phase-level overview of the whole plan; phases may contain phase_1 through phase_9 entries "
+    "with the complete task-by-task plan for each phase (omitted phase documents stay unchanged); active_phase is the current "
     "phase number or null. Each document must be non-empty and under 20,000 characters. "
-    "The master_plan must embed a fenced json block (```json) named ait-release-plan with shape "
+    "The roadmap must embed a fenced json block (```json) named ait-release-plan with shape "
     '{"current_phase":"v0.1","current_release":"v0.1.1","phases":[{"id":"v0.1","title":"...","status":"planned|in_progress|done","releases":[{"id":"v0.1.1","title":"...","status":"planned|in_progress|done","task_ids":["T-0001"]}]}]}; '
     "keep it consistent with the task board. "
     "Request any on-request project documents you need via info_requests before answering."
