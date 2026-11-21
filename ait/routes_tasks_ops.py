@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ait.common import *
+from ait.trackers import sync_project_trackers
 
 
 def handle_tasks_ops_post(handler, path, body) -> bool:

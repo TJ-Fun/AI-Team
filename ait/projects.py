@@ -479,7 +479,9 @@ def is_project_doc_slug(slug: str) -> bool:
         slug in PROJECT_CONTEXT_FILES
         or slug == ROADMAP_DOC_SLUG
         or slug == LEGACY_ROADMAP_SLUG
+        or slug == ROADMAP_TRACKER_DOC_SLUG
         or bool(PHASE_DOC_RE.fullmatch(slug))
+        or bool(PHASE_TRACKER_DOC_RE.fullmatch(slug))
     )
 
 
@@ -488,6 +490,11 @@ def project_doc_title(slug: str) -> str:
         return PROJECT_CONTEXT_FILES[slug]
     if slug == ROADMAP_DOC_SLUG or slug == LEGACY_ROADMAP_SLUG:
         return "Roadmap"
+    if slug == ROADMAP_TRACKER_DOC_SLUG:
+        return "Roadmap tracker"
+    tracker_match = PHASE_TRACKER_DOC_RE.fullmatch(slug)
+    if tracker_match:
+        return f"Phase {slug.split('_', 1)[1].removesuffix('_tracker')} tracker"
     if PHASE_DOC_RE.fullmatch(slug):
         return f"Phase {slug.split('_', 1)[1]} plan"
     return slug
@@ -500,8 +507,20 @@ def project_phase_doc_slugs(project_id: str) -> list[str]:
     return sorted(f.stem for f in folder.glob("phase_*.md") if PHASE_DOC_RE.fullmatch(f.stem))
 
 
+def project_phase_tracker_slugs(project_id: str) -> list[str]:
+    folder = DATA / "projects" / project_id / "context"
+    if not folder.is_dir():
+        return []
+    return sorted(f.stem for f in folder.glob("phase_*_tracker.md") if PHASE_TRACKER_DOC_RE.fullmatch(f.stem))
+
+
 def project_doc_slugs(project_id: str) -> list[str]:
-    return list(PROJECT_CONTEXT_FILES) + [ROADMAP_DOC_SLUG] + project_phase_doc_slugs(project_id)
+    return (
+        list(PROJECT_CONTEXT_FILES)
+        + [ROADMAP_DOC_SLUG, ROADMAP_TRACKER_DOC_SLUG]
+        + project_phase_doc_slugs(project_id)
+        + project_phase_tracker_slugs(project_id)
+    )
 
 
 def project_context_file(project_id: str, slug: str) -> Path:

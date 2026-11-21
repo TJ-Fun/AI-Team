@@ -52,6 +52,7 @@ def handle_projects_get(handler, path, query) -> bool:
             handler.send_json({"error": "Project not found."}, HTTPStatus.NOT_FOUND)
             return True
         ensure_project_context(project_id)
+        sync_project_trackers(project_id)
         docs = [
             {"id": slug, "title": project_doc_title(slug), "content": load_project_context(project_id, slug)}
             for slug in project_doc_slugs(project_id)

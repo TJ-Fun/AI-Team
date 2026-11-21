@@ -122,6 +122,7 @@ Projects can be planned as sequential **phases** (`v0.N`) containing ordered **r
 - **Publish.** A background worker (`ait/release_publish.py`, 60s) detects a release whose tasks are all Done/Canceled, then runs `git tag` + push in the project's local checkout and `gh release create --verify-tag` (tag-only fallback when `gh` is missing; failures retry every 10 minutes). State is kept in `data/releases/{project}.json`. On success the plan block marks the release done and advances `current_release`/`current_phase`, and a chat notice is posted.
 - **Auto-advance.** When a project has no open tasks and the current release has no tasks yet, the worker queues a PM/PO planning task (`auto_release_plan`) that skips the project-overview approval gate and creates the release's tasks directly as Ready — env setup first, then dev/QA/docs work.
 - **UI.** Task cards show a release badge and the board sorts versioned tasks by release, env tasks first, then `release_order`. Paused projects (`active: false`) are skipped entirely by the publish and auto-advance pass.
+- **Trackers.** Two system-owned documents track progress: `roadmap_tracker` (per-phase Pending / In Progress / Done with done/total counts) and `phase_N_tracker` (per-task status table). `ait/trackers.py` regenerates them from the task board on task finishes, status changes, merge approvals, overview approvals, board-delta applications, and when the Project context dialog loads; they are marked do-not-edit and excluded from PM/PO planning context.
 
 ### 4.9 Agent prompts and project templates
 

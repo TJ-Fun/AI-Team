@@ -4,6 +4,7 @@ overview approval, and design reviews."""
 from __future__ import annotations
 
 from ait.common import *
+from ait.trackers import sync_project_trackers
 
 
 def handle_tasks_pm_post(handler, path, body) -> bool:
@@ -317,6 +318,7 @@ def handle_tasks_pm_post(handler, path, body) -> bool:
                         {"at": ts, "type": "plan_tasks_released", "message": f"Plan approval released {len(released)} draft work task(s): {', '.join(released)}."}
                     )
                     write_task(task)
+                    sync_project_trackers(pid)
                     DISPATCH_EVENT.set()
         handler.send_json({"task": task, "snapshots": snapshots, "released_task_ids": released})
         return True

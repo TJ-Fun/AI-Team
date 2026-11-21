@@ -294,4 +294,5 @@ def apply_board_delta_update(task: dict[str, Any]) -> dict[str, Any]:
                 else:
                     entry["result"], entry["message"] = "applied", res
         results.append(entry)
+    sync_project_trackers(pid)
     return {"snapshots": {}, "results": results}

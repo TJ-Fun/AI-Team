@@ -1,5 +1,10 @@
 # Version log
 
+## 0.126 — 2026-11-21
+
+- Added auto-generated **tracker documents**: `roadmap_tracker` (per-phase Pending / In Progress / Done with progress counts) and `phase_N_tracker` (per-task status table for each phase). New `ait/trackers.py` regenerates them deterministically from the task board — PM/PO meta tasks are excluded — and syncs on agent task finishes, manual status changes, merge approvals, overview approvals, board-delta applications, and lazily when the Project context dialog lists documents. Trackers are system-owned and marked do-not-edit; they appear in the Project context document list like other docs.
+- Updated documentation to 0.126.
+
 ## 0.125 — 2026-11-21
 
 - Renamed the project planning document from **master plan / big plan** to **Roadmap**: the context slug is now `roadmap` (legacy `master_plan` still resolves and existing `master_plan.md` files are migrated automatically, including history). `roadmap_update` payloads use the `roadmap` key; the PM/PO prompt, replan stage request, contracts, task detail/copy views, and docs all say Roadmap. Phase plans (`phase_1`–`phase_9`) remain the detailed per-phase documents.

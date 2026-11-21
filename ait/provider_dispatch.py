@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ait.common import *
 from ait.format_retry import maybe_format_retry
+from ait.trackers import sync_project_trackers
 
 
 AUTO_ORDER_CACHE: dict[str, Any] = {"at": 0.0, "order": []}

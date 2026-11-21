@@ -124,7 +124,9 @@ PROJECT_CONTEXT_FILES: dict[str, str] = {
 
 ROADMAP_DOC_SLUG = "roadmap"
 LEGACY_ROADMAP_SLUG = "master_plan"
+ROADMAP_TRACKER_DOC_SLUG = "roadmap_tracker"
 PHASE_DOC_RE = re.compile(r"phase_[1-9]")
+PHASE_TRACKER_DOC_RE = re.compile(r"phase_[1-9]_tracker")
 INFO_REQUEST_MAX_ROUNDS = 2
 INFO_REQUEST_MAX_DOCS = 4
 
@@ -135,6 +137,7 @@ PROJECT_DOC_DESCRIPTIONS: dict[str, str] = {
     "decisions": "Approved decision log.",
     "outcomes": "Confirmed delivered outcomes.",
     ROADMAP_DOC_SLUG: "Roadmap: phase overview and release plan.",
+    ROADMAP_TRACKER_DOC_SLUG: "Roadmap tracker: auto-generated phase progress.",
 }
 
 ROLE_AUTO_DOCS: dict[str, list[str]] = {
