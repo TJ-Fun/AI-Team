@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.140 · Updated 2026-11-21
+Version 0.141 · Updated 2026-11-21
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -91,8 +91,8 @@ The app checks the configured app repository for a newer version (parsed from `d
 The **Settings → About** section contains application update controls:
 
 1. Configure the repository URL and a local checkout directory, then save the configuration.
-2. On first update, the app clones to the checkout; later updates require the checkout's Git origin to match the configured repository and normally use a fast-forward-only pull. If that pull cannot fast-forward because the remote branch was force-updated or diverged, the updater fetches `origin` and hard-resets the dedicated checkout to its tracked remote branch before copying files.
-3. The updater copies repository files into the configured app working directory. For each file, the newer modification time wins. It skips `.git`, virtual environments, caches, and `node_modules`; it does not delete deployment-only files.
+2. Every update replaces the checkout with a fresh clone of the configured repository: the clone is staged in a temporary sibling directory and moved into place only after it succeeds, so a failed clone never leaves a partial checkout.
+3. The updater then mirrors the checkout into the app working directory: every repository file is copied over, and files or directories that exist only in the working directory are deleted — except protected runtime data (`data/`, `.env*` files, `*.log`, `.git`, virtual environments, `__pycache__`, and `node_modules`). Symbolic links in the working directory are refused rather than followed.
 4. After the update response is sent, the process exits and systemd restarts it. The browser waits for the service to answer before reloading.
 
 The service must have both systemd write permission (`ReadWritePaths`) and Unix write permission for the checkout and app working directory. Repository and working directories must not overlap. The app updater does not elevate privileges.
@@ -316,5 +316,5 @@ There is no dedicated automated test suite declared in the repository. Exercise 
 - No user accounts or built-in authentication; intended for one trusted operator.
 - No built-in reverse proxy, TLS, firewall, or Oracle Cloud security-list provisioning.
 - UI documentation and local file browsing are read-only.
-- App updates preserve files that are newer by modification time and do not delete files absent from Git; this can retain obsolete deployment files.
+- App updates mirror the repository into the working directory and delete files absent from it; only protected runtime paths (`data/`, `.env*`, logs, virtual environments, caches) survive. There is no rollback — back up before major changes.
 - The repository does not record every command historically run on an Oracle server. Use the deployment commands above as a reviewed procedure, then maintain host-specific changes in a protected operations runbook.

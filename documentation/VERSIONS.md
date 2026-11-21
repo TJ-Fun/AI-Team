@@ -1,5 +1,10 @@
 # Version log
 
+## 0.141 — 2026-11-21
+
+- Documentation gap fixes (batch 2 of 4): rewrote the app-update description to match the actual implementation — every update performs a fresh clone into the checkout (staged + atomic replace), then `sync_app_files` mirrors the checkout into the working directory and deletes stale files while protecting `data/`, `.env*`, logs, `.git`, virtualenvs, `__pycache__`, and `node_modules`. Updated `DOCUMENTATION.md` §4.5/§9 and the README App Update paragraph; removed the stale "mtime wins / never deletes" claims.
+- Updated documentation to 0.141.
+
 ## 0.140 — 2026-11-21
 
 - Documentation gap fixes (batch 1 of 4): corrected the §2 repository map — removed the deleted `ait/projects.py`, added `routing.py`, `tasks_store.py`, `projects_store.py`, `project_context.py`, `replan.py`, `replan_stages.py`, and `outcomes.py`, listed the `provider-*.js` frontend modules, and fixed a stale `ait/projects.py` reference in §4.9.
