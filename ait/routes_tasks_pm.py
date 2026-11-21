@@ -23,46 +23,43 @@ def handle_tasks_pm_post(handler, path, body) -> bool:
                 return True
             handler.send_json({"task": task}, HTTPStatus.CREATED)
             return True
-        specs = {
-            "docs": (
-                "doc_update",
-                "Update project documentation",
-                "Review the project's current documents and task board, then propose updated versions of the four "
-                "PM-writable project documents (project_brief, technical_overview, decisions, outcomes). project_vision "
-                "is user-owned and must not be included. Request any "
-                "on-request documents you need via info_requests before answering. Keep confirmed facts, mark "
-                "assumptions, and keep each document under 20,000 characters.",
-            ),
-        }
-        spec = specs.get(kind)
-        if not spec:
-            handler.send_json({"error": "kind must be 'docs' or 'roadmap'."}, HTTPStatus.BAD_REQUEST)
+        if kind == "docs":
+            tasks = []
+            for slug in DOC_UPDATE_SLUGS:
+                doc_title = project_doc_title(slug)
+                tid = next_task_id()
+                ts = now_iso()
+                task = {
+                    "id": tid,
+                    "task_type": "doc_update",
+                    "doc_slug": slug,
+                    "title": f"Update project documentation: {doc_title}: {proj.get('name', pid)}",
+                    "request": (
+                        "Review the project's current documents and task board, then propose an updated version "
+                        f"of the {doc_title} document ({slug}) only. project_vision is user-owned and must not be "
+                        "included. Request any on-request documents you need via info_requests before answering. "
+                        "Keep confirmed facts, mark assumptions, and keep the document under 20,000 characters."
+                    ),
+                    "project_id": pid,
+                    "module_id": "",
+                    "assigned_role": "PM/PO",
+                    "provider": "Automatic",
+                    "status": "Ready",
+                    "produces_deliverable": False,
+                    "acceptance_checks": [],
+                    "attempts": [],
+                    "validation": None,
+                    "created_at": ts,
+                    "updated_at": ts,
+                    "dispatch_note": "Update request queued for the PM/PO agent.",
+                    "activity": [{"at": ts, "type": "created", "message": f"Project document update ({slug}) requested by user."}],
+                }
+                write_task(task)
+                tasks.append(task)
+            DISPATCH_EVENT.set()
+            handler.send_json({"tasks": tasks}, HTTPStatus.CREATED)
             return True
-        task_type, title, request = spec
-        tid = next_task_id()
-        ts = now_iso()
-        task = {
-            "id": tid,
-            "task_type": task_type,
-            "title": f"{title}: {proj.get('name', pid)}",
-            "request": request,
-            "project_id": pid,
-            "module_id": "",
-            "assigned_role": "PM/PO",
-            "provider": "Automatic",
-            "status": "Ready",
-            "produces_deliverable": False,
-            "acceptance_checks": [],
-            "attempts": [],
-            "validation": None,
-            "created_at": ts,
-            "updated_at": ts,
-            "dispatch_note": "Update request queued for the PM/PO agent.",
-            "activity": [{"at": ts, "type": "created", "message": f"{title} requested by user."}],
-        }
-        write_task(task)
-        DISPATCH_EVENT.set()
-        handler.send_json({"task": task}, HTTPStatus.CREATED)
+        handler.send_json({"error": "kind must be 'docs' or 'roadmap'."}, HTTPStatus.BAD_REQUEST)
         return True
 
     m_chain_decision = re.fullmatch(r"/api/tasks/(T-\d{4,})/chain-plan-decision", path)

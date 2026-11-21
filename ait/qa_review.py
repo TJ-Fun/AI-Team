@@ -208,7 +208,8 @@ def planning_contract_for_task(task: dict[str, Any]) -> str:
     if tt == "pm_escalation":
         return ESCALATION_CONTRACT
     if tt == "doc_update":
-        return DOC_UPDATE_CONTRACT
+        slug = str(task.get("doc_slug") or "").strip()
+        return doc_update_contract(slug) if slug else DOC_UPDATE_CONTRACT
     if tt == "roadmap_update":
         return ROADMAP_UPDATE_CONTRACT
     if tt == "doc_edit":

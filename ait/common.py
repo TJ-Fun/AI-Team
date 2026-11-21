@@ -283,6 +283,23 @@ DOC_UPDATE_CONTRACT = (
     "To request on-request project documents, reply with ONLY {\"info_requests\":[\"slug\", ...]} and no other fields; the documents will be provided and you must then continue with your final structured reply."
 )
 
+DOC_UPDATE_SLUGS: tuple[str, ...] = ("project_brief", "technical_overview", "decisions", "outcomes")
+
+
+def doc_update_contract(slug: str) -> str:
+    """Contract for a single-document doc_update task."""
+    key = str(slug or "").strip()
+    if key not in DOC_UPDATE_SLUGS:
+        key = DOC_UPDATE_SLUGS[0]
+    return (
+        "For a project-document update request, return ONLY one valid JSON object, no markdown: "
+        f'{{"type":"doc_update","summary":"brief summary","documents":{{"{key}":"complete Markdown document"}}}}. '
+        f"Return the full updated text of the {key} document only, preserving confirmed facts, marking "
+        "assumptions, and reflecting the current task board. The document must be non-empty and under "
+        "20,000 characters. Never include project_vision — it is user-owned and read-only for you. "
+        "To request on-request project documents, reply with ONLY {\"info_requests\":[\"slug\", ...]} and no other fields; the documents will be provided and you must then continue with your final structured reply."
+    )
+
 CHAIN_PLAN_CONTRACT = (
     "For a replan chain stage planning request, return ONLY one valid JSON object, no markdown: "
     '{"type":"chain_plan","summary":"brief summary","subtasks":[{"title":"short title",'

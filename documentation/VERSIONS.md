@@ -1,5 +1,10 @@
 # Version log
 
+## 0.146 — 2026-11-21
+
+- Split **Update docs** into one task per document: `POST /api/doc-updates` with `kind: "docs"` now creates four `doc_update` tasks (one per `doc_slug`: project brief, technical overview, decision log, confirmed outcomes), each with its own single-document contract (`doc_update_contract(slug)`), slug-scoped reply parser, and independent approval. Reply size drops to roughly a quarter of the previous all-four-documents payload, avoiding provider output-token truncation. Tasks without `doc_slug` (created before this change) keep the legacy four-document contract and parser.
+- Updated documentation to 0.146.
+
 ## 0.145 — 2026-11-21
 
 - Hardened the `info_requests` follow-up loop (`ait/info_requests.py`): when an agent re-requests documents it already received, the app now resends them with an explicit "do not request them again" note and continues the attempt instead of immediately failing; if the agent still ends on an `info_requests` reply after all rounds, the attempt fails as a format error naming the already-provided documents (actionable format-retry feedback) instead of a generic "must have type" parse error. `requested_documents_text` now tells the agent not to re-request, and `extract_info_requests` logs a warning when valid slugs are dropped over the 4-document cap.

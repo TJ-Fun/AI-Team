@@ -38,13 +38,18 @@ def _clean_doc_text(value: Any, label: str) -> str:
     return text
 
 
-def parse_doc_update_response(reply: str) -> dict[str, str]:
+def parse_doc_update_response(reply: str, slug: str | None = None) -> dict[str, str]:
     data = _parse_reply_json(reply)
     if data.get("type") != "doc_update":
         raise ValueError("Document update reply must have type 'doc_update'.")
     docs = data.get("documents")
     if not isinstance(docs, dict):
         raise ValueError("Document update reply needs a 'documents' object.")
+    key = str(slug or "").strip()
+    if key:
+        if key not in DOC_UPDATE_SLUGS:
+            raise ValueError(f"Unknown document slug: {key}.")
+        return {key: _clean_doc_text(docs.get(key), project_doc_title(key))}
     cleaned: dict[str, str] = {}
     for slug in DOC_UPDATE_SLUGS:
         cleaned[slug] = _clean_doc_text(docs.get(slug), project_doc_title(slug))
@@ -138,7 +143,10 @@ def _finish_update_task(task: dict[str, Any], reply: str, provider: str, parser,
 
 
 def finish_doc_update_task(task: dict[str, Any], reply: str, provider: str) -> tuple[str, str]:
-    return _finish_update_task(task, reply, provider, parse_doc_update_response, "project document update")
+    slug = str(task.get("doc_slug") or "").strip() or None
+    return _finish_update_task(
+        task, reply, provider, lambda r: parse_doc_update_response(r, slug), "project document update"
+    )
 
 
 def finish_roadmap_update_task(task: dict[str, Any], reply: str, provider: str) -> tuple[str, str]:
