@@ -1,5 +1,10 @@
 # Version log
 
+## 0.135 — 2026-11-21
+
+- Chat-driven document edits (batch 1 of 4): added the `doc_edit` task type — `PROJECT_DOCS_UPDATE_CONTRACT` in `ait/common.py`, parser/finish/apply plus `create_doc_edit_task` in `ait/doc_updates.py`, contract mapping in `ait/qa_review.py`, and the dispatch finish branch in `ait/provider_dispatch.py`. Editable scope: `project_brief`, `technical_overview`, `decisions`, `outcomes`, `roadmap`, `phase_1`–`phase_9` (+ optional `active_phase`); `project_vision` and trackers stay read-only. Type is inert until the chat action lands in batch 2.
+- Updated documentation to 0.135.
+
 ## 0.134 — 2026-11-21
 
 - Split `ait/projects.py` (batch 2 of 2, complete): extracted project CRUD/validation into `ait/projects_store.py`, per-project context documents into `ait/project_context.py`, and moved chat-history persistence into `ait/chat.py`. `ait/projects.py` is deleted; `ait/__init__.py` registers the new modules in the shared namespace. No call-site changes.

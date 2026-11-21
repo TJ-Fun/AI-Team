@@ -332,6 +332,17 @@ ROADMAP_UPDATE_CONTRACT = (
     "Request any on-request project documents you need via info_requests before answering."
 )
 
+PROJECT_DOCS_UPDATE_CONTRACT = (
+    "For a project-document edit request, return ONLY one valid JSON object, no markdown: "
+    '{"type":"doc_edit","summary":"brief summary","documents":{"<slug>":"complete Markdown document"},'
+    '"active_phase":1}. '
+    "Include only the documents that change, each with its full updated text (non-empty, under 20,000 characters). "
+    "Editable slugs: project_brief, technical_overview, decisions, outcomes, roadmap, phase_1 through phase_9. "
+    "Never include project_vision or tracker documents — they are read-only. "
+    "Set active_phase only when the roadmap's active phase changes; otherwise use null. "
+    "Request any on-request project documents you need via info_requests before answering."
+)
+
 STATE_LOCK = threading.RLock()
 DISPATCH_EVENT = threading.Event()
 

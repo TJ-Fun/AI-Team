@@ -7,8 +7,16 @@ from ait.format_retry import maybe_format_retry
 
 
 DOC_UPDATE_SLUGS = ("project_brief", "technical_overview", "decisions", "outcomes")
-DOC_UPDATE_TASK_TYPES = ("doc_update", "roadmap_update", "vision_update", "board_delta")
+DOC_UPDATE_TASK_TYPES = ("doc_update", "roadmap_update", "vision_update", "board_delta", "doc_edit")
+DOC_EDIT_CORE_SLUGS = ("project_brief", "technical_overview", "decisions", "outcomes")
+DOC_EDIT_STATIC_SLUGS = frozenset(DOC_EDIT_CORE_SLUGS) | {ROADMAP_DOC_SLUG}
 MAX_DOC_CHARS = 20000
+MAX_DOC_EDIT_REQUEST_CHARS = 8000
+
+
+def is_doc_edit_slug(slug: str) -> bool:
+    """True for PM/PO-editable docs: 4 core docs, roadmap, phase_N. Excludes vision/trackers."""
+    return slug in DOC_EDIT_STATIC_SLUGS or bool(PHASE_DOC_RE.fullmatch(slug))
 
 
 def _parse_reply_json(reply: str) -> dict[str, Any]:
@@ -69,6 +77,30 @@ def parse_roadmap_update_response(reply: str) -> dict[str, Any]:
     return {"roadmap": roadmap, "phases": phases, "active_phase": active_phase}
 
 
+def parse_doc_edit_response(reply: str) -> dict[str, Any]:
+    data = _parse_reply_json(reply)
+    if data.get("type") != "doc_edit":
+        raise ValueError("Document edit reply must have type 'doc_edit'.")
+    docs = data.get("documents")
+    if not isinstance(docs, dict) or not docs:
+        raise ValueError("Document edit reply needs a non-empty 'documents' object.")
+    cleaned: dict[str, str] = {}
+    for slug, value in docs.items():
+        key = str(slug).strip()
+        if not is_doc_edit_slug(key):
+            raise ValueError(f"Document '{key or '(empty)'}' cannot be edited by PM/PO.")
+        cleaned[key] = _clean_doc_text(value, project_doc_title(key))
+    active_phase = data.get("active_phase")
+    if active_phase is not None:
+        try:
+            active_phase = int(active_phase)
+        except (TypeError, ValueError):
+            raise ValueError("active_phase must be a phase number or null.") from None
+        if not 1 <= active_phase <= 9:
+            raise ValueError("active_phase must be between 1 and 9.")
+    return {"documents": cleaned, "active_phase": active_phase}
+
+
 def _finish_update_task(task: dict[str, Any], reply: str, provider: str, parser, label: str) -> tuple[str, str]:
     try:
         payload = parser(reply)
@@ -113,6 +145,20 @@ def finish_roadmap_update_task(task: dict[str, Any], reply: str, provider: str) 
     return _finish_update_task(task, reply, provider, parse_roadmap_update_response, "roadmap update")
 
 
+def finish_doc_edit_task(task: dict[str, Any], reply: str, provider: str) -> tuple[str, str]:
+    return _finish_update_task(task, reply, provider, parse_doc_edit_response, "project document edit")
+
+
+def _apply_active_phase(pid: str, active_phase: Any) -> None:
+    if active_phase is None:
+        return
+    projects = read_projects()
+    for proj in projects:
+        if proj.get("id") == pid:
+            proj["active_phase"] = active_phase
+    save_projects(projects)
+
+
 def apply_doc_update(task: dict[str, Any]) -> dict[str, Any]:
     """Write an approved update payload to project documents. Returns snapshot info."""
     pid = str(task.get("project_id") or "default")
@@ -130,13 +176,55 @@ def apply_doc_update(task: dict[str, Any]) -> dict[str, Any]:
         snapshots[ROADMAP_DOC_SLUG] = save_project_context_document(pid, ROADMAP_DOC_SLUG, str(payload.get("roadmap") or payload.get("master_plan") or ""))
         for slug, content in (payload.get("phases") or {}).items():
             snapshots[slug] = save_project_context_document(pid, slug, str(content))
-        if payload.get("active_phase") is not None:
-            projects = read_projects()
-            for proj in projects:
-                if proj.get("id") == pid:
-                    proj["active_phase"] = payload["active_phase"]
-            save_projects(projects)
+        _apply_active_phase(pid, payload.get("active_phase"))
+    elif task.get("task_type") == "doc_edit":
+        for slug, content in (payload.get("documents") or {}).items():
+            key = str(slug).strip()
+            if is_doc_edit_slug(key):
+                snapshots[key] = save_project_context_document(pid, key, str(content))
+        _apply_active_phase(pid, payload.get("active_phase"))
     return {"snapshots": snapshots}
+
+
+def create_doc_edit_task(project_id: str, request: str, documents: list[str] | None = None) -> dict[str, Any]:
+    """Create a Ready doc_edit task from an agreed chat change. Returns the task."""
+    pid = str(project_id or "default")
+    req = str(request or "").strip()
+    if not req:
+        raise ValueError("A document edit request is required.")
+    if len(req) > MAX_DOC_EDIT_REQUEST_CHARS:
+        raise ValueError("Document edit request is too long.")
+    targets = [str(s).strip() for s in (documents or []) if is_doc_edit_slug(str(s).strip())]
+    target_text = ", ".join(targets) if targets else "the documents discussed in the conversation"
+    ts = now_iso()
+    tid = next_task_id()
+    task = {
+        "id": tid,
+        "task_type": "doc_edit",
+        "title": "PM/PO document edit: " + re.sub(r"\s+", " ", req)[:110],
+        "request": (
+            "Apply this agreed project-document change:\n\n" + req
+            + f"\n\nTarget documents: {target_text}. "
+            "Request the current versions you need via info_requests, then return the full updated text "
+            "for each document you change under the doc_edit contract. Only include documents that actually change."
+        ),
+        "project_id": pid,
+        "module_id": "",
+        "assigned_role": "PM/PO",
+        "provider": "Automatic",
+        "status": "Ready",
+        "produces_deliverable": False,
+        "acceptance_checks": [],
+        "attempts": [],
+        "validation": None,
+        "created_at": ts,
+        "updated_at": ts,
+        "dispatch_note": "Document edit queued for the PM/PO agent.",
+        "activity": [{"at": ts, "type": "created", "message": "Document edit requested from PM/PO chat."}],
+    }
+    write_task(task)
+    DISPATCH_EVENT.set()
+    return task
 
 
 def decide_doc_update(task_id: str, decision: str) -> dict[str, Any]:
