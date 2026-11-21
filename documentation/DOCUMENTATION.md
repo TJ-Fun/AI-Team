@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.151 · Updated 2026-11-22
+Version 0.152 · Updated 2026-11-22
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 

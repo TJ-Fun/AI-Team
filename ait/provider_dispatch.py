@@ -236,6 +236,17 @@ def bump_provider_activity(provider: str, delta: int) -> None:
     ACTIVE_PROVIDER_COUNTS[provider] = max(0, ACTIVE_PROVIDER_COUNTS.get(provider, 0) + delta)
 
 
+def _expects_repo_manifest(task: dict[str, Any], qa_active: bool) -> bool:
+    """True when the task reply must be a GitHub file-change manifest."""
+    if qa_active:
+        return False
+    role = str(task.get("assigned_role") or "")
+    if role not in ("Frontend developer", "Backend developer", "Documentation"):
+        return False
+    proj = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
+    return bool(proj and proj.get("repository"))
+
+
 def dispatch_one_for_provider(provider: str) -> bool:
     task = claim_task_for_provider(provider)
     if not task:
@@ -252,7 +263,9 @@ def dispatch_one_for_provider(provider: str) -> bool:
         reply_raw = reply
         finish = str((meta or {}).get("finish_reason") or "").strip().lower()
         if finish in ("length", "max_tokens") and (
-            planning_contract_for_task(task) or needs_work_reply_envelope(task)
+            planning_contract_for_task(task)
+            or needs_work_reply_envelope(task)
+            or _expects_repo_manifest(task, qa_active)
         ):
             raise ProviderFailure(
                 provider,
@@ -348,14 +361,11 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 DISPATCH_EVENT.set()
                 return True
 
-        proj = next((p for p in read_projects() if p.get("id") == (task.get("project_id") or "default")), None)
-        if (
-            proj
-            and proj.get("repository")
-            and not qa_active
-            and task.get("assigned_role") in ("Frontend developer", "Backend developer", "Documentation")
-        ):
-            apply_repository_manifest(task, reply, provider, attempt_num)
+        if _expects_repo_manifest(task, qa_active):
+            try:
+                apply_repository_manifest(task, reply, provider, attempt_num)
+            except ValueError as exc:
+                raise ProviderFailure(provider, 400, str(exc), error_kind="format") from exc
 
         with STATE_LOCK:
             fresh = read_task(tid)

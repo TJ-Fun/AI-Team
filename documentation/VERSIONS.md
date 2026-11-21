@@ -1,5 +1,10 @@
 # Version log
 
+## 0.152 — 2026-11-22
+
+- Fixed repo-manifest tasks (Frontend/Backend/Documentation on repository projects) failing as retryable "API error 503" instead of actionable format errors: `apply_repository_manifest` `ValueError`s (truncated JSON, too many files, unsafe paths, disallowed extensions) are now wrapped as `ProviderFailure(400, error_kind="format")` in `ait/provider_dispatch.py`, so `maybe_format_retry` feeds the exact problem back to the agent. The `finish_reason=length`/`MAX_TOKENS` truncation check now also covers file-change manifest replies via the new `_expects_repo_manifest` helper — previously it only applied to planning contracts and work envelopes, so truncated manifests surfaced as misleading parse errors.
+- Updated documentation to 0.152.
+
 ## 0.151 — 2026-11-22
 
 - The notification center now surfaces tasks parked in **Needs approval** for the whole doc-update family (`doc_update`, `roadmap_update`, `vision_update`, `board_delta`, `doc_edit`) in `ait/notifications.py` — previously only project-overview, design-review, and chain-plan approvals notified, so per-document update proposals sat silently. Titles include the target document name (e.g. "Document update needs approval — Confirmed outcomes"); each notification links to the task.
