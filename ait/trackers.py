@@ -21,6 +21,7 @@ TRACKER_EXCLUDED_TYPES = {
     "design_review",
     "doc_update",
     "roadmap_update",
+    "doc_edit",
     "chain_plan",
     "chain_review",
     "chain_doc",

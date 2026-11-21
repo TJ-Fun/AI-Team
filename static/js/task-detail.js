@@ -50,7 +50,7 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
     const providerFeedback = $("#detail-provider-feedback");
     if (providerRow && providerSelect) {
       const showProviderRow =
-        !["clarification_question", "project_overview", "design_review", "pm_escalation", "doc_update", "roadmap_update"].includes(task.task_type);
+        !["clarification_question", "project_overview", "design_review", "pm_escalation", "doc_update", "roadmap_update", "doc_edit"].includes(task.task_type);
       providerRow.hidden = !showProviderRow;
       if (showProviderRow) {
         const canChange = !["In progress", "Done", "Canceled"].includes(task.status);
@@ -230,7 +230,7 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
 
     // Project document / roadmap / chain plan update section
     const updSec = $("#detail-update-section");
-    const isUpdateTask = ["doc_update", "roadmap_update", "chain_plan", "vision_update", "board_delta"].includes(task.task_type);
+    const isUpdateTask = ["doc_update", "roadmap_update", "doc_edit", "chain_plan", "vision_update", "board_delta"].includes(task.task_type);
     if (task.task_type === "board_delta" && task.update_payload) {
       updSec.hidden = false;
       const payload = task.update_payload;
@@ -277,7 +277,7 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
               ([key]) => !["type", "summary"].includes(key)
             );
       const meta =
-        task.task_type === "roadmap_update" && payload.active_phase != null
+        ["roadmap_update", "doc_edit"].includes(task.task_type) && payload.active_phase != null
           ? `<p class="draft-note"><strong>Active phase:</strong> ${escapeHtml(String(payload.active_phase))}</p>`
           : "";
       $("#detail-update-body").innerHTML =

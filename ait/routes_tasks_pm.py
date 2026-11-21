@@ -8,57 +8,6 @@ from ait.trackers import sync_project_trackers
 
 
 def handle_tasks_pm_post(handler, path, body) -> bool:
-    if path == "/api/pm-requests":
-        req_text = str(body.get("request", "")).strip()
-        if not req_text or len(req_text) > 12000:
-            handler.send_json({"error": "Describe a project request under 12,000 characters."}, HTTPStatus.BAD_REQUEST)
-            return True
-        pid = str(body.get("project_id") or "default")
-        if not any(p.get("id") == pid for p in read_projects()):
-            handler.send_json({"error": "Choose a valid project."}, HTTPStatus.BAD_REQUEST)
-            return True
-        tid = next_task_id()
-        ts = now_iso()
-        task = {
-            "id": tid,
-            "task_type": "pm_planning",
-            "title": "PM/PO planning: " + re.sub(r"\s+", " ", req_text)[:130],
-            "request": req_text,
-            "original_request": req_text,
-            "project_id": pid,
-            "module_id": "",
-            "planning_root_id": tid,
-            "planning_round": 1,
-            "assigned_role": "PM/PO",
-            "provider": "Automatic",
-            "status": "Ready",
-            "produces_deliverable": False,
-            "acceptance_checks": [],
-            "attempts": [],
-            "validation": None,
-            "created_at": ts,
-            "updated_at": ts,
-            "dispatch_note": "Planning request queued for the PM/PO agent.",
-            "activity": [{"at": ts, "type": "created", "message": "Project request sent to PM/PO from chat."}],
-        }
-        write_task(task)
-        hist = read_chat_history(pid)
-        hist.extend(
-            [
-                {"role": "user", "content": req_text, "at": ts},
-                {
-                    "role": "assistant",
-                    "content": f"I sent this request to PM/PO as {tid}. It will return clarification questions or a proposed backlog on the task board.",
-                    "at": ts,
-                    "task_id": tid,
-                },
-            ]
-        )
-        write_chat_history(hist, pid)
-        DISPATCH_EVENT.set()
-        handler.send_json({"task": task}, HTTPStatus.CREATED)
-        return True
-
     if path == "/api/doc-updates":
         kind = str(body.get("kind", "")).strip()
         pid = str(body.get("project_id") or "default")

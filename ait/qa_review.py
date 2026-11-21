@@ -225,7 +225,7 @@ def planning_contract_for_task(task: dict[str, Any]) -> str:
 
 
 def needs_work_reply_envelope(task: dict[str, Any]) -> bool:
-    if task.get("task_type") in ("pm_planning", "pm_escalation", "doc_update", "roadmap_update", "chain_plan", "chain_doc", "vision_update", "board_delta") or task.get("qa_attempt_active"):
+    if task.get("task_type") in ("pm_planning", "pm_escalation", "doc_update", "roadmap_update", "doc_edit", "chain_plan", "chain_doc", "vision_update", "board_delta") or task.get("qa_attempt_active"):
         return False
     role = str(task.get("assigned_role") or "")
     if role in ("Frontend developer", "Backend developer", "Documentation"):

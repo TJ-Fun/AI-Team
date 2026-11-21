@@ -1,6 +1,6 @@
 import { $, escapeHtml, state, api, appAlert, appConfirm } from "./core.js";
 
-export function initChat({ refreshBoard } = {}) {
+export function initChat() {
   // --- PM/PO Chat ---
   const messagesEl = $("#messages");
   const chatForm = $("#chat-form");
@@ -62,32 +62,6 @@ export function initChat({ refreshBoard } = {}) {
       chatMessages = [...chatMessages, { role: "assistant", content: err.message }];
       renderChatMessages(chatMessages);
     } finally {
-      $("#send-button").disabled = false;
-      chatInput.focus();
-    }
-  });
-
-  $("#plan-request")?.addEventListener("click", async () => {
-    const text = chatInput.value.trim();
-    if (!text) {
-      appAlert("Type a request to plan first.", "Nothing to plan");
-      chatInput.focus();
-      return;
-    }
-    const planBtn = $("#plan-request");
-    planBtn.disabled = true;
-    $("#send-button").disabled = true;
-    try {
-      await api("/api/pm-requests", {
-        method: "POST",
-        body: JSON.stringify({ request: text, project_id: state.activeProjectId }),
-      });
-      chatInput.value = "";
-      await Promise.all([loadChat(), refreshBoard()]);
-    } catch (err) {
-      appAlert(err.message);
-    } finally {
-      planBtn.disabled = false;
       $("#send-button").disabled = false;
       chatInput.focus();
     }

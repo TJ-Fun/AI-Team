@@ -1,5 +1,10 @@
 # Version log
 
+## 0.137 — 2026-11-21
+
+- Chat-driven document edits (batch 3 of 4): removed the confusing "Plan" chat button, its `chat.js` handler, the unused `initChat` param, and the `/api/pm-requests` endpoint (`pm_planning` tasks remain for internal clarification follow-ups). `doc_edit` tasks now render in the task-detail update section with approve/reject actions, are excluded from the work reply envelope and phase trackers, and the chat notice explains the confirm-then-approve flow.
+- Updated documentation to 0.137.
+
 ## 0.136 — 2026-11-21
 
 - Chat-driven document edits (batch 2 of 4): the PM/PO chat can now emit a `doc_edit_request` JSON action after the user confirms a change. `extract_doc_edit_request` in `ait/info_requests.py` validates it, `chat_system_prompt` in `ait/chat.py` teaches the protocol, and `POST /api/chat` in `ait/http_handler.py` creates a Ready `doc_edit` task via `create_doc_edit_task`, posts a chat notice with the task id, and logs a `chat_doc_edit_requested` event. Non-JSON replies are unaffected.
