@@ -212,7 +212,7 @@ def call_gemini_task(task: dict[str, Any], extra_context: str = "", model_overri
     return text, {"usage_metadata": usage, "finish_reason": finish, "streamed": True}
 
 
-def _openai_payload(task: dict[str, Any], provider: str, cfg: dict[str, Any], role: str, prompt: str, contract: str) -> dict[str, Any]:
+def _openai_payload(cfg: dict[str, Any], role: str, prompt: str, contract: str) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": cfg["model"],
         "messages": [
@@ -227,7 +227,7 @@ def _openai_payload(task: dict[str, Any], provider: str, cfg: dict[str, Any], ro
     if cfg["max_tokens_key"] == "max_completion_tokens":
         payload["max_completion_tokens"] = int(cfg["fixed_max_tokens"])
     else:
-        payload["max_tokens"] = 4096 if task.get("task_type") == "pm_planning" else 2048
+        payload["max_tokens"] = 8192
     return payload
 
 
@@ -339,7 +339,7 @@ def call_openai_compatible_task(task: dict[str, Any], provider: str, extra_conte
     if not api_key:
         raise ProviderFailure(provider, 401, f"{provider} API key is not configured.")
     role, prompt, contract = _task_prompt(task, provider, extra_context)
-    payload = _openai_payload(task, provider, cfg, role, prompt, contract)
+    payload = _openai_payload(cfg, role, prompt, contract)
     headers = _openai_headers(provider, api_key, cfg)
     endpoint = cfg["endpoint"]
 

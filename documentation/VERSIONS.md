@@ -1,5 +1,10 @@
 # Version log
 
+## 0.119 — 2026-11-21
+
+- Raised OpenAI-compatible task `max_tokens` to 8192 so long report/contract replies (for example replan review subtasks) are not truncated mid-JSON before envelope parsing. Providers using `max_completion_tokens` (GroqCloud) already sent 8192 and are unchanged; `_openai_payload` was simplified now that `task`/`provider` parameters were unused.
+- Updated documentation to 0.119.
+
 ## 0.118 — 2026-11-21
 
 - Fixed `maybe_format_retry` namespace registration: `ait/format_retry.py` is now imported and included in `ait/__init__.py`'s shared module namespace, so `write_task` is injected and format-correction retries can persist/requeue tasks instead of raising `NameError`. Verified the two-retry cap with a disposable data dir.
