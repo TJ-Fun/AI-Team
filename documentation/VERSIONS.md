@@ -1,5 +1,10 @@
 # Version log
 
+## 0.132 — 2026-11-21
+
+- Split `static/js/providers.js` (batch 3 of 3, complete): extracted the connections UI — provider list rendering, credential save/test/clear, reorder, add-provider, and per-provider model selects — into `provider-connections.js`. `providers.js` is now a ~70-line orchestrator composing `provider-shared.js`, `provider-chat-select.js`, `provider-routing.js`, and `provider-connections.js`; the exported API is unchanged.
+- Updated documentation to 0.132.
+
 ## 0.131 — 2026-11-21
 
 - Split `static/js/providers.js` (batch 2 of 3): extracted the routing UI — route rows rendering, model cache, accordion, add/remove/reorder/test handlers, and the routing form submit — into `provider-routing.js`. `providers.js` is now ~420 lines; the exported API is unchanged.
