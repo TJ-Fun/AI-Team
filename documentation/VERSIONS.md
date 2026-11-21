@@ -1,5 +1,10 @@
 # Version log
 
+## 0.147 — 2026-11-21
+
+- Documentation for the per-document **Update docs** split (0.146): `DOCUMENTATION.md` §4.2 now describes the four independent `doc_update` tasks with `doc_slug` and single-document contracts, their independent approvals, and the legacy four-document behavior for pre-split tasks.
+- Updated documentation to 0.147.
+
 ## 0.146 — 2026-11-21
 
 - Split **Update docs** into one task per document: `POST /api/doc-updates` with `kind: "docs"` now creates four `doc_update` tasks (one per `doc_slug`: project brief, technical overview, decision log, confirmed outcomes), each with its own single-document contract (`doc_update_contract(slug)`), slug-scoped reply parser, and independent approval. Reply size drops to roughly a quarter of the previous all-four-documents payload, avoiding provider output-token truncation. Tasks without `doc_slug` (created before this change) keep the legacy four-document contract and parser.
