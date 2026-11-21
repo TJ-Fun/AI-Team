@@ -1,5 +1,10 @@
 # Version log
 
+## 0.142 — 2026-11-21
+
+- Documentation gap fixes (batch 3 of 4): documented the staged replan chain as new §4.10 (Major replan → Review/Docs/Roadmap/Board delta stages, `chain_plan` approvals, sequential subtasks, `board_delta` mutations, chain cancellation rules), renamed "Update roadmap" to the actual **Major replan** button label, replaced the `master_plan` slug reference with `roadmap`, noted the `vision_update` task type, and re-applied the lost `ait/projects.py` → `ait/project_context.py` fix in §4.9.
+- Updated documentation to 0.142.
+
 ## 0.141 — 2026-11-21
 
 - Documentation gap fixes (batch 2 of 4): rewrote the app-update description to match the actual implementation — every update performs a fresh clone into the checkout (staged + atomic replace), then `sync_app_files` mirrors the checkout into the working directory and deletes stale files while protecting `data/`, `.env*`, logs, `.git`, virtualenvs, `__pycache__`, and `node_modules`. Updated `DOCUMENTATION.md` §4.5/§9 and the README App Update paragraph; removed the stale "mtime wins / never deletes" claims.
