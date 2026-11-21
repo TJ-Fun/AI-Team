@@ -222,10 +222,26 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
       ovSec.hidden = true;
     }
 
-    // Project document / roadmap update section
+    // Project document / roadmap / chain plan update section
     const updSec = $("#detail-update-section");
-    const isUpdateTask = ["doc_update", "roadmap_update"].includes(task.task_type);
-    if (isUpdateTask && task.update_payload) {
+    const isUpdateTask = ["doc_update", "roadmap_update", "chain_plan"].includes(task.task_type);
+    if (task.task_type === "chain_plan" && task.chain_plan) {
+      updSec.hidden = false;
+      const plan = task.chain_plan;
+      const subs = plan.subtasks || [];
+      $("#detail-update-body").innerHTML =
+        `<p class="draft-note"><strong>Stage:</strong> ${escapeHtml(plan.stage || task.chain_stage || "")}</p>` +
+        (plan.summary ? `<p class="draft-note">${escapeHtml(plan.summary)}</p>` : "") +
+        `<ol class="chain-subtask-list">` +
+        subs
+          .map(
+            (s, i) =>
+              `<li><strong>${escapeHtml(s.title || "")}</strong> <span class="muted">[${escapeHtml(s.kind || "")}]</span><br><span class="muted">${escapeHtml(s.request || "")}</span></li>`
+          )
+          .join("") +
+        `</ol>` +
+        `<p class="draft-note">Subtasks run one at a time after approval. Rejecting cancels the whole replan chain.</p>`;
+    } else if (isUpdateTask && task.update_payload) {
       updSec.hidden = false;
       const payload = task.update_payload;
       const entries =

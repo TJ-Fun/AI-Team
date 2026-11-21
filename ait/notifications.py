@@ -125,10 +125,18 @@ def get_notifications() -> list[dict[str, Any]]:
                     "task_id": tid,
                 }
             )
-        if t.get("status") == "Needs approval" and task_type in ("project_overview", "design_review"):
+        if t.get("status") == "Needs approval" and task_type in ("project_overview", "design_review", "chain_plan"):
             if task_type == "project_overview":
                 decision_title = "Project overview needs approval"
                 decision_message = "PM/PO proposed project vision, brief, technical overview, and decisions for your review."
+            elif task_type == "chain_plan":
+                decision_title = "Replan stage plan needs approval"
+                plan = t.get("chain_plan") or {}
+                subs = plan.get("subtasks") or []
+                decision_message = (
+                    f"PM/PO planned {len(subs)} chain subtask(s) for replan stage "
+                    f"'{plan.get('stage') or t.get('chain_stage') or ''}'. Approve to run them one by one."
+                )
             else:
                 review = t.get("review_data") or {}
                 design_change = review.get("design_change") or {}

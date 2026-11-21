@@ -24,10 +24,12 @@ from ait import info_requests  # noqa: F401
 from ait import main  # noqa: F401
 from ait import model_refresh  # noqa: F401
 from ait import notifications  # noqa: F401
+from ait import outcomes  # noqa: F401
 from ait import projects  # noqa: F401
 from ait import project_cleanup  # noqa: F401
 from ait import releases  # noqa: F401
 from ait import release_publish  # noqa: F401
+from ait import replan  # noqa: F401
 from ait import env_tasks  # noqa: F401
 from ait import project_services  # noqa: F401
 from ait import prompts  # noqa: F401

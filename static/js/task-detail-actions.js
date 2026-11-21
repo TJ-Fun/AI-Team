@@ -45,6 +45,11 @@ export function renderTaskDetailActions(task) {
         <button class="secondary" type="button" data-update-decision="reject">Reject</button>
         <button class="primary" type="button" data-update-decision="approve">Approve and apply</button>`;
     }
+    if (task.task_type === "chain_plan" && task.status === "Needs approval") {
+      actionHtml += `
+        <button class="secondary" type="button" data-chain-decision="reject">Reject chain</button>
+        <button class="primary" type="button" data-chain-decision="approve">Approve stage plan</button>`;
+    }
     if (task.status === "Needs approval" && task.merge_approval_required && task.pull_request) {
       actionHtml += `<button class="primary" type="button" data-merge-approve="1">Approve merge</button>`;
     }
@@ -200,6 +205,33 @@ export function bindTaskDetailActions({ detailDialog, refreshBoard, openTaskDial
         appAlert(err.message);
       } finally {
         updBtn.disabled = false;
+      }
+      return;
+    }
+
+    const chainBtn = e.target.closest("[data-chain-decision]");
+    if (chainBtn) {
+      const decision = chainBtn.getAttribute("data-chain-decision");
+      if (
+        decision === "reject" &&
+        !(await appConfirm(
+          "Reject this stage plan? The whole replan chain will be canceled.",
+          { title: "Reject chain plan" }
+        ))
+      ) {
+        return;
+      }
+      chainBtn.disabled = true;
+      try {
+        await api(`/api/tasks/${encodeURIComponent(task.id)}/chain-plan-decision`, {
+          method: "POST",
+          body: JSON.stringify({ decision }),
+        });
+        await refreshBoard();
+      } catch (err) {
+        appAlert(err.message);
+      } finally {
+        chainBtn.disabled = false;
       }
       return;
     }

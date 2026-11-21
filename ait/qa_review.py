@@ -211,6 +211,8 @@ def planning_contract_for_task(task: dict[str, Any]) -> str:
         return DOC_UPDATE_CONTRACT
     if tt == "roadmap_update":
         return ROADMAP_UPDATE_CONTRACT
+    if tt == "chain_plan":
+        return CHAIN_PLAN_CONTRACT
     return ""
 
 

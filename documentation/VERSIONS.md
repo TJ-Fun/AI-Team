@@ -1,5 +1,10 @@
 # Version log
 
+## 0.113 — 2026-11-21
+
+- Replan chain infrastructure (`ait/replan.py`): staged PM/PO replanning as trackable task chains. New `chain_plan` task type asks PM/PO to split a replan stage (review → vision → docs → roadmap → board delta) into subtasks; approving the stage plan queues subtasks one at a time (Draft until the previous finishes). A 60s worker (`replan_worker_loop`) releases the next subtask, advances stages, and cancels the chain if any member is canceled. Chain plan approval UI, `POST /api/tasks/{id}/chain-plan-decision`, decision notifications, and `CHAIN_PLAN_CONTRACT` added. Also fixed a missing `from ait import outcomes` import introduced in 0.112.
+- Updated documentation to 0.113.
+
 ## 0.112 — 2026-11-21
 
 - Doc maintenance: deliverable tasks now auto-append a one-line entry to the project's `outcomes` document the first time they reach Done (`ait/outcomes.py`, hooked into the dispatch completion path; idempotent via `outcome_logged`). The agent document map now shows each document's last-updated date alongside size and auto/on-request tag.

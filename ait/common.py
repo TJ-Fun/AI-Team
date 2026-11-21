@@ -266,6 +266,15 @@ DOC_UPDATE_CONTRACT = (
     "Request any on-request project documents you need via info_requests before answering."
 )
 
+CHAIN_PLAN_CONTRACT = (
+    "For a replan chain stage planning request, return ONLY one valid JSON object, no markdown: "
+    '{"type":"chain_plan","summary":"brief summary","subtasks":[{"title":"short title",'
+    '"request":"bounded PM/PO instruction","kind":"review"}]}]. '
+    "kind must be one of the allowed kinds listed in the request for this stage. "
+    "Provide 1 to 8 small subtasks; each becomes a separate trackable PM/PO task executed one at a time. "
+    "Do not claim the subtasks have already been created."
+)
+
 ROADMAP_UPDATE_CONTRACT = (
     "For a roadmap update request, return ONLY one valid JSON object, no markdown: "
     '{"type":"roadmap_update","summary":"brief summary","master_plan":"complete Markdown big plan / roadmap",'

@@ -114,6 +114,19 @@ def handle_tasks_pm_post(handler, path, body) -> bool:
         handler.send_json({"task": task}, HTTPStatus.CREATED)
         return True
 
+    m_chain_decision = re.fullmatch(r"/api/tasks/(T-\d{4,})/chain-plan-decision", path)
+    if m_chain_decision:
+        try:
+            task = decide_chain_plan(m_chain_decision.group(1), str(body.get("decision", "")))
+        except KeyError:
+            handler.send_json({"error": "Chain plan task not found."}, HTTPStatus.NOT_FOUND)
+            return True
+        except ValueError as exc:
+            handler.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
+        handler.send_json({"task": task})
+        return True
+
     m_doc_decision = re.fullmatch(r"/api/tasks/(T-\d{4,})/doc-update-decision", path)
     if m_doc_decision:
         try:
