@@ -1,5 +1,10 @@
 # Version log
 
+## 0.144 — 2026-11-21
+
+- Truncation detection for agent replies: when a provider reports `finish_reason` `length`/`MAX_TOKENS` on a task expecting a structured reply (planning contract or work envelope), dispatch now fails the attempt as a format error with an explicit "cut off at the output token limit — shorten the answer" message instead of letting the truncated JSON surface as a misleading parse error. The truncated reply is still saved, and format-retry feedback now tells the agent the real cause. Free-text deliverable replies are unaffected.
+- Updated documentation to 0.144.
+
 ## 0.143 — 2026-11-21
 
 - Documentation gap fixes (batch 4 of 4, complete): documented the `outcomes.py` auto-logging of deliverable completions into the `outcomes` context document (§4.1 item 8) and expanded `ABOUT.md` with a brief feature list. All gaps from the documentation review are now addressed.

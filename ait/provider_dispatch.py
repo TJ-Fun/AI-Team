@@ -250,6 +250,17 @@ def dispatch_one_for_provider(provider: str) -> bool:
     try:
         reply, actual_model, meta = call_task_provider(task, provider)
         reply_raw = reply
+        finish = str((meta or {}).get("finish_reason") or "").strip().lower()
+        if finish in ("length", "max_tokens") and (
+            planning_contract_for_task(task) or needs_work_reply_envelope(task)
+        ):
+            raise ProviderFailure(
+                provider,
+                400,
+                f"{provider} reply was cut off at the output token limit (finish_reason={finish}); "
+                "the response is incomplete. Shorten the answer and try again.",
+                error_kind="format",
+            )
         ts_received = now_iso()
         folder = provider.lower().replace(" ", "")
         rel_received = f"replies/{tid}/{folder}/attempt-{attempt_num:03d}.json"
