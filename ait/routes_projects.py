@@ -185,8 +185,8 @@ def handle_projects_put(handler, path, body) -> bool:
             handler.send_json({"error": "Project not found."}, HTTPStatus.NOT_FOUND)
             return True
         content = body.get("content")
-        if not isinstance(content, str) or not content.strip() or len(content) > 20000:
-            handler.send_json({"error": "Project document must be non-empty and under 20,000 characters."}, HTTPStatus.BAD_REQUEST)
+        if not isinstance(content, str) or not content.strip() or len(content) > MAX_DOC_CHARS:
+            handler.send_json({"error": f"Project document must be non-empty and under {MAX_DOC_CHARS:,} characters."}, HTTPStatus.BAD_REQUEST)
             return True
         snap = save_project_context_document(pid, slug, content)
         append_event(

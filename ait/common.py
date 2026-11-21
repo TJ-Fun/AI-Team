@@ -278,7 +278,7 @@ DOC_UPDATE_CONTRACT = (
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log",'
     '"outcomes":"complete Markdown confirmed outcomes"}}. '
     "Return the full updated text of all four documents, preserving confirmed facts, marking assumptions, "
-    "and reflecting the current task board. Each document must be non-empty and under 20,000 characters. "
+    "and reflecting the current task board. Each document must be non-empty and under 30,000 characters. "
     "Never include project_vision — it is user-owned and read-only for you. "
     "To request on-request project documents, reply with ONLY {\"info_requests\":[\"slug\", ...]} and no other fields; the documents will be provided and you must then continue with your final structured reply."
 )
@@ -296,7 +296,7 @@ def doc_update_contract(slug: str) -> str:
         f'{{"type":"doc_update","summary":"brief summary","documents":{{"{key}":"complete Markdown document"}}}}. '
         f"Return the full updated text of the {key} document only, preserving confirmed facts, marking "
         "assumptions, and reflecting the current task board. The document must be non-empty and under "
-        "20,000 characters. Never include project_vision — it is user-owned and read-only for you. "
+        "30,000 characters. Never include project_vision — it is user-owned and read-only for you. "
         "To request on-request project documents, reply with ONLY {\"info_requests\":[\"slug\", ...]} and no other fields; the documents will be provided and you must then continue with your final structured reply."
     )
 
@@ -314,14 +314,14 @@ CHAIN_DOC_CONTRACT = (
     '{"type":"chain_doc","summary":"brief summary","documents":{"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log",'
     '"outcomes":"complete Markdown confirmed outcomes"}}. '
-    "Include only the documents that need changes; each must be non-empty and under 20,000 characters. "
+    "Include only the documents that need changes; each must be non-empty and under 30,000 characters. "
     "Updates are applied automatically — do not include project_vision here."
 )
 
 VISION_UPDATE_CONTRACT = (
     "For a replan chain vision subtask, return ONLY one valid JSON object, no markdown: "
     '{"type":"vision_update","summary":"brief summary","project_vision":"complete Markdown project vision"}. '
-    "project_vision must be non-empty and under 20,000 characters. The user reviews and approves it before it is applied."
+    "project_vision must be non-empty and under 30,000 characters. The user reviews and approves it before it is applied."
 )
 
 BOARD_DELTA_CONTRACT = (
@@ -342,7 +342,7 @@ ROADMAP_UPDATE_CONTRACT = (
     '"phases":{"phase_1":"complete Markdown phase plan"},"active_phase":1}. '
     "roadmap is required and gives the phase-level overview of the whole plan; phases may contain phase_1 through phase_9 entries "
     "with the complete task-by-task plan for each phase (omitted phase documents stay unchanged); active_phase is the current "
-    "phase number or null. Each document must be non-empty and under 20,000 characters. "
+    "phase number or null. Each document must be non-empty and under 30,000 characters. "
     "The roadmap must embed a fenced json block (```json) named ait-release-plan with shape "
     '{"current_phase":"v0.1","current_release":"v0.1.1","phases":[{"id":"v0.1","title":"...","status":"planned|in_progress|done","releases":[{"id":"v0.1.1","title":"...","status":"planned|in_progress|done","task_ids":["T-0001"]}]}]}; '
     "keep it consistent with the task board. "
@@ -353,7 +353,7 @@ PROJECT_DOCS_UPDATE_CONTRACT = (
     "For a project-document edit request, return ONLY one valid JSON object, no markdown: "
     '{"type":"doc_edit","summary":"brief summary","documents":{"<slug>":"complete Markdown document"},'
     '"active_phase":1}. '
-    "Include only the documents that change, each with its full updated text (non-empty, under 20,000 characters). "
+    "Include only the documents that change, each with its full updated text (non-empty, under 30,000 characters). "
     "Editable slugs: project_brief, technical_overview, decisions, outcomes, roadmap, phase_1 through phase_9. "
     "Never include project_vision or tracker documents — they are read-only. "
     "Set active_phase only when the roadmap's active phase changes; otherwise use null. "

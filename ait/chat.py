@@ -230,20 +230,20 @@ def clean_overview_documents(body: dict[str, Any]) -> dict[str, str]:
     cleaned: dict[str, str] = {}
     for slug in ("project_brief", "technical_overview", "decisions"):
         val = docs.get(slug)
-        if not isinstance(val, str) or not val.strip() or len(val) > 20000:
-            raise ValueError(f"{project_doc_title(slug)} must contain text under 20,000 characters.")
+        if not isinstance(val, str) or not val.strip() or len(val) > 30000:
+            raise ValueError(f"{project_doc_title(slug)} must contain text under 30,000 characters.")
         cleaned[slug] = val.strip()
     roadmap = docs.get("roadmap")
     if isinstance(roadmap, str) and roadmap.strip():
-        if len(roadmap) > 20000:
-            raise ValueError(f"{project_doc_title('roadmap')} must contain text under 20,000 characters.")
+        if len(roadmap) > 30000:
+            raise ValueError(f"{project_doc_title('roadmap')} must contain text under 30,000 characters.")
         cleaned["roadmap"] = roadmap.strip()
     for key, val in docs.items():
         slug = str(key).strip()
         if not PHASE_DOC_RE.fullmatch(slug):
             continue
-        if not isinstance(val, str) or not val.strip() or len(val) > 20000:
-            raise ValueError(f"{project_doc_title(slug)} must contain text under 20,000 characters.")
+        if not isinstance(val, str) or not val.strip() or len(val) > 30000:
+            raise ValueError(f"{project_doc_title(slug)} must contain text under 30,000 characters.")
         cleaned[slug] = val.strip()
     return cleaned
 

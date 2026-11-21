@@ -217,7 +217,7 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
           .map(
             ([key, label]) => `
             <label class="overview-field">${escapeHtml(label)}
-              <textarea data-overview-doc="${escapeHtml(key)}" rows="7" maxlength="20000" ${
+              <textarea data-overview-doc="${escapeHtml(key)}" rows="7" maxlength="30000" ${
                 editable ? "" : "readonly"
               }>${escapeHtml(docs[key] || "")}</textarea>
             </label>`

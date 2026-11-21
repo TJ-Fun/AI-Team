@@ -10,7 +10,7 @@ DOC_UPDATE_SLUGS = ("project_brief", "technical_overview", "decisions", "outcome
 DOC_UPDATE_TASK_TYPES = ("doc_update", "roadmap_update", "vision_update", "board_delta", "doc_edit")
 DOC_EDIT_CORE_SLUGS = ("project_brief", "technical_overview", "decisions", "outcomes")
 DOC_EDIT_STATIC_SLUGS = frozenset(DOC_EDIT_CORE_SLUGS) | {ROADMAP_DOC_SLUG}
-MAX_DOC_CHARS = 20000
+MAX_DOC_CHARS = 30000
 MAX_DOC_EDIT_REQUEST_CHARS = 8000
 
 

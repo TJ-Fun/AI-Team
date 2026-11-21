@@ -38,7 +38,7 @@ def handle_tasks_pm_post(handler, path, body) -> bool:
                         "Review the project's current documents and task board, then propose an updated version "
                         f"of the {doc_title} document ({slug}) only. project_vision is user-owned and must not be "
                         "included. Request any on-request documents you need via info_requests before answering. "
-                        "Keep confirmed facts, mark assumptions, and keep the document under 20,000 characters."
+                        "Keep confirmed facts, mark assumptions, and keep the document under 30,000 characters."
                     ),
                     "project_id": pid,
                     "module_id": "",

@@ -1,5 +1,10 @@
 # Version log
 
+## 0.149 — 2026-11-21
+
+- Raised the project-document size limit from 20,000 to 30,000 characters (`MAX_DOC_CHARS` in `ait/doc_updates.py`), after a valid ~25k-char `outcomes` update was rejected. All agent-facing contracts (`DOC_UPDATE`, `doc_update_contract`, `CHAIN_DOC`, `VISION_UPDATE`, `ROADMAP_UPDATE`, `PROJECT_DOCS_UPDATE`), the PM planning overview validators (`ait/chat.py`, `ait/pm_planning_parse.py`), the manual context-document endpoint (`ait/routes_projects.py`), chain-stage validators (`ait/replan_stages.py`), the doc_update task request text, and the two document editor textareas (`index.html`, `task-detail.js`) now use the same 30,000-character limit.
+- Updated documentation to 0.149.
+
 ## 0.148 — 2026-11-21
 
 - Fixed the `info_requests` follow-up loop (`ait/info_requests.py`): follow-up calls now send full text only for newly provided documents plus a compact "already provided" slug list (previously every cached document was resent each round, bloating context to ~100k chars); slugs that are user-owned (`project_vision`), auto-generated (trackers), unknown, or over the 4-per-reply cap are rejected up front and reported back to the agent with the reason instead of silently looping; the terminal check also fires when the final reply requests only rejected slugs.

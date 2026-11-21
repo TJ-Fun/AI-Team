@@ -22,7 +22,7 @@ def parse_chain_doc_response(reply: str) -> dict[str, str]:
             raise ValueError(f"chain_doc cannot update '{key}'; allowed: {', '.join(CHAIN_DOC_SLUGS)}.")
         text = str(value or "").strip()
         if not text or len(text) > MAX_DOC_CHARS:
-            raise ValueError(f"Document '{key}' must be non-empty and under 20,000 characters.")
+            raise ValueError(f"Document '{key}' must be non-empty and under {MAX_DOC_CHARS:,} characters.")
         cleaned[key] = text
     return cleaned
 
@@ -70,7 +70,7 @@ def parse_vision_update_response(reply: str) -> dict[str, str]:
         raise ValueError("Vision update reply must have type 'vision_update'.")
     text = str(data.get("project_vision") or "").strip()
     if not text or len(text) > MAX_DOC_CHARS:
-        raise ValueError("project_vision must be non-empty and under 20,000 characters.")
+        raise ValueError(f"project_vision must be non-empty and under {MAX_DOC_CHARS:,} characters.")
     return {"project_vision": text}
 
 
