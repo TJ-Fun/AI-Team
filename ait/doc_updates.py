@@ -7,7 +7,7 @@ from ait.format_retry import maybe_format_retry
 
 
 DOC_UPDATE_SLUGS = ("project_vision", "project_brief", "technical_overview", "decisions", "outcomes")
-DOC_UPDATE_TASK_TYPES = ("doc_update", "roadmap_update")
+DOC_UPDATE_TASK_TYPES = ("doc_update", "roadmap_update", "vision_update", "board_delta")
 MAX_DOC_CHARS = 20000
 
 
@@ -124,6 +124,8 @@ def apply_doc_update(task: dict[str, Any]) -> dict[str, Any]:
                 snapshots[slug] = save_project_context_document(pid, slug, str(content))
     elif task.get("task_type") == "vision_update":
         snapshots["project_vision"] = save_project_context_document(pid, "project_vision", str(payload.get("project_vision") or ""))
+    elif task.get("task_type") == "board_delta":
+        return apply_board_delta_update(task)
     elif task.get("task_type") == "roadmap_update":
         snapshots[ROADMAP_DOC_SLUG] = save_project_context_document(pid, ROADMAP_DOC_SLUG, str(payload.get("master_plan") or ""))
         for slug, content in (payload.get("phases") or {}).items():

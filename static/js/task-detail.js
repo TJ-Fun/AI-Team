@@ -224,8 +224,25 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
 
     // Project document / roadmap / chain plan update section
     const updSec = $("#detail-update-section");
-    const isUpdateTask = ["doc_update", "roadmap_update", "chain_plan", "vision_update"].includes(task.task_type);
-    if (task.task_type === "chain_plan" && task.chain_plan) {
+    const isUpdateTask = ["doc_update", "roadmap_update", "chain_plan", "vision_update", "board_delta"].includes(task.task_type);
+    if (task.task_type === "board_delta" && task.update_payload) {
+      updSec.hidden = false;
+      const payload = task.update_payload;
+      const muts = payload.mutations || [];
+      $("#detail-update-body").innerHTML =
+        (payload.summary ? `<p class="draft-note">${escapeHtml(payload.summary)}</p>` : "") +
+        `<ul class="chain-subtask-list">` +
+        muts
+          .map((m) => {
+            const target = m.task_id ? ` <span class="muted">→ ${escapeHtml(m.task_id)}</span>` : "";
+            const detail = m.title ? ` — ${escapeHtml(m.title)} <span class="muted">[${escapeHtml(m.role || "")}]</span>` : "";
+            const why = m.reason ? `<br><span class="muted">${escapeHtml(m.reason)}</span>` : "";
+            return `<li><strong>${escapeHtml(m.op || "")}</strong>${target}${detail}${why}</li>`;
+          })
+          .join("") +
+        `</ul>` +
+        `<p class="draft-note">Approving applies all mutations at once. In-progress tasks are skipped; Done tasks can only be superseded, never deleted.</p>`;
+    } else if (task.task_type === "chain_plan" && task.chain_plan) {
       updSec.hidden = false;
       const plan = task.chain_plan;
       const subs = plan.subtasks || [];

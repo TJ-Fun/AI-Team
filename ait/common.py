@@ -290,6 +290,14 @@ VISION_UPDATE_CONTRACT = (
     "project_vision must be non-empty and under 20,000 characters. The user reviews and approves it before it is applied."
 )
 
+BOARD_DELTA_CONTRACT = (
+    "For a replan chain board-delta subtask, return ONLY one valid JSON object, no markdown: "
+    '{"type":"board_delta","summary":"brief summary","mutations":[{"op":"cancel|supersede|create",'
+    '"task_id":"T-0001","title":"task title","request":"bounded request","role":"PM/PO","reason":"why"}]}. '
+    "cancel/supersede need task_id of an existing board task; supersede/create need title, request, and a valid role. "
+    "Never delete tasks; Done tasks can only be superseded. The user approves the whole list once before anything is applied."
+)
+
 ROADMAP_UPDATE_CONTRACT = (
     "For a roadmap update request, return ONLY one valid JSON object, no markdown: "
     '{"type":"roadmap_update","summary":"brief summary","master_plan":"complete Markdown big plan / roadmap",'

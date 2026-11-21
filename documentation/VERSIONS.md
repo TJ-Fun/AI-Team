@@ -1,5 +1,10 @@
 # Version log
 
+## 0.115 — 2026-11-21
+
+- Replan chain board-delta stage (`ait/replan_stages.py`): `board_delta` tasks propose cancel/supersede/create task mutations via `BOARD_DELTA_CONTRACT`; the user approves the whole list once through the doc-update decision flow, then `apply_board_delta_update` applies it — Done tasks can only be superseded (never deleted), in-progress tasks are skipped, and supersede/create produce Ready replacement tasks. Mutation list rendered in task details; PM prompt now forbids re-asking answered questions and documents the chain task types.
+- Updated documentation to 0.115.
+
 ## 0.114 — 2026-11-21
 
 - Replan chain stages implemented (`ait/replan_stages.py`): review subtasks report via the work envelope; docs subtasks (`chain_doc`) auto-apply routine context-document updates inside the approved stage; vision subtasks (`vision_update`) propose `project_vision` for user approval via the existing doc-update decision flow; roadmap subtasks reuse `roadmap_update`. The board **Major replan** button (formerly Update roadmap) now starts a replan chain instead of a single roadmap update. `CHAIN_DOC_CONTRACT`/`VISION_UPDATE_CONTRACT` added; update-payload rendering fixed for flat doc payloads.

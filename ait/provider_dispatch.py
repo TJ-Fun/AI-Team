@@ -395,6 +395,8 @@ def dispatch_one_for_provider(provider: str) -> bool:
                     next_status, msg = finish_chain_doc_task(fresh, reply, provider)
                 elif fresh.get("task_type") == "vision_update":
                     next_status, msg = finish_vision_update_task(fresh, reply, provider)
+                elif fresh.get("task_type") == "board_delta":
+                    next_status, msg = finish_board_delta_task(fresh, reply, provider)
                 elif fresh.get("produces_deliverable"):
                     val = deterministic_validation(fresh.get("acceptance_checks") or [], reply)
                     fresh["validation"] = val

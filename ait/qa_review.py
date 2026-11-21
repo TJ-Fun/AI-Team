@@ -217,11 +217,13 @@ def planning_contract_for_task(task: dict[str, Any]) -> str:
         return CHAIN_DOC_CONTRACT
     if tt == "vision_update":
         return VISION_UPDATE_CONTRACT
+    if tt == "board_delta":
+        return BOARD_DELTA_CONTRACT
     return ""
 
 
 def needs_work_reply_envelope(task: dict[str, Any]) -> bool:
-    if task.get("task_type") in ("pm_planning", "pm_escalation", "doc_update", "roadmap_update", "chain_plan", "chain_doc", "vision_update") or task.get("qa_attempt_active"):
+    if task.get("task_type") in ("pm_planning", "pm_escalation", "doc_update", "roadmap_update", "chain_plan", "chain_doc", "vision_update", "board_delta") or task.get("qa_attempt_active"):
         return False
     role = str(task.get("assigned_role") or "")
     if role in ("Frontend developer", "Backend developer", "Documentation"):
