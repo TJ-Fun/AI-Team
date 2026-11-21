@@ -1,5 +1,10 @@
 # Version log
 
+## 0.145 — 2026-11-21
+
+- Hardened the `info_requests` follow-up loop (`ait/info_requests.py`): when an agent re-requests documents it already received, the app now resends them with an explicit "do not request them again" note and continues the attempt instead of immediately failing; if the agent still ends on an `info_requests` reply after all rounds, the attempt fails as a format error naming the already-provided documents (actionable format-retry feedback) instead of a generic "must have type" parse error. `requested_documents_text` now tells the agent not to re-request, and `extract_info_requests` logs a warning when valid slugs are dropped over the 4-document cap.
+- Updated documentation to 0.145.
+
 ## 0.144 — 2026-11-21
 
 - Truncation detection for agent replies: when a provider reports `finish_reason` `length`/`MAX_TOKENS` on a task expecting a structured reply (planning contract or work envelope), dispatch now fails the attempt as a format error with an explicit "cut off at the output token limit — shorten the answer" message instead of letting the truncated JSON surface as a misleading parse error. The truncated reply is still saved, and format-retry feedback now tells the agent the real cause. Free-text deliverable replies are unaffected.

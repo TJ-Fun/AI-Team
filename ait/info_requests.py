@@ -25,10 +25,17 @@ def extract_info_requests(reply: str) -> list[str]:
                 break
     if not isinstance(raw, list):
         return []
+    valid = [str(item).strip() for item in raw if is_project_doc_slug(str(item).strip())]
+    if len(valid) > INFO_REQUEST_MAX_DOCS:
+        logger.warning(
+            "info_requests dropped %d slug(s) over the %d-doc cap: %s",
+            len(valid) - INFO_REQUEST_MAX_DOCS,
+            INFO_REQUEST_MAX_DOCS,
+            valid[INFO_REQUEST_MAX_DOCS:],
+        )
     slugs: list[str] = []
-    for item in raw:
-        slug = str(item).strip()
-        if is_project_doc_slug(slug) and slug not in slugs:
+    for slug in valid:
+        if slug not in slugs:
             slugs.append(slug)
         if len(slugs) >= INFO_REQUEST_MAX_DOCS:
             break
@@ -71,7 +78,10 @@ def requested_documents_text(cache: dict[str, str]) -> str:
     for slug, content in cache.items():
         body = content.strip() or "(This document has not been created yet.)"
         sections.append(f"## {project_doc_title(slug)} ({slug})\n{body[:20000]}")
-    return "Requested project documents (provided on demand):\n\n" + "\n\n".join(sections)
+    return (
+        "Requested project documents (provided on demand — you already have these; "
+        "do not request them again):\n\n" + "\n\n".join(sections)
+    )
 
 
 def call_task_provider(task: dict[str, Any], provider: str) -> tuple[str, str, dict[str, Any]]:
@@ -98,8 +108,16 @@ def call_task_provider(task: dict[str, Any], provider: str) -> tuple[str, str, d
             reply, actual_model, meta = call_openai_compatible_task(task, provider, extra_context, route_model, idle_timeout, stream_enabled)
         if round_no >= INFO_REQUEST_MAX_ROUNDS:
             break
-        new_slugs = [s for s in extract_info_requests(reply) if s not in cache]
+        requested = extract_info_requests(reply)
+        new_slugs = [s for s in requested if s not in cache]
         if not new_slugs:
+            if requested and cache:
+                extra_context = (
+                    requested_documents_text(cache)
+                    + "\n\nNote: you already received these documents. Do not request them again — "
+                    "reply now with your final structured answer."
+                )
+                continue
             break
         for slug in new_slugs:
             try:
@@ -121,5 +139,13 @@ def call_task_provider(task: dict[str, Any], provider: str) -> tuple[str, str, d
                 "provider": provider,
                 "documents": new_slugs,
             }
+        )
+    if cache and extract_info_requests(reply):
+        raise ProviderFailure(
+            provider,
+            400,
+            "Agent kept requesting project documents after they were already provided "
+            f"({', '.join(sorted(cache))}); reply with the final structured object instead.",
+            error_kind="format",
         )
     return reply, actual_model, meta
