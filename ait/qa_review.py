@@ -283,5 +283,8 @@ def build_repo_agent_instructions(task: dict[str, Any], provider: str) -> str:
         + ".md .txt .html .css .js .ts .tsx .jsx .py .json .toml .yml .yaml .xml .sh. "
         + "Lock files (package-lock.json, poetry.lock, etc.) and files outside the editable scope are rejected; "
         + "one invalid entry fails the whole task. Each file content must be complete replacement text under 50,000 bytes. "
-        + "Use the optional feedback field for blockers or scope concerns instead of a PM/PO feedback section."
+        + "Use the optional feedback field for blockers or scope concerns instead of a PM/PO feedback section. "
+        + "The reply must fit the provider's output token limit: return complete contents only for files that must change, "
+        + "keep file contents minimal, and if the full change set cannot fit, return the most critical files and describe "
+        + "the remaining work in the feedback field so PM/PO can queue a follow-up task."
     )

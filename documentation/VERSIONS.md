@@ -1,5 +1,10 @@
 # Version log
 
+## 0.153 — 2026-11-22
+
+- Repo file-change manifest instructions (`build_repo_agent_instructions` in `ait/qa_review.py`) now tell agents the reply must fit the provider's output token limit: return complete contents only for files that must change, keep contents minimal, and if the full change set cannot fit, return the most critical files and describe the remaining work in the `feedback` field so PM/PO can queue a follow-up task.
+- Updated documentation to 0.153.
+
 ## 0.152 — 2026-11-22
 
 - Fixed repo-manifest tasks (Frontend/Backend/Documentation on repository projects) failing as retryable "API error 503" instead of actionable format errors: `apply_repository_manifest` `ValueError`s (truncated JSON, too many files, unsafe paths, disallowed extensions) are now wrapped as `ProviderFailure(400, error_kind="format")` in `ait/provider_dispatch.py`, so `maybe_format_retry` feeds the exact problem back to the agent. The `finish_reason=length`/`MAX_TOKENS` truncation check now also covers file-change manifest replies via the new `_expects_repo_manifest` helper — previously it only applied to planning contracts and work envelopes, so truncated manifests surfaced as misleading parse errors.
