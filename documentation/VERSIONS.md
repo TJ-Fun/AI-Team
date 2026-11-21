@@ -1,5 +1,10 @@
 # Version log
 
+## 0.140 — 2026-11-21
+
+- Documentation gap fixes (batch 1 of 4): corrected the §2 repository map — removed the deleted `ait/projects.py`, added `routing.py`, `tasks_store.py`, `projects_store.py`, `project_context.py`, `replan.py`, `replan_stages.py`, and `outcomes.py`, listed the `provider-*.js` frontend modules, and fixed a stale `ait/projects.py` reference in §4.9.
+- Updated documentation to 0.140.
+
 ## 0.139 — 2026-11-21
 
 - Fixed doc_update tasks failing with "must have type 'doc_update'" when weak models request documents in variant shapes: `extract_info_requests` in `ait/info_requests.py` now also accepts `{"type":"info_requests"}` with the slug array under `slugs`, `requests`, `documents`, or `docs`, and the `DOC_UPDATE`/`ROADMAP_UPDATE`/`PROJECT_DOCS_UPDATE` contracts in `ait/common.py` now show the literal `{"info_requests":["slug", ...]}` reply shape explicitly.
