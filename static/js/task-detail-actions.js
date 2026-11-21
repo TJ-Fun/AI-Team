@@ -1,5 +1,6 @@
 import { $, escapeHtml, state, api, appAlert, appConfirm, appPrompt } from "./core.js";
 import { getAskedProvider } from "./task-utils.js";
+import { copyTaskToClipboard } from "./task-copy.js";
 
 export function renderTaskDetailActions(task) {
     // Actions
@@ -54,8 +55,14 @@ export function renderTaskDetailActions(task) {
       actionHtml += `<button class="primary" type="button" data-merge-approve="1">Approve merge</button>`;
     }
     actionHtml += `
-      <button class="secondary" type="button" data-detail-close="1">Close</button>
-      <button class="danger" type="button" data-detail-delete="1">Delete task</button>`;
+      <div class="detail-actions-left">
+        <button class="danger" type="button" data-detail-delete="1">Delete task</button>
+        <button class="secondary" type="button" data-detail-copy="1">Copy</button>
+      </div>
+      <div class="detail-actions-right">
+        ${actionHtml}
+        <button class="secondary" type="button" data-detail-close="1">Close</button>
+      </div>`;
     $("#detail-actions").innerHTML = actionHtml;
 }
 
@@ -92,6 +99,19 @@ export function bindTaskDetailActions({ detailDialog, refreshBoard, openTaskDial
     if (e.target.closest("[data-detail-close]")) {
       state.detailTaskId = null;
       detailDialog.close();
+      return;
+    }
+
+    if (e.target.closest("[data-detail-copy]")) {
+      const btn = e.target.closest("[data-detail-copy]");
+      btn.disabled = true;
+      try {
+        await copyTaskToClipboard(task.id, btn);
+      } catch (err) {
+        appAlert(err.message);
+      } finally {
+        btn.disabled = false;
+      }
       return;
     }
 

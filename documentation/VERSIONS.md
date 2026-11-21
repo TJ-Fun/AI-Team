@@ -1,5 +1,12 @@
 # Version log
 
+## 0.122 — 2026-11-21
+
+- Task UI polish: the task card Delete button now renders red (the dark-theme `.card-delete` rule no longer overrides `.danger`), and the card's Details link is now a secondary button. Added a **Copy** button to both the task card and the task detail dialog that copies a full plain-text dump of the task — header fields, request, PM summary, answer, design review, proposed overview/update/board-delta/chain payloads, env-setup steps, acceptance checks, validation, pull request, all agent replies (including raw reply text), and the activity log — via the new `static/js/task-copy.js` module (`/api/tasks/{id}/replies` is fetched on demand).
+- Task detail actions are now split into a left group (Delete task, Copy) and a right group (all workflow actions plus Close).
+- Board header: **Update docs** and **Major replan** buttons moved after **Pause/Resume project**.
+- Updated documentation to 0.122.
+
 ## 0.121 — 2026-11-21
 
 - Made replan board-delta create/supersede mutations first-class tasks: `BOARD_DELTA_CONTRACT` now accepts `produces_deliverable`, `acceptance_checks`, `phase`, `module_id`, `release`, and `release_order`; parsing/apply persist them with PM-planning defaults (non-PM/PO roles produce deliverables, default acceptance check, phase/module/release carried or inherited on supersede). Board-delta tasks now go through deterministic checks/QA/PR merge and phase gating like normal planned work. Smoke-tested create defaults and supersede inheritance.

@@ -465,3 +465,12 @@ dialog::backdrop{background:#000000aa}
 @media(max-width:900px){.route-row{flex-wrap:wrap}.route-settings{flex-basis:100%;padding-left:28px}}
 @media(max-width:700px){.route-row-actions{flex-direction:column}}
 
+
+/* ===== Task UI polish (v0.122) ===== */
+.task-card-actions .card-delete.danger{background:#2e201c;border-color:#3a2f2c;color:#f0a99e}
+.task-card-actions .card-delete.danger:hover{background:#3a2422}
+.task-card-actions .card-copy,.task-footer .card-details{height:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:10px;padding:6px 9px;white-space:nowrap}
+.detail-actions{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.detail-actions-left{display:flex;gap:7px;flex-wrap:wrap}
+.detail-actions-right{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:7px}
+@media(max-width:600px){.detail-actions{flex-direction:column}.detail-actions-right{justify-content:flex-start}}

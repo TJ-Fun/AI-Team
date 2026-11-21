@@ -1,5 +1,6 @@
 import { $, escapeHtml, state, api, appAlert, appConfirm, elapsedSeconds, formatDuration, formatTime, statusClass } from "./core.js";
 import { getAskedProvider } from "./task-utils.js";
+import { copyTaskToClipboard } from "./task-copy.js";
 
 export function initTaskBoard(context = {}) {
   function renderTasks() {
@@ -155,8 +156,9 @@ export function initTaskBoard(context = {}) {
                   : ""
               }
               <button class="danger card-delete" type="button" data-delete-task="${escapeHtml(task.id)}">Delete</button>
+              <button class="secondary card-copy" type="button" data-copy-task="${escapeHtml(task.id)}">Copy</button>
             </div>
-            <button class="text-button" type="button" data-open-detail="${escapeHtml(task.id)}">Details</button>
+            <button class="secondary card-details" type="button" data-open-detail="${escapeHtml(task.id)}">Details</button>
           </div>
         </article>`;
       })
@@ -256,6 +258,21 @@ export function initTaskBoard(context = {}) {
         appAlert(err.message);
       } finally {
         delBtn.disabled = false;
+      }
+      return;
+    }
+
+    const copyBtn = e.target.closest("[data-copy-task]");
+    if (copyBtn) {
+      const id = copyBtn.getAttribute("data-copy-task");
+      copyBtn.disabled = true;
+      try {
+        const ok = await copyTaskToClipboard(id, copyBtn);
+        if (!ok) appAlert("Task not found.");
+      } catch (err) {
+        appAlert(err.message);
+      } finally {
+        copyBtn.disabled = false;
       }
       return;
     }
