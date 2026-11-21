@@ -211,8 +211,7 @@ PM_PLANNING_CONTRACT = (
     '"description":"short effect"},{"label":"another choice","description":"short effect"}],'
     '"allow_free_text":true}]}. Provide 2 to 8 useful options per question and allow free text. '
     "If no more clarification is needed: "
-    '{"type":"plan","summary":"brief plan summary","project_overview":{"project_vision":"complete Markdown project vision",'
-    '"project_brief":"complete Markdown brief",'
+    '{"type":"plan","summary":"brief plan summary","project_overview":{"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log"},'
     '"tasks":[{"title":"task title","request":"bounded implementation request",'
     '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1,"release":"v0.1.1","release_order":1,"kind":"","steps":[]}]}. '
@@ -231,7 +230,10 @@ PM_PLANNING_CONTRACT = (
     "Every plan that produces deliverables must include "
     "at least one Documentation task per phase covering user-facing or technical documentation. "
     "When writing the overview, preserve confirmed existing context, separate facts from assumptions, "
-    "and provide concise complete content for all four documents. Do not claim the tasks have already been created."
+    "and provide concise complete content for all three documents. Do not claim the tasks have already been created. "
+    "The Project vision document is user-owned and read-only for you: use it as the source of truth, but answers "
+    "to clarification questions and direct user instructions override it. If the vision conflicts with a user "
+    "answer or instruction, follow the user and ask a clarification question when needed."
 )
 
 ESCALATION_CONTRACT = (
@@ -258,12 +260,12 @@ WORK_REPLY_CONTRACT = (
 
 DOC_UPDATE_CONTRACT = (
     "For a project-document update request, return ONLY one valid JSON object, no markdown: "
-    '{"type":"doc_update","summary":"brief summary","documents":{"project_vision":"complete Markdown project vision",'
-    '"project_brief":"complete Markdown brief",'
+    '{"type":"doc_update","summary":"brief summary","documents":{"project_brief":"complete Markdown brief",'
     '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log",'
     '"outcomes":"complete Markdown confirmed outcomes"}}. '
-    "Return the full updated text of all five documents, preserving confirmed facts, marking assumptions, "
+    "Return the full updated text of all four documents, preserving confirmed facts, marking assumptions, "
     "and reflecting the current task board. Each document must be non-empty and under 20,000 characters. "
+    "Never include project_vision — it is user-owned and read-only for you. "
     "Request any on-request project documents you need via info_requests before answering."
 )
 

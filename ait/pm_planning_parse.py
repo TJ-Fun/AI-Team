@@ -160,7 +160,7 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
         if not isinstance(ov, dict):
             raise ValueError("A final plan must include a project_overview for user approval.")
         ov_docs: dict[str, str] = {}
-        for slug in ("project_vision", "project_brief", "technical_overview", "decisions"):
+        for slug in ("project_brief", "technical_overview", "decisions"):
             val = ov.get(slug)
             if not isinstance(val, str) or not val.strip() or len(val) > 20000:
                 raise ValueError(f"The project overview needs non-empty {slug} text under 20,000 characters.")

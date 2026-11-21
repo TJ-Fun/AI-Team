@@ -1,5 +1,10 @@
 # Version log
 
+## 0.124 — 2026-11-21
+
+- **Project vision is now user-editable only.** The PM/PO planning contract no longer asks for `project_vision` in the project overview (brief, technical overview, and decisions only), `doc_update` covers the four PM-writable documents, and overview approval preserves the existing vision. The replan chain lost its `vision` stage (now review → docs → roadmap → board delta); pending legacy `vision_update` tasks still apply. Contracts state that clarification answers and direct user instructions override the vision.
+- Updated documentation to 0.124.
+
 ## 0.123 — 2026-11-21
 
 - Fixed project context document routes: slug patterns now allow digits (`phase_1`, `phase_1_tracker`), so phase plans and trackers can be saved, restored, and have history managed — previously these routes 404'd before reaching the handler. Also fixed a `KeyError` 500 in the save/restore responses for non-core documents (`master_plan`, `phase_N`) by using `project_doc_title`.

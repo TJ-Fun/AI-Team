@@ -6,7 +6,7 @@ from ait.common import *
 from ait.format_retry import maybe_format_retry
 
 
-DOC_UPDATE_SLUGS = ("project_vision", "project_brief", "technical_overview", "decisions", "outcomes")
+DOC_UPDATE_SLUGS = ("project_brief", "technical_overview", "decisions", "outcomes")
 DOC_UPDATE_TASK_TYPES = ("doc_update", "roadmap_update", "vision_update", "board_delta")
 MAX_DOC_CHARS = 20000
 

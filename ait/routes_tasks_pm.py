@@ -77,8 +77,9 @@ def handle_tasks_pm_post(handler, path, body) -> bool:
             "docs": (
                 "doc_update",
                 "Update project documentation",
-                "Review the project's current documents and task board, then propose updated versions of all five "
-                "project documents (project_vision, project_brief, technical_overview, decisions, outcomes). Request any "
+                "Review the project's current documents and task board, then propose updated versions of the four "
+                "PM-writable project documents (project_brief, technical_overview, decisions, outcomes). project_vision "
+                "is user-owned and must not be included. Request any "
                 "on-request documents you need via info_requests before answering. Keep confirmed facts, mark "
                 "assumptions, and keep each document under 20,000 characters.",
             ),

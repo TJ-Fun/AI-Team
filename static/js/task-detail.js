@@ -202,12 +202,13 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
         const docs = task.overview_documents || {};
         const editable = task.status === "Needs approval";
         const pairs = [
-          ["project_vision", "Project vision"],
           ["project_brief", "Project brief"],
           ["technical_overview", "Technical overview"],
           ["decisions", "Decision log"],
         ];
-        fieldsWrap.innerHTML = pairs
+        fieldsWrap.innerHTML =
+          `<p class="draft-note">Project vision is user-owned and read-only for the PM/PO — it is not part of this proposal. Edit it via Project context if needed.</p>` +
+          pairs
           .map(
             ([key, label]) => `
             <label class="overview-field">${escapeHtml(label)}

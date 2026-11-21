@@ -6,24 +6,21 @@ from ait.common import *
 from ait.format_retry import maybe_format_retry
 
 
-CHAIN_STAGES = ["review", "vision", "docs", "roadmap", "board_delta"]
+CHAIN_STAGES = ["review", "docs", "roadmap", "board_delta"]
 STAGE_TITLES = {
     "review": "Review",
-    "vision": "Vision",
     "docs": "Docs",
     "roadmap": "Roadmap",
     "board_delta": "Board delta",
 }
 STAGE_KINDS = {
     "review": ["review"],
-    "vision": ["vision"],
     "docs": ["doc"],
     "roadmap": ["roadmap"],
     "board_delta": ["board_delta"],
 }
 KIND_TASK_TYPES = {
     "review": "chain_review",
-    "vision": "vision_update",
     "doc": "chain_doc",
     "roadmap": "roadmap_update",
     "board_delta": "board_delta",
@@ -39,11 +36,6 @@ STAGE_REQUESTS = {
         "documents, and recent outcomes. Identify what is still valid, what is stale, and what a major "
         "replan must change. Check the decision log and do not re-ask questions that already have answers. "
         "Plan subtasks of kind 'review' that each produce a bounded analysis report."
-    ),
-    "vision": (
-        "Replan stage VISION: based on the review findings, propose updated project_vision content that "
-        "reflects the new direction. Plan subtasks of kind 'vision' (usually one) that each propose the "
-        "full updated vision document for user approval."
     ),
     "docs": (
         "Replan stage DOCS: update the routine context documents (project_brief, technical_overview, "
