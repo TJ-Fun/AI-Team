@@ -50,7 +50,13 @@ def chat_system_prompt(project_id: str) -> str:
             "Chat mode: you are talking directly with the user in a chat window, not processing a formal planning request. "
             "Answer conversationally in clear markdown. Do not return the planning JSON schema unless the user explicitly asks you to produce a plan; "
             "when they do, remind them that plans become tasks when created from the board. "
-            "When you need an on-request project document, reply with only a JSON object like {\"info_requests\":[\"slug\"]} and the app will provide it.",
+            "When you need an on-request project document, reply with only a JSON object like {\"info_requests\":[\"slug\"]} and the app will provide it. "
+            "When the user explicitly confirms a project-document change after your discussion (roadmap, phase plans, project_brief, "
+            "technical_overview, decisions, or outcomes), reply with ONLY a JSON object "
+            '{"doc_edit_request":{"message":"short note shown to the user","request":"precise description of the agreed change",'
+            '"documents":["slug", ...]}}. '
+            "Never propose edits to project_vision or tracker documents — they are read-only. "
+            "The queued task still requires the user to approve the proposed document text on the task board before anything is applied.",
             project_context_for_role("PM/PO", {"project_id": project_id}),
             f"Current task board (read-only context):\n{board_text}",
         ]

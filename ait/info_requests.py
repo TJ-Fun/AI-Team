@@ -29,6 +29,37 @@ def extract_info_requests(reply: str) -> list[str]:
     return slugs
 
 
+def extract_doc_edit_request(reply: str) -> dict[str, Any] | None:
+    """Return a validated doc_edit request from a chat reply, or None.
+
+    The PM/PO may answer a chat message with only a JSON object of the form
+    {"doc_edit_request": {"message": "...", "request": "...", "documents": ["slug"]}}.
+    """
+    clean = reply.strip()
+    if clean.startswith("```"):
+        clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", clean, flags=re.IGNORECASE).strip()
+    try:
+        obj = json.loads(clean)
+    except Exception:
+        return None
+    if not isinstance(obj, dict):
+        return None
+    raw = obj.get("doc_edit_request")
+    if not isinstance(raw, dict):
+        return None
+    request = str(raw.get("request") or "").strip()
+    if not request or len(request) > MAX_DOC_EDIT_REQUEST_CHARS:
+        return None
+    message = str(raw.get("message") or "").strip()[:2000]
+    docs_raw = raw.get("documents")
+    documents = (
+        [str(s).strip() for s in docs_raw if is_doc_edit_slug(str(s).strip())]
+        if isinstance(docs_raw, list)
+        else []
+    )
+    return {"request": request, "message": message, "documents": documents}
+
+
 def requested_documents_text(cache: dict[str, str]) -> str:
     sections = []
     for slug, content in cache.items():

@@ -1,5 +1,10 @@
 # Version log
 
+## 0.136 — 2026-11-21
+
+- Chat-driven document edits (batch 2 of 4): the PM/PO chat can now emit a `doc_edit_request` JSON action after the user confirms a change. `extract_doc_edit_request` in `ait/info_requests.py` validates it, `chat_system_prompt` in `ait/chat.py` teaches the protocol, and `POST /api/chat` in `ait/http_handler.py` creates a Ready `doc_edit` task via `create_doc_edit_task`, posts a chat notice with the task id, and logs a `chat_doc_edit_requested` event. Non-JSON replies are unaffected.
+- Updated documentation to 0.136.
+
 ## 0.135 — 2026-11-21
 
 - Chat-driven document edits (batch 1 of 4): added the `doc_edit` task type — `PROJECT_DOCS_UPDATE_CONTRACT` in `ait/common.py`, parser/finish/apply plus `create_doc_edit_task` in `ait/doc_updates.py`, contract mapping in `ait/qa_review.py`, and the dispatch finish branch in `ait/provider_dispatch.py`. Editable scope: `project_brief`, `technical_overview`, `decisions`, `outcomes`, `roadmap`, `phase_1`–`phase_9` (+ optional `active_phase`); `project_vision` and trackers stay read-only. Type is inert until the chat action lands in batch 2.

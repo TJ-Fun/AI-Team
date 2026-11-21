@@ -168,6 +168,22 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     reply, used_provider, used_model = call_chat_provider(hist, project_id)
                     dur = round(time.time() - t0, 2)
+                    doc_action = extract_doc_edit_request(reply)
+                    task_id = ""
+                    if doc_action:
+                        try:
+                            edit_task = create_doc_edit_task(project_id, doc_action["request"], doc_action["documents"])
+                            task_id = str(edit_task.get("id") or "")
+                            note = doc_action["message"] or "I queued the agreed document changes for review."
+                            reply = (
+                                f"{note}\n\nDocument edit task {task_id} is on the board — "
+                                "review the proposed changes there and approve or reject them."
+                            )
+                            append_event({"at": now_iso(), "type": "chat_doc_edit_requested", "task_id": task_id})
+                        except Exception as exc:
+                            logger.warning("Chat doc_edit task creation failed project=%s: %s", project_id, exc)
+                            note = doc_action["message"] or "I tried to queue the document changes."
+                            reply = f"{note}\n\n(The document edit task could not be created — please try again.)"
                     msg = {
                         "role": "assistant",
                         "content": reply,
@@ -176,6 +192,8 @@ class Handler(BaseHTTPRequestHandler):
                         "model": used_model,
                         "duration_seconds": dur,
                     }
+                    if task_id:
+                        msg["task_id"] = task_id
                     hist.append(msg)
                     write_chat_history(hist, project_id)
                     append_event({"at": now_iso(), "type": "chat_reply", "provider": used_provider, "model": used_model, "duration_seconds": dur})
