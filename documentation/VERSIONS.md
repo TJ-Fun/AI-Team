@@ -1,5 +1,10 @@
 # Version log
 
+## 0.154 — 2026-11-22
+
+- Documentation for the repo-manifest format-error handling and split guidance (0.152–0.153): `DOCUMENTATION.md` §4.4 now describes the manifest output-limit instruction and the `feedback`-field follow-up path.
+- Updated documentation to 0.154.
+
 ## 0.153 — 2026-11-22
 
 - Repo file-change manifest instructions (`build_repo_agent_instructions` in `ait/qa_review.py`) now tell agents the reply must fit the provider's output token limit: return complete contents only for files that must change, keep contents minimal, and if the full change set cannot fit, return the most critical files and describe the remaining work in the `feedback` field so PM/PO can queue a follow-up task.
