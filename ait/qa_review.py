@@ -239,8 +239,14 @@ def parse_work_reply_envelope(reply: str) -> str:
         clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", clean, flags=re.IGNORECASE).strip()
     try:
         obj = json.loads(clean)
-    except Exception as exc:
-        raise ValueError("Agent reply must be a JSON envelope with 'summary' and 'details' fields.") from exc
+    except Exception:
+        start, end = clean.find("{"), clean.rfind("}")
+        if start == -1 or end <= start:
+            raise ValueError("Agent reply must be a JSON envelope with 'summary' and 'details' fields.")
+        try:
+            obj = json.loads(clean[start : end + 1])
+        except Exception as exc:
+            raise ValueError("Agent reply must be a JSON envelope with 'summary' and 'details' fields.") from exc
     if not isinstance(obj, dict):
         raise ValueError("Agent reply envelope must be a JSON object.")
     summary = str(obj.get("summary") or "").strip()

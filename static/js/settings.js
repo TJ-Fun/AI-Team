@@ -139,6 +139,28 @@ export function initSettings({ loadProjectsIntoSettings, reloadSettingsData, set
   });
 
   // Load logs
+  let lastLogLines = [];
+  function renderLogLines() {
+    const filter = ($("#log-filter")?.value || "").trim().toLowerCase();
+    const logs = filter ? lastLogLines.filter((line) => line.toLowerCase().includes(filter)) : lastLogLines;
+    const out = $("#log-output");
+    if (logs.length === 0) {
+      out.innerHTML = `<span class="muted">${lastLogLines.length ? "No log lines match the filter." : "No logs found."}</span>`;
+      return;
+    }
+    out.innerHTML = logs
+      .map((line) => {
+        let className = "log-info";
+        const level = line.match(/\|\s*(DEBUG|INFO|WARNING|ERROR|CRITICAL)\s*\|/)?.[1];
+        if (level === "CRITICAL") className = "log-critical";
+        else if (level === "ERROR") className = "log-error";
+        else if (level === "WARNING") className = "log-warning";
+        else if (level === "DEBUG") className = "log-debug";
+        return `<span class="${className}">${escapeHtml(line)}</span>`;
+      })
+      .join("\n");
+  }
+  $("#log-filter")?.addEventListener("input", renderLogLines);
   $("#load-logs")?.addEventListener("click", async () => {
     const level = $("#log-level")?.value || "all";
     $("#log-output").textContent = "Loading logs…";
@@ -147,22 +169,8 @@ export function initSettings({ loadProjectsIntoSettings, reloadSettingsData, set
         method: "POST",
         body: JSON.stringify({ level, lines: 1000 }),
       });
-      const logs = res.logs || [];
-      if (logs.length === 0) {
-        $("#log-output").innerHTML = `<span class="muted">No logs found.</span>`;
-      } else {
-        $("#log-output").innerHTML = logs
-          .map((line) => {
-            let className = "log-info";
-            const level = line.match(/\|\s*(DEBUG|INFO|WARNING|ERROR|CRITICAL)\s*\|/)?.[1];
-            if (level === "CRITICAL") className = "log-critical";
-            else if (level === "ERROR") className = "log-error";
-            else if (level === "WARNING") className = "log-warning";
-            else if (level === "DEBUG") className = "log-debug";
-            return `<span class="${className}">${escapeHtml(line)}</span>`;
-          })
-          .join("\n");
-      }
+      lastLogLines = res.logs || [];
+      renderLogLines();
     } catch (err) {
       $("#log-output").innerHTML = `<span class="log-error">Failed to load logs: ${escapeHtml(err.message)}</span>`;
     }

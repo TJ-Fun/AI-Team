@@ -1,5 +1,15 @@
 # Version log
 
+## 0.116 — 2026-11-21
+
+- Agent exchange capture and format-failure handling (plan `ToDo/2026-11-21_plan_agent_reply_capture.md`):
+  - Raw replies are now persisted on receipt, before envelope validation — failed attempts keep the full agent output (`text` on error replies, `raw_text` alongside parsed text on success). Reply entries carry `error_kind` (`api`/`format`); activity messages say "reply format invalid" instead of "API error 400" for format problems, and dispatch failures are logged with a reply excerpt.
+  - Work-envelope format failures get up to two automatic format-correction retries (`maybe_format_retry`) with the parse error fed back to the agent, instead of blind route retries.
+  - The outgoing prompt (system instruction + user prompt, 200 KB cap) is saved per attempt as `replies/{task}/{provider}/attempt-NNN.prompt.txt` and linked via `prompt_file` in reply JSON; `GET /api/tasks/{id}/file?path=...` serves reply-dir files (path-confined).
+  - Task details: reply cards show the error kind, a raw-reply expander, and a **View sent prompt** button. Settings → Logs gained a free-text filter for loaded lines.
+  - `parse_work_reply_envelope` now extracts the outermost `{...}` object when the reply is wrapped in prose; `WORK_REPLY_CONTRACT` clarifies that reports belong inside `details`.
+- Updated documentation to 0.116.
+
 ## 0.115 — 2026-11-21
 
 - Replan chain board-delta stage (`ait/replan_stages.py`): `board_delta` tasks propose cancel/supersede/create task mutations via `BOARD_DELTA_CONTRACT`; the user approves the whole list once through the doc-update decision flow, then `apply_board_delta_update` applies it — Done tasks can only be superseded (never deleted), in-progress tasks are skipped, and supersede/create produce Ready replacement tasks. Mutation list rendered in task details; PM prompt now forbids re-asking answered questions and documents the chain task types.

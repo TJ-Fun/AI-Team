@@ -351,17 +351,46 @@ export function initTaskDetail({ refreshBoard, loadChat, populateProviderSelects
       const replies = res.replies || [];
       repliesEl.innerHTML = replies.length
         ? replies
-            .map(
-              (r) => `
+            .map((r) => {
+              const kind = r.error_kind ? ` · ${escapeHtml(r.error_kind)}` : "";
+              const rawBlock =
+                r.raw_text && r.raw_text !== r.text
+                  ? `<details class="reply-raw"><summary>Raw reply</summary><pre class="reply-text">${escapeHtml(r.raw_text)}</pre></details>`
+                  : "";
+              const promptBlock = r.prompt_file
+                ? `<button class="secondary reply-prompt-btn" type="button" data-prompt-file="${escapeHtml(r.prompt_file)}">View sent prompt</button><pre class="reply-text reply-prompt-text" hidden></pre>`
+                : "";
+              return `
             <article class="reply-card">
               <div class="reply-heading">${escapeHtml(r.provider)} · attempt ${escapeHtml(r.attempt)} · ${escapeHtml(
                 r.state
-              )} · ${escapeHtml(formatTime(r.at))}</div>
+              )}${kind} · ${escapeHtml(formatTime(r.at))}</div>
               <pre class="reply-text">${escapeHtml(r.text || r.error || "No response text was saved.")}</pre>
-            </article>`
-            )
+              ${rawBlock}${promptBlock}
+            </article>`;
+            })
             .join("")
         : `<span class="muted">No agent replies yet.</span>`;
+      repliesEl.querySelectorAll(".reply-prompt-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const pre = btn.parentElement.querySelector(".reply-prompt-text");
+          if (!pre || !pre.hidden) {
+            if (pre) pre.hidden = true;
+            return;
+          }
+          pre.hidden = false;
+          pre.textContent = "Loading prompt…";
+          try {
+            const resp = await fetch(
+              `/api/tasks/${encodeURIComponent(task.id)}/file?path=${encodeURIComponent(btn.dataset.promptFile)}`
+            );
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            pre.textContent = await resp.text();
+          } catch (err) {
+            pre.textContent = `Could not load prompt: ${err.message}`;
+          }
+        });
+      });
     } catch (err) {
       if (state.detailTaskId === task.id && state.detailRenderedSnapshot === renderSnapshot) {
         repliesEl.textContent = `Could not load replies: ${err.message}`;

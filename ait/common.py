@@ -250,9 +250,10 @@ ESCALATION_CONTRACT = (
 )
 
 WORK_REPLY_CONTRACT = (
-    "Return ONLY one valid JSON object, no markdown, with this shape: "
+    "Return ONLY one valid JSON object, no markdown, no code fences, no extra text, with this shape: "
     '{"summary":"one-line outcome","details":"complete answer or report text"}. '
-    "Keep details complete but concise. Do not include file contents or diffs."
+    "Keep details complete but concise. Do not include file contents or diffs. "
+    "If the task asks for a report or analysis, put the entire report inside 'details'."
 )
 
 DOC_UPDATE_CONTRACT = (
