@@ -1,5 +1,12 @@
 # Version log
 
+## 0.117 — 2026-11-21
+
+- Recovery fix for agent exchange capture: implemented the missing `_save_agent_prompt` helper in `ait/provider_stream.py`, so each provider attempt writes `replies/{task}/{provider}/attempt-NNN.prompt.txt` and reply JSON links `prompt_file`.
+- Hardened `GET /api/tasks/{id}/file` path confinement with `Path.is_relative_to` so sibling reply directories cannot be read through a task ID prefix.
+- Clear `format_retry_feedback`/`format_retries` after an accepted reply while preserving feedback when `maybe_format_retry` requeues a task.
+- Updated documentation to 0.117.
+
 ## 0.116 — 2026-11-21
 
 - Agent exchange capture and format-failure handling (plan `ToDo/2026-11-21_plan_agent_reply_capture.md`):

@@ -281,9 +281,11 @@ def dispatch_one_for_provider(provider: str) -> bool:
             }
         )
 
+        format_retry_resolved = False
         if needs_work_reply_envelope(task):
             try:
                 reply = parse_work_reply_envelope(reply)
+                format_retry_resolved = True
             except ValueError as exc:
                 raise ProviderFailure(provider, 400, str(exc), error_kind="format") from exc
 
@@ -448,6 +450,10 @@ def dispatch_one_for_provider(provider: str) -> bool:
                 else:
                     fresh["validation"] = {"status": "not_required", "checks": [], "validated_at": ts}
                     next_status, msg = "Done", f"{provider} replied; no deliverable validation was required."
+
+                if format_retry_resolved or not fresh.get("format_retry_feedback"):
+                    fresh.pop("format_retry_feedback", None)
+                    fresh.pop("format_retries", None)
 
                 for att in fresh.get("attempts") or []:
                     if att.get("number") == attempt_num:

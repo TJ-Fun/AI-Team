@@ -47,6 +47,38 @@ def _openai_error_detail(exc: urllib.error.HTTPError) -> str:
     return detail_str[:1500]
 
 
+def _save_agent_prompt(task: dict[str, Any], provider: str, role: str, prompt: str, contract: str) -> None:
+    tid = str(task.get("id") or "")
+    attempts = task.get("attempts") or []
+    attempt_num = int((attempts[-1] or {}).get("number") or 0) if attempts else 0
+    if not tid or attempt_num < 1:
+        return
+    folder = provider.lower().replace(" ", "")
+    rel = f"replies/{tid}/{folder}/attempt-{attempt_num:03d}.prompt.txt"
+    system = combined_agent_prompt(role) + (("\n\n" + contract) if contract else "")
+    route_model = str(task.get("_route_model") or "auto")
+    body = (
+        f"Task: {tid}\nProvider: {provider}\nRole: {role}\nRoute model: {route_model}\nAttempt: {attempt_num}\n\n"
+        "SYSTEM INSTRUCTION:\n"
+        f"{system}\n\nUSER PROMPT:\n{prompt}"
+    )[:200000]
+    try:
+        atomic_text(DATA / rel, body)
+        task["_prompt_file_rel"] = rel
+        append_event(
+            {
+                "at": now_iso(),
+                "task_id": tid,
+                "type": "agent_prompt_saved",
+                "provider": provider,
+                "attempt": attempt_num,
+                "chars": len(body),
+            }
+        )
+    except Exception as exc:
+        logger.warning("Could not save agent prompt task_id=%s provider=%s attempt=%s: %s", tid, provider, attempt_num, exc)
+
+
 def _task_prompt(task: dict[str, Any], provider: str, extra_context: str) -> tuple[str, str, str]:
     role = str(task.get("assigned_role") or "PM/PO")
     checks = task.get("acceptance_checks") or []

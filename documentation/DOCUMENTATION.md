@@ -1,6 +1,6 @@
 # Personal AI Team — Project Documentation
 
-Version 0.116 · Updated 2026-11-21
+Version 0.117 · Updated 2026-11-21
 
 Repository: [https://github.com/TJ-Fun/AI-Team](https://github.com/TJ-Fun/AI-Team)
 
@@ -82,7 +82,7 @@ Use the configured service user's permitted paths. The example service grants pr
 
 **Wipe GitHub** (`POST /api/projects/{id}/wipe-github`, `ait/github_repo_wipe.py` + `ait/project_cleanup.py`) is an irreversible repository reset: it requires typing `owner/repo` as confirmation, refuses when another project uses the same repository or the local clone has uncommitted changes or unpushed commits, then force-points the default branch to a fresh empty "Clean start" commit and deletes all releases, non-default branches, and tags through the GitHub API before removing the local clone. If any remote deletion fails, the local clone is kept and the error is returned. There is no undo — rely on GitHub-side backups if needed.
 
-Every provider call is captured for inspection: the outgoing prompt (system instruction + user prompt, capped at 200 KB) is saved as `replies/{task}/{provider}/attempt-NNN.prompt.txt` before the request, and the raw reply is saved to `attempt-NNN.json` immediately on receipt — before format validation — so failed attempts keep the full agent output (`raw_text` on success, `text` on error replies). Reply entries carry `error_kind` (`api` vs `format`); work-envelope format failures get up to two automatic format-correction retries with the parse error fed back to the agent, and dispatch failures are logged with a reply excerpt. Task details show the error kind, a raw-reply expander, and a **View sent prompt** button (`GET /api/tasks/{id}/file?path=...`, confined to the task's reply directory).
+Every provider call is captured for inspection: the outgoing prompt (system instruction + user prompt, capped at 200 KB) is saved as `replies/{task}/{provider}/attempt-NNN.prompt.txt` before the request, and the raw reply is saved to `attempt-NNN.json` immediately on receipt — before format validation — so failed attempts keep the full agent output (`raw_text` on success, `text` on error replies). Reply entries carry `error_kind` (`api` vs `format`); work-envelope format failures get up to two automatic format-correction retries with the parse error fed back to the agent (accepted replies clear the retry budget), and dispatch failures are logged with a reply excerpt. Task details show the error kind, a raw-reply expander, and a **View sent prompt** button (`GET /api/tasks/{id}/file?path=...`, confined to the task's reply directory).
 
 ### 4.5 App updates
 

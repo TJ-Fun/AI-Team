@@ -25,7 +25,7 @@ def handle_tasks_core_get(handler, path, query) -> bool:
         rel = str((query.get("path") or [""])[0] or "").strip()
         root = (DATA / "replies" / tid).resolve()
         target = (DATA / rel).resolve() if rel.startswith("replies/") else None
-        if not target or not str(target).startswith(str(root)) or not target.is_file():
+        if not target or not target.is_relative_to(root) or not target.is_file():
             handler.send_json({"error": "File not found."}, HTTPStatus.NOT_FOUND)
             return True
         handler.serve_file(target, "text/plain; charset=utf-8")
