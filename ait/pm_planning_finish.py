@@ -94,6 +94,7 @@ def finish_pm_planning_task(task: dict[str, Any], reply: str, provider: str) -> 
                     project_id=task.get("project_id") or "default",
                     module_id=item["module_id"],
                     steps=item.get("steps"),
+                    fallback=item.get("fallback") or "",
                     status=plan_status,
                     source_plan_task_id=task["id"],
                     planning_root_id=task.get("planning_root_id"),

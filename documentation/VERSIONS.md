@@ -1,5 +1,10 @@
 # Version log
 
+## 0.128 — 2026-11-21
+
+- PM/PO feasibility rule: the planning contract now requires verifying every proposed task is executable by the assigned role with repository/provider access; anything needing user or host action (accounts, credentials, consoles, billing, third-party dashboards, manual installs) must be an `env_setup` User task. Env setup steps gained an optional `troubleshooting` field and tasks a `fallback` field (alternatives or plan/phase adjustments); both render in the env section and task copy. Also restored the roadmap/phases fields in the plan contract schema and the `roadmap` wording in the PM/PO prompt.
+- Updated documentation to 0.128.
+
 ## 0.127 — 2026-11-21
 
 - PM/PO planning rework: the plan `project_overview` now includes a **Roadmap** document (phase-level overview) plus `phases` with a detailed task-by-task plan per phase (`phase_1`–`phase_9`). The overview approval dialog renders and saves all of them; approving writes the roadmap and phase plan documents to Project context and refreshes the trackers. Plans that reference a phase without a phase plan get a warning. Project vision remains user-owned and untouched.

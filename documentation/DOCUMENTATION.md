@@ -107,7 +107,7 @@ The Settings dialog uses Projects, Connections, Routing, Agent prompts, Logs, an
 
 ### 4.7 Environment setup tasks, services manifest, and CI evidence
 
-PM/PO plans can propose manual **env_setup** tasks for host/account preparation. Each task contains an ordered list of steps (at least one, no fixed maximum) with instructions and expected output; users start the task, paste command output, and mark each step confirmed, skipped, problem, or change. Problems block the task and can be escalated to PM/PO for revised instructions. Env tasks are never dispatched to providers and do not create repository pull requests.
+PM/PO plans can propose manual **env_setup** tasks for host/account preparation. Each task contains an ordered list of steps (at least one, no fixed maximum) with instructions, expected output, and optional per-step troubleshooting; the task may also carry a fallback describing alternatives or plan/phase adjustments. The PM/PO contract requires verifying every proposed task is agent-executable — anything needing user/host action becomes an env_setup task. Users start the task, paste command output, and mark each step confirmed, skipped, problem, or change. Problems block the task and can be escalated to PM/PO for revised instructions. Env tasks are never dispatched to providers and do not create repository pull requests.
 
 Each project also stores a **Services & hosting** manifest (web host, API runtime, database, auth, media, bot protection, preview/staging/production URLs, and health path). The manifest is editable in **Settings → Projects** and summarized into PM/PO project context so planning accounts for external services.
 

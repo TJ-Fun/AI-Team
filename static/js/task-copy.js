@@ -126,15 +126,19 @@ export function taskCopyText(task, replies = []) {
     }
   }
 
-  if (task.env_state) {
-    const env = task.env_state;
-    const steps = (env.steps || [])
-      .map((s) => `- [${s.status || ""}] ${s.title || s.id || ""}\n  ${s.instructions || ""}${s.output ? `\n  Output: ${s.output}` : ""}${s.note ? `\n  Note: ${s.note}` : ""}`)
+  if (task.env_state || task.env_steps) {
+    const env = task.env_state || {};
+    const steps = (task.env_steps || env.steps || [])
+      .map(
+        (s) =>
+          `- [${s.status || ""}] ${s.title || s.id || ""}\n  ${s.instructions || ""}${s.expected ? `\n  Expected: ${s.expected}` : ""}${s.troubleshooting ? `\n  Troubleshooting: ${s.troubleshooting}` : ""}${s.output ? `\n  Output: ${s.output}` : ""}${s.note ? `\n  Note: ${s.note}` : ""}`
+      )
       .join("\n");
     const issue = env.issue
       ? `\nIssue at ${env.issue.step_id || ""}: ${env.issue.result || ""}${env.issue.note ? ` — ${env.issue.note}` : ""}`
       : "";
-    out += section("Environment setup", `${steps}${issue}`.trim());
+    const fallback = task.env_fallback ? `\nFallback: ${task.env_fallback}` : "";
+    out += section("Environment setup", `${steps}${issue}${fallback}`.trim());
   }
 
   if (task.validation) {

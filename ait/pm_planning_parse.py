@@ -117,6 +117,7 @@ def parse_pm_plan_response(reply: str, project_id: str = "default") -> dict[str,
                         "release": release,
                         "release_order": release_order,
                         "steps": env_steps,
+                        "fallback": str(t.get("fallback") or "").strip()[:4000],
                     }
                 )
                 continue

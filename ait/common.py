@@ -216,12 +216,20 @@ PM_PLANNING_CONTRACT = (
     '"allow_free_text":true}]}. Provide 2 to 8 useful options per question and allow free text. '
     "If no more clarification is needed: "
     '{"type":"plan","summary":"brief plan summary","project_overview":{"project_brief":"complete Markdown brief",'
-    '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log"},'
+    '"technical_overview":"complete Markdown technical overview","decisions":"complete Markdown decision log",'
+    '"roadmap":"complete Markdown roadmap (phase overview only)",'
+    '"phases":{"phase_1":"complete Markdown task-by-task phase plan"}},'
     '"tasks":[{"title":"task title","request":"bounded implementation request",'
     '"role":"Frontend developer","module_id":"valid project sub-project ID or empty string","acceptance_checks":["observable check"],"produces_deliverable":true,"phase":1,"release":"v0.1.1","release_order":1,"kind":"","steps":[]}]}. '
     "Task fields: kind is empty for normal work tasks; set kind to \"env_setup\" only for manual user/host setup tasks. "
+    "Before proposing any task, verify the assigned role can actually complete it with repository access and provider "
+    "capabilities. Anything requiring user or host action — accounts, credentials, consoles, billing, third-party "
+    "dashboards, manual installs — MUST be kind \"env_setup\" with role \"User\", never a dev role. "
     "An env_setup task MUST include a non-empty \"steps\" array with one object per user action: "
-    "{\"title\":\"short step\",\"instructions\":\"exact step-by-step commands/checks\",\"expected\":\"expected output\"}. "
+    "{\"title\":\"short step\",\"instructions\":\"exact step-by-step commands/checks\",\"expected\":\"expected output\","
+    "\"troubleshooting\":\"what to check/do when this step fails\"}. "
+    "Each env_setup task should also include \"fallback\": what to do if a step cannot be completed — alternative "
+    "approach, manual workaround, or how to adjust the plan/phase. "
     "Keep each step short and focused; there is no fixed maximum, but prefer the fewest steps that fully cover the setup. "
     "Env tasks are manual, use role \"User\", are not dispatched to providers, and a plan containing an env_setup task without steps is invalid. "
     "Use only these work roles: PM/PO, Frontend developer, Backend developer, QA, UI designer, Documentation. "

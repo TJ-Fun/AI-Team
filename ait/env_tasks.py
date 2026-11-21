@@ -24,6 +24,7 @@ def clean_env_steps(raw: Any) -> list[dict[str, Any]]:
         title = str(item.get("title", "")).strip()[:160]
         instructions = str(item.get("instructions", "")).strip()[:12000]
         expected = str(item.get("expected", "")).strip()[:2000]
+        troubleshooting = str(item.get("troubleshooting", "")).strip()[:2000]
         if not title or not instructions:
             raise ValueError("Each environment step needs a title and detailed instructions.")
         steps.append(
@@ -32,6 +33,7 @@ def clean_env_steps(raw: Any) -> list[dict[str, Any]]:
                 "title": title,
                 "instructions": instructions,
                 "expected": expected,
+                "troubleshooting": troubleshooting,
                 "status": "pending",
                 "output": "",
                 "note": "",
@@ -61,6 +63,7 @@ def create_env_task(
     phase: int | None = None,
     release: str = "",
     release_order: int | None = None,
+    fallback: str = "",
 ) -> dict[str, Any]:
     proj = next((p for p in read_projects() if p.get("id") == project_id), None)
     if not proj:
@@ -84,6 +87,7 @@ def create_env_task(
         "produces_deliverable": False,
         "acceptance_checks": [],
         "env_steps": clean_steps,
+        "env_fallback": str(fallback or "").strip()[:4000],
         "env_state": {"current_step": 0, "started_at": None, "completed_at": None},
         "created_at": ts,
         "updated_at": ts,

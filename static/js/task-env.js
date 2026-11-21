@@ -73,10 +73,15 @@ export function renderEnvSection(task) {
     })
     .join("");
 
+  const fallbackHtml = task.env_fallback
+    ? `<div class="env-step"><div class="env-step-head"><strong>If a step cannot be completed</strong></div><p class="detail-copy">${escapeHtml(task.env_fallback)}</p></div>`
+    : "";
+
   body.innerHTML = `
     <p class="draft-note">${doneCount}/${steps.length} steps confirmed · status ${escapeHtml(task.status)}</p>
     ${startHtml}
     ${issueHtml}
+    ${fallbackHtml}
     ${stepsHtml}`;
 }
 
