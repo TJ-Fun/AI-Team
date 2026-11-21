@@ -1,5 +1,10 @@
 # Version log
 
+## 0.130 — 2026-11-21
+
+- Split `static/js/providers.js` (batch 1 of 3): extracted shared provider helpers into `provider-shared.js` and the chat provider/model selectors into `provider-chat-select.js`. `initProviders` keeps returning the same API object; no consumer changes.
+- Updated documentation to 0.130.
+
 ## 0.129 — 2026-11-21
 
 - Fixed duplicated action buttons in the task detail dialog: `renderTaskDetailActions` embedded the accumulated `actionHtml` inside its own right-hand wrapper, so every workflow button (status actions, chain plan approve/reject, overview/update decisions, merge approval) rendered twice. The markup is now composed once — left group (Delete task, Copy) and right group (workflow actions + Close).

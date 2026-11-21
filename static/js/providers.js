@@ -1,60 +1,19 @@
 import { $, escapeHtml, state, api, appAlert, appConfirm } from "./core.js";
+import {
+  isProviderConnected,
+  providerKindLabel,
+  chatProviderOptions,
+  populateProviderSelects,
+  setConnectionsSuccess,
+} from "./provider-shared.js";
+import { initChatProviderSelect } from "./provider-chat-select.js";
 
 export function initProviders({ refreshStatus, refreshBoard } = {}) {
-  function chatProviderOptions(selected) {
-    const providers = state.routingProviders.length ? state.routingProviders : [];
-    const known = state.connections.length > 0;
-    return ["Auto", ...providers]
-      .map(
-        (opt) =>
-          `<option value="${escapeHtml(opt)}"${opt === selected ? " selected" : ""}>${escapeHtml(opt)}${
-            opt !== "Auto" && known && !isProviderConnected(opt) ? " · not connected" : ""
-          }</option>`
-      )
-      .join("");
-  }
+  const { renderChatModelSelect, renderChatProviderSelect } = initChatProviderSelect();
 
   // --- Connections Dialog ---
   const connectionsForm = $("#connections-form");
   const routingForm = $("#routing-form");
-
-  function isProviderConnected(providerName) {
-    return state.connections.some((c) => c.is_provider !== false && c.name === providerName && c.configured);
-  }
-
-  function providerKindLabel(kind) {
-    return kind === "gemini" ? "Gemini API" : "OpenAI-compatible";
-  }
-
-  function populateProviderSelects() {
-    const options = ["Automatic", "Auto", ...state.routingProviders]
-      .map((opt) => `<option value="${escapeHtml(opt)}">${escapeHtml(opt)}</option>`)
-      .join("");
-    const taskSelect = document.querySelector('select[name="provider"]');
-    if (taskSelect) {
-      const current = taskSelect.value || "Automatic";
-      taskSelect.innerHTML = options;
-      taskSelect.value = [...taskSelect.options].some((o) => o.value === current) ? current : "Automatic";
-    }
-    const detailSelect = $("#detail-provider-select");
-    if (detailSelect) {
-      const current = detailSelect.value || "Automatic";
-      detailSelect.innerHTML = options;
-      detailSelect.value = [...detailSelect.options].some((o) => o.value === current) ? current : "Automatic";
-    }
-  }
-
-  function setConnectionsSuccess(message = "") {
-    const el = $("#connections-success");
-    if (!el) return;
-    if (message) {
-      el.textContent = message;
-      el.hidden = false;
-    } else {
-      el.textContent = "";
-      el.hidden = true;
-    }
-  }
 
   function renderConnectionsAndRouting() {
     const providers = state.connections
@@ -338,99 +297,6 @@ export function initProviders({ refreshStatus, refreshBoard } = {}) {
       }
     }
   }
-
-  async function renderChatModelSelect() {
-    const sel = $("#chat-model-select");
-    if (!sel) return;
-    const provider = state.chatProvider || "Auto";
-    sel.disabled = true;
-    if (provider === "Auto") {
-      sel.innerHTML = `<option value="" selected>Auto model</option>`;
-      sel.title = "Auto uses each provider's configured model.";
-      return;
-    }
-    try {
-      if (!state.connections.length) {
-        const connRes = await api("/api/connections");
-        state.connections = connRes.connections || [];
-      }
-      const rec = state.connections.find((c) => c.name === provider);
-      if (!rec) {
-        sel.innerHTML = `<option value="">Provider unavailable</option>`;
-        return;
-      }
-      const res = await api(`/api/providers/${encodeURIComponent(rec.id)}/models`);
-      const current = String(res.current || "auto");
-      const override = state.chatModelOverride || "";
-      const options = [
-        `<option value=""${override ? "" : " selected"}>Provider default (${escapeHtml(
-          current === "auto" ? "Auto" : current
-        )})</option>`,
-      ];
-      for (const m of res.models || []) {
-        options.push(`<option value="${escapeHtml(m)}"${m === override ? " selected" : ""}>${escapeHtml(m)}</option>`);
-      }
-      if (override && !(res.models || []).includes(override)) {
-        options.push(`<option value="${escapeHtml(override)}" selected>${escapeHtml(override)}</option>`);
-      }
-      sel.innerHTML = options.join("");
-      sel.disabled = false;
-      sel.title = res.selectable
-        ? "Model used by the PM/PO chat for this provider."
-        : res.error || "Model list unavailable; the provider default is used.";
-    } catch (err) {
-      sel.innerHTML = `<option value="">Model unavailable</option>`;
-      sel.title = err.message;
-    }
-  }
-
-  function renderChatProviderSelect() {
-    const options = chatProviderOptions(state.chatProvider);
-    const sel = $("#chat-provider-select");
-    if (sel) sel.innerHTML = options;
-    const menu = $("#chat-provider-menu");
-    if (menu) menu.innerHTML = options;
-  }
-
-  $("#chat-provider-select")?.addEventListener("change", (e) => {
-    state.chatProvider = e.target.value;
-    renderChatModelSelect();
-    const menu = $("#chat-provider-menu");
-    if (menu) menu.innerHTML = chatProviderOptions(state.chatProvider);
-  });
-
-  $("#chat-provider-menu")?.addEventListener("change", async (e) => {
-    const provider = e.target.value;
-    state.chatProvider = provider;
-    renderChatModelSelect();
-    const sel = $("#chat-provider-select");
-    if (sel) sel.innerHTML = chatProviderOptions(provider);
-    try {
-      const res = await api("/api/routing", {
-        method: "POST",
-        body: JSON.stringify({ chat_provider: provider }),
-      });
-      state.chatModelOverride = res.chat_model_override || "";
-      renderChatModelSelect();
-    } catch (err) {
-      appAlert(`Could not save chat provider: ${err.message}`, "Chat provider");
-    }
-  });
-
-  $("#chat-model-select")?.addEventListener("change", async (e) => {
-    const model = e.target.value;
-    try {
-      const res = await api("/api/routing", {
-        method: "POST",
-        body: JSON.stringify({ chat_provider: state.chatProvider, chat_model: model }),
-      });
-      state.chatProvider = res.chat_provider || state.chatProvider;
-      state.chatModelOverride = res.chat_model_override || "";
-    } catch (err) {
-      appAlert(`Could not save chat model: ${err.message}`, "Chat model");
-      renderChatModelSelect();
-    }
-  });
 
   async function reloadSettingsData() {
     const [connRes, routeRes] = await Promise.all([api("/api/connections"), api("/api/routing")]);
