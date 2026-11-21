@@ -294,8 +294,12 @@ VISION_UPDATE_CONTRACT = (
 BOARD_DELTA_CONTRACT = (
     "For a replan chain board-delta subtask, return ONLY one valid JSON object, no markdown: "
     '{"type":"board_delta","summary":"brief summary","mutations":[{"op":"cancel|supersede|create",'
-    '"task_id":"T-0001","title":"task title","request":"bounded request","role":"PM/PO","reason":"why"}]}. '
+    '"task_id":"T-0001","title":"task title","request":"bounded request","role":"PM/PO",'
+    '"produces_deliverable":true,"acceptance_checks":["observable check"],"phase":1,'
+    '"module_id":"valid project sub-project ID or empty string","release":"v0.1.1","release_order":1,"reason":"why"}]}. '
     "cancel/supersede need task_id of an existing board task; supersede/create need title, request, and a valid role. "
+    "produces_deliverable defaults to true for non-PM/PO roles; provide acceptance_checks when it is true. "
+    "phase is 1-9, module_id must be a valid project sub-project ID or empty, release/release_order are optional. "
     "Never delete tasks; Done tasks can only be superseded. The user approves the whole list once before anything is applied."
 )
 

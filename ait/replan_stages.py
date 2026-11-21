@@ -111,6 +111,29 @@ def parse_board_delta_response(reply: str) -> dict[str, Any]:
                 raise ValueError(f"{op} mutation needs a title and request.")
             if mut["role"] not in WORK_ROLES:
                 raise ValueError(f"Invalid role '{mut['role']}' for board mutation.")
+            produces = item.get("produces_deliverable")
+            mut["produces_deliverable"] = produces if isinstance(produces, bool) else None
+            raw_checks = item.get("acceptance_checks")
+            if raw_checks is None:
+                mut["acceptance_checks"] = None
+            elif not isinstance(raw_checks, list):
+                raise ValueError(f"{op} mutation acceptance_checks must be a list.")
+            else:
+                mut["acceptance_checks"] = [str(c).strip()[:500] for c in raw_checks if str(c).strip()][:20]
+            try:
+                phase = int(item.get("phase")) if item.get("phase") is not None else None
+            except (TypeError, ValueError):
+                raise ValueError(f"{op} mutation phase must be a number.") from None
+            if phase is not None and not 1 <= phase <= 9:
+                raise ValueError(f"{op} mutation phase must be between 1 and 9.")
+            mut["phase"] = phase
+            mut["module_id"] = str(item.get("module_id") or "").strip()[:200] or None
+            mut["release"] = normalize_release_id(item.get("release")) or None
+            try:
+                release_order = int(item.get("release_order")) if item.get("release_order") is not None else None
+            except (TypeError, ValueError):
+                release_order = None
+            mut["release_order"] = release_order
         mutations.append(mut)
     return {"summary": summary, "mutations": mutations}
 
@@ -145,6 +168,26 @@ def _apply_board_supersede(target: dict[str, Any], mut: dict[str, Any], reason: 
             {"at": ts, "type": "board_delta", "message": f"Superseded by approved replan board delta. {reason}".strip()}
         )
         write_task(target)
+    role = str(mut.get("role") or target.get("assigned_role") or "PM/PO")
+    produces = mut.get("produces_deliverable")
+    if not isinstance(produces, bool):
+        produces = target.get("produces_deliverable")
+        if not isinstance(produces, bool):
+            produces = role != "PM/PO"
+    checks = mut.get("acceptance_checks")
+    if checks is None:
+        checks = target.get("acceptance_checks") or []
+    checks = [str(c).strip()[:500] for c in checks if str(c).strip()][:20]
+    if produces and not checks:
+        checks = ["Manually review the resulting deliverable against the task request."]
+    phase = mut.get("phase") or target.get("phase") or 1
+    module_id = mut.get("module_id") or target.get("module_id") or ""
+    project = next((p for p in read_projects() if p.get("id") == (target.get("project_id") or "default")), None)
+    valid_mods = {str(m.get("id") or "") for m in (project or {}).get("modules", []) if isinstance(m, dict)}
+    if module_id and valid_mods and module_id not in valid_mods:
+        module_id = ""
+    release = mut.get("release") if mut.get("release") is not None else (target.get("release") or "")
+    release_order = mut.get("release_order") if mut.get("release_order") is not None else target.get("release_order")
     new_id = next_task_id()
     write_task(
         {
@@ -152,14 +195,16 @@ def _apply_board_supersede(target: dict[str, Any], mut: dict[str, Any], reason: 
             "task_type": "work",
             "title": mut["title"],
             "request": mut["request"],
-            "assigned_role": mut["role"],
+            "assigned_role": role,
             "provider": "Automatic",
             "status": "Ready",
-            "produces_deliverable": False,
-            "acceptance_checks": [],
+            "produces_deliverable": produces,
+            "acceptance_checks": checks,
             "project_id": target.get("project_id") or "default",
-            "module_id": target.get("module_id") or "",
-            "phase": target.get("phase") or 1,
+            "module_id": module_id,
+            "phase": phase,
+            "release": release,
+            "release_order": release_order,
             "supersedes_task_id": target.get("id"),
             "created_at": ts,
             "updated_at": ts,
@@ -172,6 +217,22 @@ def _apply_board_supersede(target: dict[str, Any], mut: dict[str, Any], reason: 
 
 
 def _apply_board_create(mut: dict[str, Any], pid: str, ts: str) -> str:
+    role = str(mut.get("role") or "PM/PO")
+    produces = mut.get("produces_deliverable")
+    if not isinstance(produces, bool):
+        produces = role != "PM/PO"
+    checks = mut.get("acceptance_checks")
+    if checks is None:
+        checks = []
+    checks = [str(c).strip()[:500] for c in checks if str(c).strip()][:20]
+    if produces and not checks:
+        checks = ["Manually review the resulting deliverable against the task request."]
+    phase = mut.get("phase") or 1
+    module_id = mut.get("module_id") or ""
+    project = next((p for p in read_projects() if p.get("id") == pid), None)
+    valid_mods = {str(m.get("id") or "") for m in (project or {}).get("modules", []) if isinstance(m, dict)}
+    if module_id and valid_mods and module_id not in valid_mods:
+        module_id = ""
     new_id = next_task_id()
     write_task(
         {
@@ -179,14 +240,16 @@ def _apply_board_create(mut: dict[str, Any], pid: str, ts: str) -> str:
             "task_type": "work",
             "title": mut["title"],
             "request": mut["request"],
-            "assigned_role": mut["role"],
+            "assigned_role": role,
             "provider": "Automatic",
             "status": "Ready",
-            "produces_deliverable": False,
-            "acceptance_checks": [],
+            "produces_deliverable": produces,
+            "acceptance_checks": checks,
             "project_id": pid,
-            "module_id": "",
-            "phase": 1,
+            "module_id": module_id,
+            "phase": phase,
+            "release": mut.get("release") or "",
+            "release_order": mut.get("release_order"),
             "created_at": ts,
             "updated_at": ts,
             "attempts": [],

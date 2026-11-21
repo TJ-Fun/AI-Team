@@ -1,5 +1,10 @@
 # Version log
 
+## 0.121 — 2026-11-21
+
+- Made replan board-delta create/supersede mutations first-class tasks: `BOARD_DELTA_CONTRACT` now accepts `produces_deliverable`, `acceptance_checks`, `phase`, `module_id`, `release`, and `release_order`; parsing/apply persist them with PM-planning defaults (non-PM/PO roles produce deliverables, default acceptance check, phase/module/release carried or inherited on supersede). Board-delta tasks now go through deterministic checks/QA/PR merge and phase gating like normal planned work. Smoke-tested create defaults and supersede inheritance.
+- Updated documentation to 0.121.
+
 ## 0.120 — 2026-11-21
 
 - Fixed replan chain stage progression: `advance_chain()` now creates the next stage's plan task when the current stage finishes, so **Major replan** progresses review → vision → docs → roadmap → board_delta instead of completing after Review. Docs-stage subtasks auto-apply project-document updates once reached; smoke-tested plan creation without duplicates.
