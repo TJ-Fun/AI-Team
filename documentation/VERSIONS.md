@@ -1,5 +1,10 @@
 # Version log
 
+## 0.150 — 2026-11-22
+
+- The project board now sorts tasks by creation time, newest on top (`static/js/task-board.js`); the previous release-grouped ordering (release → release_order → env_setup first) is replaced by a strict `created_at` descending sort. Release badges on task cards are unchanged — display only.
+- Updated documentation to 0.150.
+
 ## 0.149 — 2026-11-21
 
 - Raised the project-document size limit from 20,000 to 30,000 characters (`MAX_DOC_CHARS` in `ait/doc_updates.py`), after a valid ~25k-char `outcomes` update was rejected. All agent-facing contracts (`DOC_UPDATE`, `doc_update_contract`, `CHAIN_DOC`, `VISION_UPDATE`, `ROADMAP_UPDATE`, `PROJECT_DOCS_UPDATE`), the PM planning overview validators (`ait/chat.py`, `ait/pm_planning_parse.py`), the manual context-document endpoint (`ait/routes_projects.py`), chain-stage validators (`ait/replan_stages.py`), the doc_update task request text, and the two document editor textareas (`index.html`, `task-detail.js`) now use the same 30,000-character limit.

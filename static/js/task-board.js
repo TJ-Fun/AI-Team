@@ -51,31 +51,11 @@ export function initTaskBoard(context = {}) {
     }
     if (emptyEl) emptyEl.hidden = true;
 
-    const releaseKey = (t) => {
-      const rel = String(t.release || "");
-      if (!rel) return null;
-      const parts = rel.replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
-      while (parts.length < 3) parts.push(0);
-      return parts;
-    };
-    const cmpRelease = (a, b) => {
-      for (let i = 0; i < 3; i += 1) {
-        if (a[i] !== b[i]) return a[i] - b[i];
-      }
-      return 0;
-    };
     const sortedTasks = [...visibleTasks].sort((a, b) => {
-      const ra = releaseKey(a);
-      const rb = releaseKey(b);
-      if (!ra && !rb) return 0;
-      if (!ra) return -1;
-      if (!rb) return 1;
-      const byRelease = cmpRelease(ra, rb);
-      if (byRelease) return byRelease;
-      const envA = a.task_type === "env_setup" ? 0 : 1;
-      const envB = b.task_type === "env_setup" ? 0 : 1;
-      if (envA !== envB) return envA - envB;
-      return (a.release_order ?? 9999) - (b.release_order ?? 9999);
+      const ta = String(a.created_at || a.updated_at || "");
+      const tb = String(b.created_at || b.updated_at || "");
+      if (ta !== tb) return tb.localeCompare(ta);
+      return String(b.id || "").localeCompare(String(a.id || ""));
     });
 
     listEl.innerHTML = sortedTasks
