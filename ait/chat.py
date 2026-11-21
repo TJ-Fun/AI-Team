@@ -240,3 +240,34 @@ def clean_overview_documents(body: dict[str, Any]) -> dict[str, str]:
             raise ValueError(f"{project_doc_title(slug)} must contain text under 20,000 characters.")
         cleaned[slug] = val.strip()
     return cleaned
+
+
+# --- Chat history ---
+def chat_history_path(project_id: str) -> Path:
+    safe_id = re.sub(r"[^a-z0-9-]+", "-", str(project_id or "default").lower()).strip("-") or "default"
+    return DATA / "chat" / f"{safe_id}.json"
+
+
+def read_chat_history(project_id: str = "default") -> list[dict[str, Any]]:
+    ensure_data()
+    p = chat_history_path(project_id)
+    if not p.is_file():
+        return []
+    try:
+        val = json.loads(p.read_text(encoding="utf-8"))
+        return val if isinstance(val, list) else []
+    except Exception:
+        return []
+
+
+def write_chat_history(messages: list[dict[str, Any]], project_id: str = "default") -> None:
+    ensure_data()
+    with STATE_LOCK:
+        atomic_json(chat_history_path(project_id), messages)
+
+
+def append_chat_notice(content: str, timestamp: str, task_id: str, project_id: str = "default") -> None:
+    with STATE_LOCK:
+        hist = read_chat_history(project_id)
+        hist.append({"role": "assistant", "content": content, "at": timestamp, "task_id": task_id})
+        write_chat_history(hist, project_id)

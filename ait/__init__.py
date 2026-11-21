@@ -26,7 +26,8 @@ from ait import main  # noqa: F401
 from ait import model_refresh  # noqa: F401
 from ait import notifications  # noqa: F401
 from ait import outcomes  # noqa: F401
-from ait import projects  # noqa: F401
+from ait import projects_store  # noqa: F401
+from ait import project_context  # noqa: F401
 from ait import routing  # noqa: F401
 from ait import tasks_store  # noqa: F401
 from ait import trackers  # noqa: F401
@@ -66,7 +67,8 @@ _DOMAIN_MODULES = (
     provider_registry,
     secrets,
     prompts,
-    projects,
+    projects_store,
+    project_context,
     routing,
     tasks_store,
     trackers,

@@ -1,5 +1,10 @@
 # Version log
 
+## 0.134 — 2026-11-21
+
+- Split `ait/projects.py` (batch 2 of 2, complete): extracted project CRUD/validation into `ait/projects_store.py`, per-project context documents into `ait/project_context.py`, and moved chat-history persistence into `ait/chat.py`. `ait/projects.py` is deleted; `ait/__init__.py` registers the new modules in the shared namespace. No call-site changes.
+- Updated documentation to 0.134.
+
 ## 0.133 — 2026-11-21
 
 - Split `ait/projects.py` (batch 1 of 2): extracted routing configuration/resolution (including per-task route selection) into `ait/routing.py` and task JSON storage/reply lookup into `ait/tasks_store.py`. `projects.py` keeps project CRUD, context documents, and chat history; `ait/__init__.py` registers the new modules in the shared namespace. No call-site changes.
