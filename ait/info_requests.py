@@ -17,6 +17,12 @@ def extract_info_requests(reply: str) -> list[str]:
     if not isinstance(obj, dict):
         return []
     raw = obj.get("info_requests")
+    if not isinstance(raw, list) and str(obj.get("type") or "").strip() == "info_requests":
+        for key in ("slugs", "requests", "documents", "docs"):
+            candidate = obj.get(key)
+            if isinstance(candidate, list):
+                raw = candidate
+                break
     if not isinstance(raw, list):
         return []
     slugs: list[str] = []

@@ -1,5 +1,10 @@
 # Version log
 
+## 0.139 — 2026-11-21
+
+- Fixed doc_update tasks failing with "must have type 'doc_update'" when weak models request documents in variant shapes: `extract_info_requests` in `ait/info_requests.py` now also accepts `{"type":"info_requests"}` with the slug array under `slugs`, `requests`, `documents`, or `docs`, and the `DOC_UPDATE`/`ROADMAP_UPDATE`/`PROJECT_DOCS_UPDATE` contracts in `ait/common.py` now show the literal `{"info_requests":["slug", ...]}` reply shape explicitly.
+- Updated documentation to 0.139.
+
 ## 0.138 — 2026-11-21
 
 - Chat-driven document edits (batch 4 of 4, complete): documented the `doc_edit` chat flow and Plan-button removal in `documentation/DOCUMENTATION.md` §4.2. The feature is now fully wired: discuss a change with PM/PO in chat, confirm, the agent queues a `doc_edit` task, and approving it on the board applies the new document text.

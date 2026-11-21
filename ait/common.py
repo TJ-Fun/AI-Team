@@ -280,7 +280,7 @@ DOC_UPDATE_CONTRACT = (
     "Return the full updated text of all four documents, preserving confirmed facts, marking assumptions, "
     "and reflecting the current task board. Each document must be non-empty and under 20,000 characters. "
     "Never include project_vision — it is user-owned and read-only for you. "
-    "Request any on-request project documents you need via info_requests before answering."
+    "To request on-request project documents, reply with ONLY {\"info_requests\":[\"slug\", ...]} and no other fields; the documents will be provided and you must then continue with your final structured reply."
 )
 
 CHAIN_PLAN_CONTRACT = (
@@ -329,7 +329,7 @@ ROADMAP_UPDATE_CONTRACT = (
     "The roadmap must embed a fenced json block (```json) named ait-release-plan with shape "
     '{"current_phase":"v0.1","current_release":"v0.1.1","phases":[{"id":"v0.1","title":"...","status":"planned|in_progress|done","releases":[{"id":"v0.1.1","title":"...","status":"planned|in_progress|done","task_ids":["T-0001"]}]}]}; '
     "keep it consistent with the task board. "
-    "Request any on-request project documents you need via info_requests before answering."
+    "To request on-request project documents, reply with ONLY {\"info_requests\":[\"slug\", ...]} and no other fields; the documents will be provided and you must then continue with your final structured reply."
 )
 
 PROJECT_DOCS_UPDATE_CONTRACT = (
@@ -340,7 +340,7 @@ PROJECT_DOCS_UPDATE_CONTRACT = (
     "Editable slugs: project_brief, technical_overview, decisions, outcomes, roadmap, phase_1 through phase_9. "
     "Never include project_vision or tracker documents — they are read-only. "
     "Set active_phase only when the roadmap's active phase changes; otherwise use null. "
-    "Request any on-request project documents you need via info_requests before answering."
+    "To request on-request project documents, reply with ONLY {\"info_requests\":[\"slug\", ...]} and no other fields; the documents will be provided and you must then continue with your final structured reply."
 )
 
 STATE_LOCK = threading.RLock()
